@@ -1,117 +1,147 @@
 {% extends 'base.html' %}
-{% block title %}Kelola Akun - Fluenglo{% endblock %}
-
-{% macro akun_fields(prefix, edit=false) %}
-  <div class="field"><label>Nama Lengkap</label><input type="text" name="nama" id="{{ prefix }}-nama" placeholder="Nama pengguna" data-rule="nama" autocomplete="off"></div>
-  <div class="field"><label>Username</label><input type="text" name="username" id="{{ prefix }}-username" placeholder="Username" data-rule="username" autocomplete="off"></div>
-  <div class="field"><label>Password</label><input type="password" name="password" id="{{ prefix }}-password" placeholder="{{ 'Kosongkan jika tidak diubah' if edit else 'Masukkan password' }}" data-rule="password" {{ 'data-optional' if edit }} autocomplete="new-password"></div>
-{% endmacro %}
-
-{% macro pengajar_fields(prefix, edit=false) %}
-  <div class="row2 pengajar-only" {{ 'hidden' if not edit }}>
-    <div class="field"><label>Nomor Whatsapp</label><input type="text" name="whatsapp" id="{{ prefix }}-wa" placeholder="No. whatssapp" data-rule="wa" inputmode="tel"></div>
-    <div class="field photo"><label>Photo Profil</label>
-      <div class="sel-box pbox"><span class="fname" style="color:#999">file png</span><span class="plus">+</span></div>
-      <div class="fileop">Buka file untuk upload foto</div>
-      <input type="file" name="foto" accept="image/*" data-rule="foto" {{ 'data-optional' if edit }} hidden>
-    </div>
-  </div>
-{% endmacro %}
+{% from '_macros.html' import ic, field, pwfield, modal %}
+{% block title %}Kelola Akun · Fluenglo{% endblock %}
 
 {% block content %}
-<div class="card-tbl">
-  <h2>Daftar Akun</h2>
-  <table>
-    <thead><tr><th>Nama</th><th>Username</th><th>Peran</th><th>Password</th><th>Nomor WA</th><th>Foto</th></tr></thead>
-    <tbody>
-    {% for u in users if u['role'] != 'admin' %}
-      {% set p = u['role'] == 'pengajar' %}
-      <tr>
-        <td><button type="button" class="link" data-user='{{ {"id": u["id"], "nama": u["nama"], "username": u["username"], "role": u["role"], "wa": u["no_whatsapp"] or "", "foto": u["foto"] or ""}|tojson }}'>{{ u['nama'] }}</button></td>
-        <td>{{ u['username'] }}</td>
-        <td>{{ 'Pengajar' if p else 'Siswa' }}{% if not p and u['kelas_nama'] %} <span style="color:#d62828">({{ u['kelas_nama'] }})</span>{% endif %}</td>
-        <td>{{ u['password'] }}</td>
-        <td>{{ (u['no_whatsapp'] or '-') if p else '-' }}</td>
-        <td>{{ (u['foto'] or '-') if p else '-' }}</td>
-      </tr>
-    {% else %}
-      <tr><td colspan="6">Belum ada akun. Tekan tombol + untuk menambah.</td></tr>
-    {% endfor %}
-    </tbody>
-  </table>
-</div>
-{% endblock %}
+{% macro tgl(w) %}{{ w[8:10] }}/{{ w[5:7] }}/{{ w[:4] }}, {{ w[11:16] }}{% endmacro %}
+{# data dari app.py: users, kelas_list, riwayat_password (list), terakhir_ubah ({user_id: waktu}) #}
+{% set siswa = users|selectattr('role', 'equalto', 'siswa')|list %}
+{% set pengajar = users|selectattr('role', 'equalto', 'pengajar')|list %}
 
-{% block fab %}
-<button type="button" class="fab" data-open="m-tambah" aria-label="Tambah akun"><img src="{{ url_for('static', filename='images/yellow_plus_icon.png') }}" alt=""></button>
-{% endblock %}
-
-{% block modals %}
-<!-- Buat akun -->
-<div id="m-tambah" class="modal" hidden>
-  <div class="mh">Buat Akun<button type="button" class="x" data-close><img src="{{ url_for('static', filename='images/red_x_icon.png') }}" alt="Tutup"></button></div>
-  <form class="mb" method="post" action="{{ url_for('kelola_akun') }}" enctype="multipart/form-data" data-validate novalidate>
-    {{ akun_fields('add') }}
-    <div class="field"><label>Peran</label>
-      <div class="select" data-ph="Pengajar / Siswa">
-        <input type="hidden" name="role" data-rule="role" data-role-toggle>
-        <div class="sel-box"><span class="sel-text"></span><i class="arrow"></i></div>
-        <div class="sel-opts"><div data-v="pengajar">Pengajar</div><div data-v="siswa">Siswa</div></div>
-      </div>
-    </div>
-    <div class="field siswa-only" hidden><label>Kelas</label>
-      <div class="select" data-ph="Pilih kelas">
-        <input type="hidden" name="kelas_id" data-rule="required" data-msg="{{ 'Pilih kelas' if kelas_list else 'Belum ada kelas, buat kelas terlebih dahulu' }}">
-        <div class="sel-box"><span class="sel-text"></span><i class="arrow"></i></div>
-        <div class="sel-opts">{% for k in kelas_list %}<div data-v="{{ k['id'] }}">{{ k['nama_kelas'] }}</div>{% else %}<div data-v="">Belum ada kelas</div>{% endfor %}</div>
-      </div>
-    </div>
-    {{ pengajar_fields('add') }}
-    <div class="actions"><button class="btn" type="submit">Tambahkan</button></div>
-  </form>
+<div class="toolbar">
+  <div class="seg">
+    <button type="button" class="seg-btn is-active" data-tab="siswa">Siswa ({{ siswa|length }})</button>
+    <button type="button" class="seg-btn" data-tab="pengajar">Pengajar ({{ pengajar|length }})</button>
+  </div>
+  <button type="button" class="btn btn-yellow" data-for="siswa" data-open="modal-tambah-siswa">+ Tambah Siswa</button>
+  <button type="button" class="btn btn-yellow" data-for="pengajar" data-open="modal-tambah-pengajar" hidden>+ Tambah Pengajar</button>
 </div>
 
-<!-- Pilihan edit / hapus -->
-<div id="m-aksi" class="modal sm" hidden>
-  <div class="mh" id="aksi-nama" style="font-size:18px">Akun</div>
-  <div class="center"><div class="actions" style="justify-content:center">
-    <button type="button" class="btn" id="aksi-edit">Edit</button>
-    <button type="button" class="btn no" id="aksi-hapus" style="color:#b3261e">Hapus</button>
+{# ===== tabel siswa ===== #}
+<div class="table-card" data-panel="siswa"><div class="table-scroll">
+<table class="data-table">
+  <thead><tr><th>Nama</th><th>Kelas</th><th>Username</th><th>Email</th><th>No. WhatsApp</th><th>Alamat</th><th>Password Diubah</th><th>Profil Lengkap</th><th>Aksi</th></tr></thead>
+  <tbody>
+  {% for u in siswa %}
+  <tr>
+    <td class="td-strong">{{ u.nama }}</td><td>{{ u.kelas_nama or '-' }}</td><td>{{ u.username }}</td>
+    <td>{{ u.email or '-' }}</td><td>{{ u.no_whatsapp or '-' }}</td><td class="td-clip">{{ u.alamat or '-' }}</td>
+    <td>{{ tgl(terakhir_ubah[u.id]) if u.id in terakhir_ubah else 'Belum pernah' }}</td>
+    <td><a class="link-profil" href="{{ url_for('biodata_akun', user_id=u.id) }}">Buka Profil</a></td>
+    <td><div class="aksi">
+      <button type="button" class="icon-btn icon-edit" title="Edit" data-edit="modal-edit-siswa"
+        data-action="{{ url_for('edit_akun', user_id=u.id) }}"
+        data-fill='{{ {"nama": u.nama, "username": u.username, "kelas_id": u.kelas_id, "whatsapp": u.no_whatsapp, "alamat": u.alamat}|tojson }}'>{{ ic('pencil', 16) }}</button>
+      <button type="button" class="icon-btn icon-del" title="Hapus" data-confirm="{{ url_for('hapus_akun', user_id=u.id) }}"
+        data-text="Yakin ingin menghapus akun {{ u.nama }}? Tindakan ini tidak dapat dibatalkan.">{{ ic('trash', 16) }}</button>
+    </div></td>
+  </tr>
+  {% else %}<tr class="row-empty"><td colspan="9">Belum ada akun siswa. Klik "Tambah Siswa" untuk membuat akun pertama.</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div></div>
+
+{# ===== tabel pengajar ===== #}
+<div class="table-card" data-panel="pengajar" hidden><div class="table-scroll">
+<table class="data-table">
+  <thead><tr><th>Nama</th><th>Username</th><th>Email</th><th>No. WhatsApp</th><th>Alamat</th><th>NIK</th><th>Password Diubah</th><th>Profil Lengkap</th><th>Aksi</th></tr></thead>
+  <tbody>
+  {% for u in pengajar %}
+  <tr>
+    <td class="td-strong">{{ u.nama }}</td><td>{{ u.username }}</td><td>{{ u.email or '-' }}</td>
+    <td>{{ u.no_whatsapp or '-' }}</td><td class="td-clip">{{ u.alamat or '-' }}</td><td>{{ u.nik or '-' }}</td>
+    <td>{{ tgl(terakhir_ubah[u.id]) if u.id in terakhir_ubah else 'Belum pernah' }}</td>
+    <td><a class="link-profil" href="{{ url_for('biodata_akun', user_id=u.id) }}">Buka Profil</a></td>
+    <td><div class="aksi">
+      <button type="button" class="icon-btn icon-edit" title="Edit" data-edit="modal-edit-pengajar"
+        data-action="{{ url_for('edit_akun', user_id=u.id) }}"
+        data-fill='{{ {"nama": u.nama, "username": u.username, "whatsapp": u.no_whatsapp, "alamat": u.alamat, "nik": u.nik}|tojson }}'>{{ ic('pencil', 16) }}</button>
+      <button type="button" class="icon-btn icon-del" title="Hapus" data-confirm="{{ url_for('hapus_akun', user_id=u.id) }}"
+        data-text="Yakin ingin menghapus akun {{ u.nama }}? Tindakan ini tidak dapat dibatalkan.">{{ ic('trash', 16) }}</button>
+    </div></td>
+  </tr>
+  {% else %}<tr class="row-empty"><td colspan="9">Belum ada akun pengajar. Klik "Tambah Pengajar" untuk membuat akun pertama.</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div></div>
+
+{# ===== riwayat password (data dari tabel riwayat_password) ===== #}
+<section class="card riwayat">
+  <h2>Riwayat Perubahan Password</h2>
+  <p class="muted">Tercatat saat siswa atau pengajar mengganti passwordnya sendiri. Isi password tidak ditampilkan.</p>
+  {% if riwayat_password %}
+  <ul class="riwayat-list">{% for r in riwayat_password %}<li><strong>{{ r.nama }}</strong> ({{ r.role }}) mengganti password · {{ tgl(r.waktu) }}</li>{% endfor %}</ul>
+  {% else %}<p class="empty-text">Belum ada perubahan password.</p>{% endif %}
+</section>
+
+{# ===== modal tambah siswa ===== #}
+{% call modal('modal-tambah-siswa', 'Tambah Akun Siswa') %}
+<form method="post" action="{{ url_for('kelola_akun') }}">
+  <input type="hidden" name="role" value="siswa">
+  <div class="modal-body">
+    <div class="form-grid">
+      {{ field('Nama Lengkap', 'nama', 'Masukkan nama lengkap') }}
+      <div class="field"><label>Kelas</label>
+        <select name="kelas_id" required><option value="">Pilih kelas</option>
+          {% for k in kelas_list %}<option value="{{ k.id }}">{{ k.nama_kelas }}</option>{% endfor %}
+        </select></div>
+      {{ field('Username', 'username', 'Minimal 5 karakter') }}
+      {{ field('Nomor WhatsApp', 'whatsapp', 'Contoh: 08123456789') }}
+      {{ pwfield(ph='Min. 8 karakter, huruf + angka') }}
+      {{ field('Alamat', 'alamat', 'Masukkan alamat') }}
+    </div>
+    <p class="form-note">Email bersifat opsional dan diisi siswa sendiri lewat menu Profil.</p>
+  </div>
+  <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Tambahkan</button></div>
+</form>
+{% endcall %}
+
+{# ===== modal edit siswa ===== #}
+{% call modal('modal-edit-siswa', 'Edit Akun Siswa') %}
+<form method="post">
+  <div class="modal-body"><div class="form-grid">
+    {{ field('Nama Lengkap', 'nama', '') }}
+    <div class="field"><label>Kelas</label>
+      <select name="kelas_id" required>{% for k in kelas_list %}<option value="{{ k.id }}">{{ k.nama_kelas }}</option>{% endfor %}</select></div>
+    {{ field('Username', 'username', '') }}
+    {{ field('Nomor WhatsApp', 'whatsapp', '') }}
+    {{ pwfield(req=false, ph='Kosongkan jika tidak diubah') }}
+    {{ field('Alamat', 'alamat', '') }}
   </div></div>
-</div>
+  <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Simpan</button></div>
+</form>
+{% endcall %}
 
-<!-- Edit akun siswa / pengajar -->
-<div id="m-edit" class="modal" hidden>
-  <div class="mh"><span id="edit-title">Edit Akun Siswa</span><button type="button" class="x" data-close><img src="{{ url_for('static', filename='images/red_x_icon.png') }}" alt="Tutup"></button></div>
-  <form class="mb" id="form-edit" method="post" action="#" enctype="multipart/form-data" data-validate novalidate>
-    {{ akun_fields('edit', true) }}
-    {{ pengajar_fields('edit', true) }}
-    <div class="actions"><button class="btn" type="submit">Simpan</button></div>
-  </form>
-</div>
-{% endblock %}
+{# ===== modal tambah pengajar ===== #}
+{% call modal('modal-tambah-pengajar', 'Tambah Akun Pengajar') %}
+<form method="post" action="{{ url_for('kelola_akun') }}" enctype="multipart/form-data">
+  <input type="hidden" name="role" value="pengajar">
+  <div class="modal-body"><div class="form-grid">
+    {{ field('Nama Lengkap', 'nama', 'Masukkan nama lengkap') }}
+    {{ field('NIK', 'nik', '16 digit angka') }}
+    {{ field('Username', 'username', 'Minimal 5 karakter') }}
+    {{ field('Nomor WhatsApp', 'whatsapp', 'Contoh: 08123456789') }}
+    {{ pwfield(ph='Min. 8 karakter, huruf + angka') }}
+    {{ field('Alamat', 'alamat', 'Masukkan alamat') }}
+    <div class="field"><label>Photo Profil <span class="label-note">(opsional)</span></label><input type="file" name="foto" accept="image/*"></div>
+  </div></div>
+  <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Tambahkan</button></div>
+</form>
+{% endcall %}
 
-{% block scripts %}
-<script>
-let cur = null;
-document.querySelectorAll('[data-user]').forEach(b => b.addEventListener('click', e => {
-  e.stopPropagation(); cur = JSON.parse(b.dataset.user);
-  document.getElementById('aksi-nama').textContent = cur.nama;
-  openModal('m-aksi');
-}));
-document.getElementById('aksi-hapus').onclick = () => confirmDel('Yakin ingin menghapus akun ' + cur.nama + '?', '/admin/users/delete/' + cur.id);
-document.getElementById('aksi-edit').onclick = () => {
-  const f = document.getElementById('form-edit'), p = cur.role === 'pengajar';
-  f.action = '/admin/users/edit/' + cur.id;
-  document.getElementById('edit-title').textContent = p ? 'Edit Akun Pengajar' : 'Edit Akun Siswa';
-  f.querySelector('[name=nama]').value = cur.nama;
-  f.querySelector('[name=username]').value = cur.username;
-  f.querySelector('[name=password]').value = '';
-  f.querySelector('[name=whatsapp]').value = cur.wa;
-  f.querySelector('.fname').textContent = cur.foto && p ? cur.foto : 'file png';
-  f.querySelectorAll('.pengajar-only').forEach(x => x.hidden = !p);
-  f.querySelectorAll('.bad').forEach(x => { x.classList.remove('bad'); x.querySelector('.err')?.remove(); });
-  openModal('m-edit');
-};
-</script>
+{# ===== modal edit pengajar ===== #}
+{% call modal('modal-edit-pengajar', 'Edit Akun Pengajar') %}
+<form method="post" enctype="multipart/form-data">
+  <div class="modal-body"><div class="form-grid">
+    {{ field('Nama Lengkap', 'nama', '') }}
+    {{ field('NIK', 'nik', '') }}
+    {{ field('Username', 'username', '') }}
+    {{ field('Nomor WhatsApp', 'whatsapp', '') }}
+    {{ pwfield(req=false, ph='Kosongkan jika tidak diubah') }}
+    {{ field('Alamat', 'alamat', '') }}
+    <div class="field"><label>Photo Profil <span class="label-note">(kosong = tetap)</span></label><input type="file" name="foto" accept="image/*"></div>
+  </div></div>
+  <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Simpan</button></div>
+</form>
+{% endcall %}
 {% endblock %}

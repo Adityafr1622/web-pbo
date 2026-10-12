@@ -1,12 +1,14 @@
 # PEMBAGIAN TUGAS DI models/presensi.py
-# Presensi -> ANGGOTA 4
+# Presensi                      -> ANGGOTA 4 (Backend Presensi)
 # CatatanPengajar (Catatan Akhir) -> ANGGOTA 3 (Monitoring)
 
-# 4 PILAR OOP di bagian Presensi (cari komentar ENCAPSULATION / ABSTRACTION / INHERITANCE / POLYMORPHISM):
-#  - ENCAPSULATION : class Presensi membungkus data + aturan validasi + perilakunya
-#  - ABSTRACTION   : pemanggil (route / Pengajar) cukup panggil method, tanpa tahu SQL-nya
-#  - INHERITANCE   : lewat Pengajar(User) di models/user.py yang memakai class ini
-#  - POLYMORPHISM  : lewat Pengajar.catat_presensi() di models/user.py (menerima objek atau id)
+# 4 PILAR OOP di file ini (cari komentar ENCAPSULATION / ABSTRACTION / INHERITANCE / POLYMORPHISM):
+#  - ENCAPSULATION : Presensi & CatatanPengajar bungkus data + aturan validasi + perilakunya sendiri
+#  - ABSTRACTION   : pemanggil (route / Pengajar) cukup panggil method, tanpa tau SQL-nya
+#  - INHERITANCE   : class di file ini nggak mewarisi apa-apa. Fitur presensi & catatan akhir
+#                    dipakai lewat Pengajar yang turunan User (models/user.py)
+#  - POLYMORPHISM  : Pengajar.catat_presensi() nerima objek Kelas/Siswa atau id-nya,
+#                    jadi satu method bisa nangani bentuk input yang beda
 
 from datetime import datetime
 import database
@@ -24,12 +26,12 @@ def _ke_int(nilai, nama):
 
 
 class Presensi:
-    # ENCAPSULATION: Data kehadiran (id, tanggal, siswa_id, kelas_id, status) dan
-    # perilakunya (simpan, update_status, rekap) dibungkus dalam SATU class.
-    # Aturan status (STATUS_VALID/_ALIAS) disimpan di dalam class, bukan tersebar di route.
+    # ENCAPSULATION: data kehadiran (id, tanggal, siswa_id, kelas_id, status) dan
+    # perilakunya (simpan, update_status, rekap) ada dalam SATU class.
+    # Aturan status (STATUS_VALID/_ALIAS) disimpan di sini, bukan nyebar di route.
     STATUS_DEFAULT = "Belum Hadir"
     STATUS_VALID = ["Hadir", "Izin", "Sakit", "Alfa"]
-    # ENCAPSULATION: Awalan underscore (_ALIAS) = detail internal, tidak untuk dipakai dari luar.
+    # ENCAPSULATION: awalan underscore (_ALIAS) = detail internal, jangan dipakai dari luar.
     # nilai dari form (huruf kecil) -> nilai yang disimpan di database
     _ALIAS = {"hadir": "Hadir", "izin": "Izin", "sakit": "Sakit",
               "alfa": "Alfa", "alpha": "Alfa", "alpa": "Alfa"}
@@ -42,8 +44,8 @@ class Presensi:
         self.status = status
 
     # ---------- pembuatan objek ----------
-    # ABSTRACTION: dari_row / muat / ambil_kelas menyembunyikan proses baca database.
-    # Pemanggil cukup menerima objek Presensi, tidak perlu tahu tabel & kolomnya.
+    # ABSTRACTION: dari_row / muat / ambil_kelas / riwayat_siswa nyembunyiin proses baca database.
+    # Pemanggil cukup terima objek Presensi, nggak perlu tau tabel & kolomnya.
     @classmethod
     def dari_row(cls, row):
         return cls(row["id"], row["tanggal"], row["siswa_id"], row["kelas_id"], row["status"])
@@ -68,9 +70,14 @@ class Presensi:
                 hasil.append(cls(None, tanggal, s["id"], kelas_id))
         return hasil
 
+    @classmethod
+    def riwayat_siswa(cls, siswa_id):
+        """Semua presensi seorang siswa, tanggal terbaru di atas."""
+        return [cls.dari_row(r) for r in database.ambil_presensi_siswa(_ke_int(siswa_id, "Siswa"))]
+
     # ---------- validasi ----------
-    # ENCAPSULATION: Semua aturan validasi presensi dikunci di dalam class ini,
-    # sehingga data yang masuk database pasti sudah lolos pemeriksaan yang sama.
+    # ENCAPSULATION: semua aturan validasi presensi dikunci di class ini,
+    # jadi data yang masuk database pasti lolos pemeriksaan yang sama.
     @staticmethod
     def normalisasi_status(status):
         kunci = (status or "").strip().lower()
@@ -110,14 +117,14 @@ class Presensi:
         return kelas_id, tanggal
 
     # ---------- aksi ----------
-    # ABSTRACTION: simpan_massal() = satu pintu sederhana untuk menyimpan presensi.
-    # Di dalamnya ada validasi, upsert (tidak duplikat), dan transaksi database,
-    # tetapi pemanggil (Pengajar / route Flask) tidak perlu mengetahuinya.
+    # ABSTRACTION: simpan_massal() = satu pintu simpel buat nyimpan presensi.
+    # Di dalamnya ada validasi, upsert (nggak duplikat), dan transaksi database,
+    # tapi pemanggil (Pengajar / route Flask) nggak perlu tau.
     @staticmethod
     def simpan_massal(kelas_id, tanggal, data_status):
         """Simpan presensi banyak siswa sekaligus.
         data_status: {siswa_id: 'hadir' / 'Izin' / ...}. Semua divalidasi dulu,
-        kalau ada satu yang salah tidak ada yang tersimpan. Return jumlah siswa."""
+        kalau ada satu yang salah nggak ada yang tersimpan. Return jumlah siswa."""
         if not data_status:
             raise ValueError("Belum ada status kehadiran yang dipilih.")
         bersih = {}
@@ -135,8 +142,8 @@ class Presensi:
         return self.id
 
     def update_status(self, status):
-        # ENCAPSULATION: Status hanya diubah lewat method ini, sehingga selalu
-        # divalidasi dulu (Hadir/Izin/Sakit/Alfa) sebelum masuk ke objek & database.
+        # ENCAPSULATION: status cuma diubah lewat method ini, jadi selalu divalidasi dulu
+        # (Hadir/Izin/Sakit/Alfa) sebelum masuk ke objek & database.
         self.status = Presensi.normalisasi_status(status)
         if self.id:
             database.update_status_presensi(self.id, self.status)
@@ -146,21 +153,37 @@ class Presensi:
 
     @staticmethod
     def tandai_semua_hadir(daftar_presensi):
-        """Ubah semua Presensi di daftar jadi 'Hadir'. Return jumlah yang diubah."""
+        """Tandai semua Presensi di daftar jadi 'Hadir' (tombol 'hadir semua' buat pengajar).
+        Disimpan per kelas+tanggal dalam satu transaksi. Return jumlah yang diubah."""
+        kelompok = {}
         for p in daftar_presensi:
-            p.update_status("Hadir")
+            kelompok.setdefault((p.kelas_id, p.tanggal), []).append(p)
+
+        for (kelas_id, tanggal), daftar in kelompok.items():
+            Presensi.simpan_massal(kelas_id, tanggal, {p.siswa_id: "Hadir" for p in daftar})
+            id_tersimpan = {r["siswa_id"]: r["id"]
+                            for r in database.ambil_presensi_kelas_tanggal(kelas_id, tanggal)}
+            for p in daftar:  # sinkronkan objek dengan yang sudah masuk database
+                p.status = "Hadir"
+                p.id = id_tersimpan.get(p.siswa_id, p.id)
         return len(daftar_presensi)
 
     # ---------- rekap ----------
-    # ABSTRACTION: rekap_siswa()/rekap_kelas() mengembalikan hasil siap pakai
-    # (jumlah per status, persen hadir) tanpa membuka detail query GROUP BY ke pemanggil.
+    # ABSTRACTION: rekap_siswa()/rekap_kelas() ngembaliin hasil siap pakai
+    # (jumlah per status, persen hadir) tanpa buka detail query GROUP BY ke pemanggil.
+    @staticmethod
+    def _status_baku(status):
+        """Status dari database -> salah satu STATUS_VALID (data lama 'alpha' ikut jadi 'Alfa'), atau None."""
+        return Presensi._ALIAS.get((status or "").strip().lower())
+
     @staticmethod
     def rekap_siswa(siswa_id):
         """{'Hadir': n, 'Izin': n, 'Sakit': n, 'Alfa': n, 'total': n, 'persen_hadir': x}"""
         hasil = {st: 0 for st in Presensi.STATUS_VALID}
         for r in database.rekap_presensi_siswa(siswa_id):
-            if r["status"] in hasil:
-                hasil[r["status"]] = r["jumlah"]
+            baku = Presensi._status_baku(r["status"])
+            if baku:
+                hasil[baku] += r["jumlah"]
         total = sum(hasil.values())
         hasil["total"] = total
         hasil["persen_hadir"] = round(hasil["Hadir"] * 100 / total, 1) if total else 0
@@ -174,13 +197,16 @@ class Presensi:
             data[s["id"]] = {"siswa_id": s["id"], "nama": s["nama"],
                              **{st: 0 for st in Presensi.STATUS_VALID}}
         for r in database.rekap_presensi_kelas(kelas_id):
-            if r["siswa_id"] in data and r["status"] in Presensi.STATUS_VALID:
-                data[r["siswa_id"]][r["status"]] = r["jumlah"]
+            baku = Presensi._status_baku(r["status"])
+            if r["siswa_id"] in data and baku:
+                data[r["siswa_id"]][baku] += r["jumlah"]
         return list(data.values())
 
 
 class CatatanPengajar:
-    # Catatan akhir: 1 catatan per siswa per kelas, ditulis setelah seluruh pertemuan selesai
+    # Catatan akhir: 1 catatan per siswa per kelas, ditulis pengajar setelah seluruh pertemuan
+    # selesai, tampil di Monitoring Anak.
+    # ENCAPSULATION: isi catatan + aturan simpan/ubah dibungkus di class ini.
     def __init__(self, id, siswa_id, pengajar_id, kelas_id, isi_catatan, tanggal=None):
         self.id = id
         self.siswa_id = siswa_id
@@ -189,14 +215,67 @@ class CatatanPengajar:
         self.isi_catatan = isi_catatan
         self.tanggal = tanggal
 
+    # ABSTRACTION: semua akses data lewat fungsi di database.py, class ini nggak nulis SQL sendiri
+    # (aturan "guru 1 & guru 2 kelas tsb boleh nulis" dan "siswa harus anggota kelas" sudah dicek di sana).
+    @classmethod
+    def dari_row(cls, row):
+        return cls(row["id"], row["siswa_id"], row["pengajar_id"], row["kelas_id"],
+                   row["catatan"], row["tanggal_dibuat"])
+
+    @classmethod
+    def ambil_siswa(cls, siswa_id):
+        """Semua catatan akhir seorang siswa (terbaru di atas), buat Monitoring Anak."""
+        return [cls.dari_row(r) for r in database.ambil_catatan_akhir_by_siswa(_ke_int(siswa_id, "Siswa"))]
+
+    @classmethod
+    def ambil(cls, siswa_id, kelas_id):
+        """Catatan akhir siswa di satu kelas, None kalau belum ada."""
+        kelas_id = _ke_int(kelas_id, "Kelas")
+        for c in cls.ambil_siswa(siswa_id):
+            if c.kelas_id == kelas_id:
+                return c
+        return None
+
+    def _baris_database(self):
+        """Baris catatan ini (lengkap dengan nama pengajar & nama kelas), None kalau belum tersimpan."""
+        if self.id is None:
+            return None
+        for r in database.ambil_catatan_akhir_by_siswa(self.siswa_id):
+            if r["id"] == self.id and r["kelas_id"] == self.kelas_id:
+                return r
+        return None
+
     def simpan_catatan(self):
-        # TODO (Anggota 3): simpan catatan akhir baru ke database
-        pass
+        """Simpan catatan akhir. Kalau siswa ini sudah punya catatan di kelas tsb,
+        isinya diperbarui (satu siswa satu catatan per kelas), bukan dobel."""
+        isi = (self.isi_catatan or "").strip()
+        if not isi:
+            raise ValueError("Catatan tidak boleh kosong.")
+
+        self.id = database.tambah_catatan_akhir(self.siswa_id, self.kelas_id, self.pengajar_id, isi)
+        self.isi_catatan = isi
+        baris = self._baris_database()
+        self.tanggal = baris["tanggal_dibuat"] if baris else self.tanggal
+        return self.id
 
     def ubah_catatan(self, isi_baru):
-        # TODO (Anggota 3): edit catatan akhir yang sudah ada
-        pass
+        """Ubah catatan akhir yang sudah tersimpan. Return False kalau catatannya sudah nggak ada."""
+        isi_baru = (isi_baru or "").strip()
+        if not isi_baru:
+            raise ValueError("Catatan baru tidak boleh kosong.")
+        if self.id is None:
+            raise ValueError("Catatan belum memiliki ID.")
+        if self._baris_database() is None:
+            return False
+
+        database.tambah_catatan_akhir(self.siswa_id, self.kelas_id, self.pengajar_id, isi_baru)
+        self.isi_catatan = isi_baru
+        baris = self._baris_database()
+        self.tanggal = baris["tanggal_dibuat"] if baris else self.tanggal
+        return True
 
     def get_detail_catatan(self):
-        # TODO (Anggota 3): ambil detail catatan untuk ditampilkan di Monitoring Anak
-        pass
+        """Detail catatan buat Monitoring Anak (dict: id, siswa_id, kelas_id, pengajar_id,
+        catatan, tanggal_dibuat, nama_pengajar, nama_kelas), None kalau belum tersimpan."""
+        baris = self._baris_database()
+        return dict(baris) if baris else None

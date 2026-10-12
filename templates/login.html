@@ -1,27 +1,52 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Masuk - Fluenglo</title>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body style="background:#fff;font-family:Arial,Helvetica,sans-serif">
+{% extends 'base.html' %}
+{% from '_macros.html' import ic %}
+{% block title %}Masuk · Fluenglo{% endblock %}
+{% block body_class %}login-page{% endblock %}
+
+{% block shell %}
 <div class="login">
-  <div class="l"><img src="{{ url_for('static', filename='images/logo.png') }}" alt="Fluenglo"></div>
-  <form class="r" method="post" action="{{ url_for('login') }}">
-    <h1>Masuk</h1>
-    {% with msgs = get_flashed_messages(with_categories=true) %}
-      {% for cat, msg in msgs %}<div class="flash {{ cat }}">{{ msg }}</div>{% endfor %}
-    {% endwith %}
-    <label for="username">Username</label>
-    <input id="username" name="username" type="text" placeholder="Masukkan username" required autofocus>
-    <label for="password">Password</label>
-    <input id="password" name="password" type="password" placeholder="Masukkan password" required>
-    <button type="submit">Login</button>
-  </form>
+  <aside class="login-hero" style="--hero-img: url('{{ url_for('static', filename='images/bg-login.png') }}')">
+    <img class="login-logo" src="{{ url_for('static', filename='images/logo-fluenglo.png') }}" alt="Fluenglo">
+  </aside>
+
+  <main class="login-main">
+    <div class="login-tabs">
+      <button type="button" class="pill is-active" data-pane="login">Halaman Login</button>
+      <button type="button" class="pill" data-pane="about">Tentang Kami</button>
+    </div>
+
+    <section class="login-panel" data-pane-id="login">
+      <h1>Selamat Datang!</h1>
+      <p class="sub">Silahkan masuk untuk melanjutkan pembelajaran</p>
+      <form class="login-card" method="post" action="{{ url_for('login') }}">
+        <label class="field-label" for="username">Nama Pengguna</label>
+        <div class="input-icon">{{ ic('user') }}
+          <input id="username" name="username" placeholder="Masukan nama pengguna" autocomplete="username" required autofocus>
+        </div>
+        <label class="field-label" for="password">Kata Sandi</label>
+        <div class="input-icon">{{ ic('lock') }}
+          <input id="password" type="password" name="password" placeholder="Masukan kata sandi" autocomplete="current-password" required>
+          <button type="button" class="pw-toggle" aria-label="Tampilkan/sembunyikan kata sandi">{{ ic('eye-off') }}{{ ic('eye') }}</button>
+        </div>
+        <div class="lupa-row"><button type="button" class="link-btn" data-lupa>Lupa Kata Sandi?</button></div>
+        <div class="hint-box" id="lupa-hint" hidden>Hubungi admin Fluenglo lewat WhatsApp atau email di tab Tentang Kami untuk mengatur ulang kata sandi.</div>
+        <div class="login-actions"><button class="btn btn-login">Masuk</button></div>
+      </form>
+    </section>
+
+    <section class="login-panel" data-pane-id="about" hidden>
+      <h1>Tentang Fluenglo</h1>
+      <div class="card about-card">
+        <p class="about-text">Fluenglo adalah kursus Bahasa Inggris yang dirancang khusus untuk siswa SMA. Kami membantu siswa belajar grammar, vocabulary, reading, writing, hingga listening secara terstruktur, dengan jadwal, materi, dan tugas yang bisa dipantau langsung oleh siswa, pengajar, maupun orang tua. Tujuan kami sederhana: membuat belajar Bahasa Inggris terasa lebih mudah, teratur, dan menyenangkan.</p>
+        <h2 class="about-sub">Hubungi Kami</h2>
+        <div class="contact-row">
+          {# TODO: ganti nomor, email, dan akun Instagram yang asli #}
+          <a class="contact contact-wa" href="https://wa.me/6281234567890" target="_blank" rel="noopener"><span class="contact-ic">{{ ic('whatsapp', 26) }}</span>WhatsApp</a>
+          <a class="contact" href="mailto:halo@fluenglo.id"><span class="contact-ic">{{ ic('mail', 26) }}</span>Email</a>
+          <a class="contact" href="https://instagram.com/fluenglo" target="_blank" rel="noopener"><span class="contact-ic">{{ ic('instagram', 26) }}</span>Instagram</a>
+        </div>
+      </div>
+    </section>
+  </main>
 </div>
-<script src="{{ url_for('static', filename='js/password_toggle.js') }}"></script>
-</body>
-</html>
+{% endblock %}
