@@ -5,6 +5,7 @@ from werkzeug.utils import secure_filename
 import database
 from models.akademik import Jadwal, HARI_VALID
 from models.user import buat_objek_user, Admin
+from models.presensi import Presensi
 
 app = Flask(__name__)
 app.secret_key = 'fluenglo_secret_key_pbo'
@@ -311,7 +312,8 @@ def detail_kelas(kelas_id):
     siswa_list = database.ambil_siswa_by_kelas(kelas_id)
 
     return render_template('detail_kelas.html', kelas=kelas_row, pengajar_list=pengajar_list,
-                           siswa_list=siswa_list)
+                           siswa_list=siswa_list,
+                           presensi_list=siapkan_presensi_list(kelas_id))
 
 
 # --- ROUTE KELOLA JADWAL ---
@@ -520,8 +522,45 @@ def tambah_komentar_tugas(tugas_id):
 # --- ROUTE MATERI, TUGAS, PENILAIAN, MONITORING, PRESENSI ---
 # TODO (Anggota 2): route Materi (upload/download/hapus) dan Tugas (buat, kumpul, komentar)
 # TODO (Anggota 3): route penilaian tugas, Monitoring (rekap nilai, rekap presensi, catatan akhir)
-# TODO (Anggota 4): route Presensi (hadir, sakit, izin, alfa)
+
+# --- ROUTE PRESENSI (Anggota 4) ---
+def siapkan_presensi_list(kelas_id):
+    """Daftar pertemuan kelas (dari jadwal + presensi yang sudah ada), terbaru di atas.
+    Tiap item: tanggal (YYYY-MM-DD), label ('Senin, 5 Oktober 2026'),
+    status = {siswa_id: 'hadir'|'izin'|'sakit'|'alfa'} untuk mengisi radio button."""
+    semua_tanggal = set(database.ambil_tanggal_jadwal_kelas(kelas_id)) | \
+                    set(database.ambil_tanggal_presensi_kelas(kelas_id))
+    hasil = []
+    for tgl in sorted(semua_tanggal, reverse=True):
+        try:
+            label = Presensi.format_label(tgl)
+        except ValueError:
+            continue
+        status = {p.siswa_id: p.status.lower() for p in Presensi.ambil_kelas(kelas_id, tgl)
+                  if p.status in Presensi.STATUS_VALID}
+        hasil.append({'tanggal': tgl, 'label': label, 'status': status})
+    return hasil
+
+
+@app.route('/kelas/<int:kelas_id>/presensi', methods=['POST'])
+def simpan_presensi(kelas_id):
+    user = get_current_user()
+    if not user or user.role != 'pengajar':
+        return redirect(url_for('login'))
+
+    data_status = {}
+    for s in database.ambil_siswa_by_kelas(kelas_id):
+        st = request.form.get(f"st_{s['id']}")
+        if st:
+            data_status[s['id']] = st
+
+    try:
+        jumlah = user.catat_presensi_kelas(kelas_id, request.form.get('tanggal', ''), data_status)
+        flash(f'Presensi {jumlah} siswa berhasil disimpan!', 'success')
+    except ValueError as e:
+        flash(str(e), 'danger')
+    return redirect(url_for('detail_kelas', kelas_id=kelas_id) + '#p-presensi')
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True)
