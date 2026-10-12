@@ -370,4 +370,91 @@ def ambil_komentar_tugas(tugas_id):
 # TODO (Anggota 3): query penilaian tugas, rekap nilai, dan catatan akhir pengajar
 
 # --- PRESENSI FUNCTIONS ---
-# TODO (Anggota 4): query presensi (catat, update status, rekap per siswa/kelas)
+def ambil_presensi_by_id(presensi_id):
+    conn = get_connection()
+    row = conn.execute('SELECT * FROM presensi WHERE id = ?', (presensi_id,)).fetchone()
+    conn.close()
+    return row
+
+def ambil_presensi_kelas_tanggal(kelas_id, tanggal):
+    conn = get_connection()
+    rows = conn.execute('SELECT * FROM presensi WHERE kelas_id = ? AND tanggal = ?',
+                        (kelas_id, tanggal)).fetchall()
+    conn.close()
+    return rows
+
+def ambil_presensi_siswa(siswa_id):
+    conn = get_connection()
+    rows = conn.execute('SELECT * FROM presensi WHERE siswa_id = ? ORDER BY tanggal DESC',
+                        (siswa_id,)).fetchall()
+    conn.close()
+    return rows
+
+def ambil_tanggal_jadwal_kelas(kelas_id):
+    """Daftar tanggal (string YYYY-MM-DD) pertemuan kelas menurut tabel jadwal."""
+    conn = get_connection()
+    rows = conn.execute('''
+        SELECT DISTINCT tanggal FROM jadwal
+        WHERE kelas_id = ? AND tanggal IS NOT NULL AND tanggal != ''
+    ''', (kelas_id,)).fetchall()
+    conn.close()
+    return [r['tanggal'] for r in rows]
+
+def ambil_tanggal_presensi_kelas(kelas_id):
+    conn = get_connection()
+    rows = conn.execute('SELECT DISTINCT tanggal FROM presensi WHERE kelas_id = ?', (kelas_id,)).fetchall()
+    conn.close()
+    return [r['tanggal'] for r in rows]
+
+def _simpan_presensi(conn, tanggal, siswa_id, kelas_id, status):
+    """Upsert: satu siswa hanya punya satu presensi per kelas per tanggal."""
+    row = conn.execute('SELECT id FROM presensi WHERE tanggal = ? AND siswa_id = ? AND kelas_id = ?',
+                       (tanggal, siswa_id, kelas_id)).fetchone()
+    if row:
+        conn.execute('UPDATE presensi SET status = ? WHERE id = ?', (status, row['id']))
+        return row['id']
+    cur = conn.execute('INSERT INTO presensi (tanggal, siswa_id, kelas_id, status) VALUES (?, ?, ?, ?)',
+                       (tanggal, siswa_id, kelas_id, status))
+    return cur.lastrowid
+
+def simpan_presensi(tanggal, siswa_id, kelas_id, status):
+    conn = get_connection()
+    presensi_id = _simpan_presensi(conn, tanggal, siswa_id, kelas_id, status)
+    conn.commit()
+    conn.close()
+    return presensi_id
+
+def simpan_presensi_massal(kelas_id, tanggal, data_status):
+    """data_status: {siswa_id: status}. Semua disimpan dalam satu transaksi."""
+    conn = get_connection()
+    try:
+        for siswa_id, status in data_status.items():
+            _simpan_presensi(conn, tanggal, siswa_id, kelas_id, status)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+def update_status_presensi(presensi_id, status):
+    conn = get_connection()
+    conn.execute('UPDATE presensi SET status = ? WHERE id = ?', (status, presensi_id))
+    conn.commit()
+    conn.close()
+
+def rekap_presensi_siswa(siswa_id):
+    conn = get_connection()
+    rows = conn.execute('SELECT status, COUNT(*) AS jumlah FROM presensi WHERE siswa_id = ? GROUP BY status',
+                        (siswa_id,)).fetchall()
+    conn.close()
+    return rows
+
+def rekap_presensi_kelas(kelas_id):
+    conn = get_connection()
+    rows = conn.execute('''
+        SELECT siswa_id, status, COUNT(*) AS jumlah FROM presensi
+        WHERE kelas_id = ? GROUP BY siswa_id, status
+    ''', (kelas_id,)).fetchall()
+    conn.close()
+    return rows

@@ -3,6 +3,7 @@
 
 from abc import ABC, abstractmethod
 import re
+from datetime import date
 import database
 
 
@@ -184,9 +185,36 @@ class Pengajar(User):
         # TODO (Anggota 2): komentar di tugas (dipakai juga buat masukan per pertemuan)
         pass
 
-    def catat_presensi(self, kelas, siswa, status):
-        # TODO (Anggota 4): catat presensi siswa
-        pass
+    def mengajar_kelas(self, kelas_id):
+        # ENCAPSULATION: Aturan hak akses "siapa boleh mencatat presensi" dibungkus
+        # di dalam objek Pengajar sendiri, bukan ditulis ulang di setiap route.
+        """True jika pengajar ini adalah guru 1 atau guru 2 di kelas tsb."""
+        row = database.ambil_kelas_by_id(kelas_id)
+        return row is not None and self.id in (row["pengajar_id"], row["pengajar_id2"])
+
+    def catat_presensi(self, kelas, siswa, status, tanggal=None):
+        """Catat presensi satu siswa. kelas/siswa boleh objek atau id.
+        tanggal format YYYY-MM-DD, default hari ini (harus ada di jadwal kelas)."""
+        # POLYMORPHISM: Parameter kelas/siswa boleh berupa objek (Kelas, Siswa) ATAU
+        # angka id: method yang sama menangani keduanya (duck typing lewat getattr).
+        kelas_id = getattr(kelas, "id", kelas)
+        siswa_id = getattr(siswa, "id", siswa)
+        tanggal = tanggal or date.today().isoformat()
+        return self.catat_presensi_kelas(kelas_id, tanggal, {siswa_id: status})
+
+    def catat_presensi_kelas(self, kelas, tanggal, data_status):
+        """Catat presensi banyak siswa sekaligus. data_status: {siswa_id: status}."""
+        # ABSTRACTION: Pengajar cukup memanggil Presensi.simpan_massal(); detail SQL
+        # dan transaksi disembunyikan di models/presensi.py dan database.py.
+        from models.presensi import Presensi
+        kelas_id = getattr(kelas, "id", kelas)
+        try:
+            kelas_id = int(kelas_id)
+        except (TypeError, ValueError):
+            raise ValueError("Kelas tidak valid.")
+        if not self.mengajar_kelas(kelas_id):
+            raise ValueError("Kamu bukan pengajar di kelas ini.")
+        return Presensi.simpan_massal(kelas_id, tanggal, data_status)
 
     def beri_catatan_akhir(self, kelas, siswa, isi):
         # TODO (Anggota 3): tulis atau edit catatan akhir per siswa
@@ -387,4 +415,4 @@ def buat_objek_user(row):
                         foto, no_wa, biodata, alamat, email, nik)
     elif role == "admin":
         return Admin(row["id"], row["nama"], row["username"], row["password"])
-    raise ValueError(f"Role tidak dikenal: {role}")
+    raise ValueError(f"Role tidak dikenal: {role}")
