@@ -227,10 +227,18 @@ class Pengumpulan:
         self.waktu_kumpul = waktu_kumpul
 
     def submit_jawaban(self, file_jawaban):
-        pass
+        file_jawaban = (file_jawaban or "").strip()
+        if not file_jawaban:
+            raise ValueError("File jawaban tidak boleh kosong.")
+        self.file_jawaban = file_jawaban
+        database.simpan_pengumpulan(self.tugas_id, self.siswa_id, self.file_jawaban)
 
     def beri_nilai(self, nilai):
-        pass
+        nilai_int = _ke_int(nilai, "Nilai")
+        if not (0 <= nilai_int <= 100):
+            raise ValueError("Nilai harus berada di antara 0 sampai 100.")
+        self.nilai = nilai_int
+        database.update_nilai_pengumpulan(self.id, self.nilai)
 
 
 class Komentar:
@@ -242,8 +250,12 @@ class Komentar:
         self.waktu = waktu
 
     def tambah_komentar(self):
-        pass
+        isi = (self.isi_komentar or "").strip()
+        if not isi:
+            raise ValueError("Isi komentar tidak boleh kosong.")
+        database.tambah_komentar(self.tugas_id, self.user_id, isi)
 
     @staticmethod
     def get_list_komentar(tugas_id):
-        pass
+        tugas_id = _ke_int(tugas_id, "Tugas")
+        return database.ambil_komentar_tugas(tugas_id)

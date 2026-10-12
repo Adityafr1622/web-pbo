@@ -390,6 +390,132 @@ def kelola_jadwal():
 
     return render_template('kelola_jadwal.html', jadwal_list=jadwal_list, kelas_list=kelas_list, pengajar_list=pengajar_list)
 
+# --- ROUTE MATERI (UPLOAD, DOWNLOAD, HAPUS) ---
+
+@app.route('/kelas/<int:kelas_id>/materi', methods=['GET', 'POST'])
+def kelola_materi(kelas_id):
+    user = get_current_user()
+    if not user:
+        return redirect(url_for('login'))
+    
+    kelas = database.ambil_kelas_by_id(kelas_id)
+    if not kelas:
+        flash('Kelas tidak ditemukan.', 'danger')
+        return redirect(url_for('dashboard'))
+
+    if request.method == 'POST':
+        if user.role != 'pengajar':
+            flash('Hanya pengajar yang dapat mengunggah materi.', 'danger')
+            return redirect(url_for('kelola_materi', kelas_id=kelas_id))
+        
+        judul = request.form.get('judul')
+        kategori = request.form.get('kategori', 'Umum')
+        file = request.files.get('file_materi')
+        
+        if not judul or not file or not file.filename:
+            flash('Judul dan file materi wajib diisi!', 'danger')
+            return redirect(url_for('kelola_materi', kelas_id=kelas_id))
+        
+        filename = secure_filename(file.filename)
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        
+        database.tambah_materi(kelas_id, user.id, judul, kategori, filename)
+        flash('Materi berhasil diunggah!', 'success')
+        return redirect(url_for('kelola_materi', kelas_id=kelas_id))
+
+    materi_list = database.ambil_materi_by_kelas(kelas_id)
+    return render_template('materi.html', kelas=kelas, materi_list=materi_list, user=user)
+
+@app.route('/materi/hapus/<int:materi_id>')
+def hapus_materi(materi_id):
+    user = get_current_user()
+    if not user or user.role != 'pengajar':
+        return redirect(url_for('login'))
+    
+    materi = database.ambil_materi_by_id(materi_id)
+    if materi:
+        database.hapus_materi(materi_id)
+        flash('Materi berhasil dihapus!', 'success')
+        return redirect(url_for('kelola_materi', kelas_id=materi['kelas_id']))
+    flash('Materi tidak ditemukan.', 'danger')
+    return redirect(url_for('dashboard'))
+
+
+# --- ROUTE TUGAS (BUAT, KUMPUL, KOMENTAR) ---
+
+@app.route('/kelas/<int:kelas_id>/tugas')
+def daftar_tugas(kelas_id):
+    user = get_current_user()
+    if not user:
+        return redirect(url_for('login'))
+    
+    kelas = database.ambil_kelas_by_id(kelas_id)
+    tugas_list = database.ambil_tugas_by_kelas(kelas_id)
+    return render_template('tugas.html', kelas=kelas, tugas_list=tugas_list, user=user)
+
+@app.route('/tugas/tambah/<int:kelas_id>', methods=['POST'])
+def buat_tugas(kelas_id):
+    user = get_current_user()
+    if not user or user.role != 'pengajar':
+        return redirect(url_for('login'))
+    
+    judul = request.form.get('judul')
+    deskripsi = request.form.get('deskripsi')
+    deadline = request.form.get('deadline')
+    
+    if not judul or not deadline:
+        flash('Judul dan deadline tugas wajib diisi!', 'danger')
+        return redirect(url_for('daftar_tugas', kelas_id=kelas_id))
+    
+    database.tambah_tugas(kelas_id, user.id, judul, deskripsi, deadline)
+    flash('Tugas berhasil dibuat!', 'success')
+    return redirect(url_for('daftar_tugas', kelas_id=kelas_id))
+
+@app.route('/tugas/<int:tugas_id>', methods=['GET'])
+def detail_tugas(tugas_id):
+    user = get_current_user()
+    if not user:
+        return redirect(url_for('login'))
+    
+    tugas = database.ambil_tugas_by_id(tugas_id)
+    if not tugas:
+        flash('Tugas tidak ditemukan.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    pengumpulan = database.ambil_pengumpulan_by_tugas_siswa(tugas_id, user.id) if user.role == 'siswa' else database.ambil_pengumpulan_by_tugas(tugas_id)
+    komentar_list = database.ambil_komentar_tugas(tugas_id)
+    
+    return render_template('detail_tugas.html', tugas=tugas, pengumpulan=pengumpulan, komentar_list=komentar_list, user=user)
+
+@app.route('/tugas/<int:tugas_id>/kumpul', methods=['POST'])
+def kumpul_tugas(tugas_id):
+    user = get_current_user()
+    if not user or user.role != 'siswa':
+        return redirect(url_for('login'))
+    
+    file = request.files.get('file_jawaban')
+    if not file or not file.filename:
+        flash('Pilih file jawaban terlebih dahulu!', 'danger')
+        return redirect(url_for('detail_tugas', tugas_id=tugas_id))
+    
+    filename = secure_filename(file.filename)
+    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+    
+    database.simpan_pengumpulan(tugas_id, user.id, filename)
+    flash('Tugas berhasil dikumpulkan!', 'success')
+    return redirect(url_for('detail_tugas', tugas_id=tugas_id))
+
+@app.route('/tugas/<int:tugas_id>/komentar', methods=['POST'])
+def tambah_komentar_tugas(tugas_id):
+    user = get_current_user()
+    if not user:
+        return redirect(url_for('login'))
+    
+    isi = request.form.get('isi_komentar')
+    if isi:
+        database.tambah_komentar(tugas_id, user.id, isi)
+        flash('Komentar berhasil dikirim.', 'success')
+    return redirect(url_for('detail_tugas', tugas_id=tugas_id))
 
 # --- ROUTE MATERI, TUGAS, PENILAIAN, MONITORING, PRESENSI ---
 # TODO (Anggota 2): route Materi (upload/download/hapus) dan Tugas (buat, kumpul, komentar)

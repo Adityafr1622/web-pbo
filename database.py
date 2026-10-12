@@ -286,7 +286,85 @@ def hapus_jadwal(jadwal_id):
 
 
 # --- MATERI & TUGAS FUNCTIONS ---
-# TODO (Anggota 2): query materi (upload, ambil, hapus) dan tugas (buat, ambil, kumpul, komentar)
+def tambah_materi(kelas_id, pengajar_id, judul, kategori, file_path):
+    conn = get_db_connection()
+    conn.execute("INSERT INTO materi (kelas_id, pengajar_id, judul, kategori, file_path) VALUES (?, ?, ?, ?, ?)",
+                 (kelas_id, pengajar_id, judul, kategori, file_path))
+    conn.commit()
+    conn.close()
+
+def ambil_materi_by_kelas(kelas_id):
+    conn = get_db_connection()
+    materi = conn.execute("SELECT * FROM materi WHERE kelas_id = ?", (kelas_id,)).fetchall()
+    conn.close()
+    return materi
+
+def ambil_materi_by_id(materi_id):
+    conn = get_db_connection()
+    materi = conn.execute("SELECT * FROM materi WHERE id = ?", (materi_id,)).fetchone()
+    conn.close()
+    return materi
+
+def hapus_materi(materi_id):
+    conn = get_db_connection()
+    conn.execute("DELETE FROM materi WHERE id = ?", (materi_id,))
+    conn.commit()
+    conn.close()
+
+def tambah_tugas(kelas_id, pengajar_id, judul, deskripsi, deadline):
+    conn = get_db_connection()
+    conn.execute("INSERT INTO tugas (kelas_id, pengajar_id, judul, deskripsi, deadline) VALUES (?, ?, ?, ?, ?)",
+                 (kelas_id, pengajar_id, judul, deskripsi, deadline))
+    conn.commit()
+    conn.close()
+
+def ambil_tugas_by_kelas(kelas_id):
+    conn = get_db_connection()
+    tugas = conn.execute("SELECT * FROM tugas WHERE kelas_id = ?", (kelas_id,)).fetchall()
+    conn.close()
+    return tugas
+
+def ambil_tugas_by_id(tugas_id):
+    conn = get_db_connection()
+    tugas = conn.execute("SELECT * FROM tugas WHERE id = ?", (tugas_id,)).fetchone()
+    conn.close()
+    return tugas
+
+def simpan_pengumpulan(tugas_id, siswa_id, file_jawaban):
+    conn = get_db_connection()
+    existing = conn.execute("SELECT id FROM pengumpulan WHERE tugas_id = ? AND siswa_id = ?", (tugas_id, siswa_id)).fetchone()
+    if existing:
+        conn.execute("UPDATE pengumpulan SET file_jawaban = ?, waktu_kumpul = CURRENT_TIMESTAMP WHERE id = ?", (file_jawaban, existing['id']))
+    else:
+        conn.execute("INSERT INTO pengumpulan (tugas_id, siswa_id, file_jawaban) VALUES (?, ?, ?)",
+                     (tugas_id, siswa_id, file_jawaban))
+    conn.commit()
+    conn.close()
+
+def ambil_pengumpulan_by_tugas_siswa(tugas_id, siswa_id):
+    conn = get_db_connection()
+    p = conn.execute("SELECT * FROM pengumpulan WHERE tugas_id = ? AND siswa_id = ?", (tugas_id, siswa_id)).fetchone()
+    conn.close()
+    return p
+
+def ambil_pengumpulan_by_tugas(tugas_id):
+    conn = get_db_connection()
+    p = conn.execute("SELECT p.*, u.nama as siswa_nama FROM pengumpulan p JOIN user u ON p.siswa_id = u.id WHERE p.tugas_id = ?", (tugas_id,)).fetchall()
+    conn.close()
+    return p
+
+def tambah_komentar(tugas_id, user_id, isi):
+    conn = get_db_connection()
+    conn.execute("INSERT INTO komentar (tugas_id, user_id, isi_komentar) VALUES (?, ?, ?)",
+                 (tugas_id, user_id, isi))
+    conn.commit()
+    conn.close()
+
+def ambil_komentar_tugas(tugas_id):
+    conn = get_db_connection()
+    k = conn.execute("SELECT k.*, u.nama as user_nama FROM komentar k JOIN user u ON k.user_id = u.id WHERE k.tugas_id = ? ORDER BY k.id ASC", (tugas_id,)).fetchall()
+    conn.close()
+    return k
 
 # --- PENILAIAN & CATATAN AKHIR FUNCTIONS ---
 # TODO (Anggota 3): query penilaian tugas, rekap nilai, dan catatan akhir pengajar
