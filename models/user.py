@@ -5,6 +5,7 @@
 from abc import ABC, abstractmethod
 import re
 from datetime import date, datetime
+from werkzeug.security import check_password_hash  # BARU: verifikasi password ter-hash
 import database
 
 # ABSTRACTION: User jadi kerangka dasar, ga boleh dibuat objeknya langsung (ABC)
@@ -17,9 +18,21 @@ class User(ABC):
         self.__password = password
         self.role = role
 
-    # ENCAPSULATION: cuma bisa dicek lewat method ini, nilainya ga pernah keluar
+    # ENCAPSULATION: cuma bisa dicek lewat method ini, nilainya ga pernah keluar.
+    # DIUBAH: password disimpan sebagai hash satu arah, jadi yang dibandingkan hasil hash-nya,
+    # bukan teks aslinya. Dibalik apa pun, password asli nggak bisa dibaca lagi dari database.
     def cek_password(self, password):
-        return self.__password == password
+        if database.password_sudah_hash(self.__password):
+            return check_password_hash(self.__password, password or "")
+
+        # Akun lama (dibuat sebelum hashing) passwordnya masih polos: dicocokkan apa adanya
+        # SEKALI ini saja, lalu langsung ditulis ulang jadi hash. Jadi data lama tetap bisa
+        # login tanpa perlu seed ulang, dan otomatis ikut aman setelah login pertama.
+        if self.__password != password:
+            return False
+        database.edit_user(self.id, password=password)
+        self.__password = database.hash_password(password)
+        return True
 
     # ENCAPSULATION: satu-satunya pintu buat ganti password, lama diverifikasi dulu
     def ganti_password(self, password_lama, password_baru):
@@ -29,9 +42,9 @@ class User(ABC):
             raise ValueError("Password minimal 8 karakter dan wajib kombinasi huruf + angka.")
         if password_baru == password_lama:
             raise ValueError("Password baru tidak boleh sama dengan password lama.")
-        database.edit_user(self.id, password=password_baru)
+        database.edit_user(self.id, password=password_baru)  # di-hash di dalam edit_user
         database.catat_riwayat_password(self.id)  # BARU: catat waktu ganti password (isi password tidak disimpan)
-        self.__password = password_baru
+        self.__password = database.hash_password(password_baru)  # DIUBAH: simpan hash, bukan teks asli
 
     # ENCAPSULATION: aturan validasi ditaruh di class-nya sendiri
     @staticmethod
@@ -110,6 +123,9 @@ class Siswa(User):
             raise ValueError("Alamat siswa wajib diisi.")
         return User.rapikan_whatsapp(whatsapp), alamat
 
+    # POLYMORPHISM: Siswa, Pengajar, dan Admin sama-sama punya lihat_profil(), tapi isi
+    # dict yang dikembalikan beda. Route /profil cukup memanggilnya tanpa cek role.
+    # ENCAPSULATION: yang keluar cuma data yang memang boleh dilihat — password tidak ikut.
     def lihat_profil(self):
         kelas = database.ambil_kelas_siswa(self.id)
         return {
@@ -142,6 +158,8 @@ class Siswa(User):
         if foto:
             self.foto = foto
 
+    # ABSTRACTION: siswa cukup bilang "tunjukkan kelasku"; join tabel users-kelas dan
+    # pengumpulan daftar pengajarnya disembunyikan di database.py.
     def lihat_kelas(self):
         """Melihat kelas yang diikuti beserta nama pengajarnya (key pengajar_list)."""
         kelas = database.ambil_kelas_siswa(self.id)
@@ -156,6 +174,9 @@ class Siswa(User):
 
     def kumpul_tugas(self, tugas, jawaban):
         """Mengumpulkan atau memperbarui jawaban tugas siswa."""
+        # POLYMORPHISM: parameter `tugas` boleh objek Tugas ATAU angka id-nya; satu method
+        # menangani dua bentuk input lewat getattr (duck typing).
+        # ENCAPSULATION: siswa nggak bisa menembak tugas kelas lain — dicek boleh_akses_kelas().
         from models.akademik import Pengumpulan
 
         tugas_id = getattr(tugas, "id", tugas)
@@ -187,7 +208,9 @@ class Siswa(User):
         return pengumpulan
 
     def komentar_tugas(self, tugas, isi):
-        """Siswa memberikan komentar atau pertanyaan pada tugas."""
+        """Siswa memberikan komentar atau pertanyaan pada tugas.
+        DIUBAH: komentar masuk ke percakapan privat milik siswa ini sendiri (siswa_id = id-nya),
+        jadi yang bisa membaca cuma dia dan pengajar kelasnya."""
         from models.akademik import Komentar
 
         tugas_id = getattr(tugas, "id", tugas)
@@ -213,7 +236,8 @@ class Siswa(User):
             tugas_id=tugas_id,
             user_id=self.id,
             isi_komentar=isi,
-            waktu=None
+            waktu=None,
+            siswa_id=self.id  # DIUBAH: percakapan ini milik siswa ybs
         )
         komentar.tambah_komentar()
 
@@ -221,6 +245,8 @@ class Siswa(User):
 
     def lihat_monitoring(self):
         """Satu menu monitoring: rekap presensi, rekap nilai, dan catatan akhir dari pengajar."""
+        # ABSTRACTION: route cuma terima satu dict siap tampil. Empat query berbeda
+        # (rekap presensi, rekap nilai, daftar nilai, catatan akhir) digabung di sini.
         presensi = {"hadir": 0, "izin": 0, "sakit": 0, "alfa": 0}
         for r in database.rekap_presensi_siswa(self.id):
             status = (r["status"] or "").lower()
@@ -252,9 +278,12 @@ class Siswa(User):
         kelas = database.ambil_kelas_by_id(self.kelas_id) if self.kelas_id else None
         return kelas is not None and pengajar_id in [p["id"] for p in database.ambil_pengajar_kelas(kelas)]
 
-    # POLYMORPHISM: tampilkan_menu() di-override, isinya menu khusus siswa
+    # POLYMORPHISM: tampilkan_menu() di-override, isinya menu khusus siswa.
+    # DIUBAH: "Materi" & "Tugas" dikeluarkan dari navbar karena dua halaman itu selalu
+    # dibuka dari dalam sebuah kelas (butuh kelas_id), bukan dari menu atas. Sekarang
+    # isinya persis seperti dokumen: Kelas, Jadwal, Monitoring Anak.
     def tampilkan_menu(self):
-        return ["Profil", "Kelas", "Jadwal", "Materi", "Tugas", "Monitoring Anak"]
+        return ["Profil", "Kelas", "Jadwal", "Monitoring Anak"]
 
 # INHERITANCE: Pengajar juga turunan User, plus atribut sendiri (foto, wa, alamat, email, nik)
 class Pengajar(User):
@@ -294,6 +323,9 @@ class Pengajar(User):
             "biodata": self.biodata, "alamat": self.alamat, "nik": self.nik,
         }
 
+    # ENCAPSULATION: dua pintu keluar berbeda untuk data yang sama. lihat_profil() lengkap
+    # (ada NIK) khusus admin & pengajar ybs, profil_publik() versi aman buat siswa.
+    # NIK tidak pernah bocor ke siswa karena memang nggak pernah dimasukkan ke dict ini.
     def profil_publik(self):
         """Versi buat siswa: nama, username, WA, email, alamat, tanpa NIK."""
         return {
@@ -340,6 +372,8 @@ class Pengajar(User):
 
     def upload_materi(self, kelas, judul, kategori, file):
         """Menyimpan materi untuk kelas yang diajar."""
+        # ENCAPSULATION: syarat sah sebuah materi (judul & file wajib, pengajarnya harus
+        # memang mengajar kelas itu) dikunci di method ini, bukan dititip ke route.
         kelas_id = Pengajar._ke_int(kelas, "Kelas")
 
         judul = (judul or "").strip()
@@ -425,6 +459,8 @@ class Pengajar(User):
 
     def beri_nilai(self, pengumpulan, nilai):
         """Memberi atau memperbarui nilai tugas siswa. pengumpulan boleh objek atau id pengumpulan."""
+        # POLYMORPHISM: lagi-lagi parameter boleh objek Pengumpulan atau id-nya saja.
+        # ENCAPSULATION: rentang nilai 0-100 dan hak "siapa boleh menilai" dijaga di sini.
         pengumpulan_id = Pengajar._ke_int(pengumpulan, "Data pengumpulan")
 
         try:
@@ -454,11 +490,14 @@ class Pengajar(User):
             nilai=nilai
         )
 
-    def komentar_tugas(self, tugas, isi):
-        """Pengajar memberikan komentar atau masukan pada tugas."""
+    def komentar_tugas(self, tugas, isi, siswa=None):
+        """Pengajar memberikan masukan pada tugas SEORANG siswa.
+        DIUBAH: wajib menyebut siswanya, karena komentar sekarang percakapan privat
+        pengajar <-> satu siswa, bukan papan komentar sekelas."""
         from models.akademik import Komentar
 
         tugas_id = Pengajar._ke_int(tugas, "Tugas")
+        siswa_id = Pengajar._ke_int(siswa, "Siswa")
 
         isi = (isi or "").strip()
         if not isi:
@@ -476,11 +515,44 @@ class Pengajar(User):
             tugas_id=tugas_id,
             user_id=self.id,
             isi_komentar=isi,
-            waktu=None
+            waktu=None,
+            siswa_id=siswa_id
         )
         komentar.tambah_komentar()
 
         return komentar
+
+    def edit_tugas(self, tugas, judul, deskripsi, deadline):
+        """BARU: ubah tugas di kelas yang diajar. Balikin kelas_id-nya (buat redirect)."""
+        tugas_id = Pengajar._ke_int(tugas, "Tugas")
+        data = database.ambil_tugas_by_id(tugas_id)
+        if not data:
+            raise ValueError("Tugas tidak ditemukan.")
+        if not self.mengajar_kelas(data["kelas_id"]):
+            raise ValueError("Kamu bukan pengajar di kelas ini.")
+
+        judul = (judul or "").strip()
+        deskripsi = (deskripsi or "").strip()
+        deadline = (deadline or "").strip()
+        if not judul:
+            raise ValueError("Judul tugas wajib diisi.")
+        if not deadline:
+            raise ValueError("Deadline tugas wajib diisi.")
+        Pengajar._cek_deadline(deadline)
+
+        database.edit_tugas(tugas_id, judul, deskripsi, deadline)
+        return data["kelas_id"]
+
+    def hapus_tugas(self, tugas):
+        """BARU: hapus tugas di kelas yang diajar. Balikin kelas_id-nya (buat redirect)."""
+        tugas_id = Pengajar._ke_int(tugas, "Tugas")
+        data = database.ambil_tugas_by_id(tugas_id)
+        if not data:
+            raise ValueError("Tugas tidak ditemukan.")
+        if not self.mengajar_kelas(data["kelas_id"]):
+            raise ValueError("Kamu bukan pengajar di kelas ini.")
+        database.hapus_tugas(tugas_id)
+        return data["kelas_id"]
 
     def mengajar_kelas(self, kelas_id):
         # ENCAPSULATION: Aturan hak akses "siapa boleh mengelola kelas ini" dibungkus
@@ -525,6 +597,8 @@ class Pengajar(User):
 
     def beri_catatan_akhir(self, kelas, siswa, isi):
         """Membuat atau memperbarui catatan akhir siswa (satu siswa satu catatan per kelas)."""
+        # ABSTRACTION: pemanggil nggak perlu tau catatan ini insert baru atau update yang lama —
+        # database.tambah_catatan_akhir() yang memutuskan, aturannya satu siswa satu catatan.
         kelas_id = getattr(kelas, "id", kelas)
         siswa_id = getattr(siswa, "id", siswa)
 
@@ -550,14 +624,19 @@ class Pengajar(User):
 
     def lihat_monitoring_siswa(self, siswa_id):
         """Buka monitoring seorang siswa dari profil siswa (cuma siswa di kelas yang diajar)."""
+        # POLYMORPHISM: Admin punya method bernama sama, tapi versi Admin boleh membuka
+        # siswa mana pun sedangkan versi Pengajar ini dibatasi kelas yang dia ajar.
         row = database.ambil_user_by_id(siswa_id)
         if not row or row["role"] != "siswa" or not self.boleh_lihat_siswa(row):
             raise ValueError("Siswa tidak ditemukan di kelas yang kamu ajar.")
         return buat_objek_user(row).lihat_monitoring()
 
-    # POLYMORPHISM: nama method sama, isi menu beda dari Siswa
+    # POLYMORPHISM: nama method sama, isi menu beda dari Siswa.
+    # DIUBAH: label disamakan dengan daftar menu di base.html ("Kelas", "Jadwal"). Sebelumnya
+    # labelnya "Kelas dan Jadwal Mengajar" dkk yang tidak dikenal navbar, jadi pengajar cuma
+    # kebagian menu Profil. Materi/Tugas/Presensi/Catatan Akhir tetap diakses dari dalam kelas.
     def tampilkan_menu(self):
-        return ["Profil", "Kelas dan Jadwal Mengajar", "Materi", "Tugas", "Presensi", "Catatan Akhir"]
+        return ["Profil", "Kelas", "Jadwal"]
 
 # INHERITANCE: Admin turunan User juga
 class Admin(User):
@@ -568,6 +647,11 @@ class Admin(User):
         return {"id": self.id, "nama": self.nama, "username": self.username}
 
     def kelola_akun(self, aksi, **data):
+        # ABSTRACTION: satu pintu untuk tambah/edit/hapus akun. Route cukup menyebut aksinya,
+        # urusan validasi dan query-nya disembunyikan di dalam sini.
+        # INHERITANCE: aturan yang dipakai bareng (validasi_username, validasi_password)
+        # diambil dari superclass User, nggak ditulis ulang khusus buat Admin.
+        # ENCAPSULATION: akun admin sengaja nggak bisa diedit/dihapus lewat jalur ini.
         if aksi == "tambah":
             username = (data.get("username") or "").strip()
             password = data.get("password")
@@ -678,6 +762,8 @@ class Admin(User):
             raise ValueError(f"Aksi tidak dikenal: {aksi}")
 
     def kelola_kelas(self, aksi, **data):
+        # ABSTRACTION: Admin cukup bilang mau "tambah"/"edit"/"hapus"; pengecekan nama kembar,
+        # jumlah pengajar, dan data terkait dikerjakan class Kelas dan database.py.
         from models.akademik import Kelas
         deskripsi = (data.get("deskripsi") or "").strip() or None  # BARU: deskripsi kelas (opsional)
         if aksi == "tambah":
@@ -714,6 +800,8 @@ class Admin(User):
             raise ValueError(f"Aksi tidak dikenal: {aksi}")
 
     def kelola_jadwal(self, aksi, **data):
+        # ABSTRACTION: semua aturan jadwal (format jam, hari harus cocok dengan tanggal,
+        # bentrok kelas/pengajar) ada di Jadwal.cek_input(), bukan di sini maupun di route.
         from models.akademik import Jadwal
         if aksi == "tambah":
             kelas_id, pengajar_id, jam, tanggal, materi = Jadwal.cek_input(
@@ -747,6 +835,8 @@ class Admin(User):
 
     def monitoring_sistem(self):
         """Ringkasan data sistem + daftar monitoring tiap siswa (nilai, presensi, jumlah catatan akhir)."""
+        # ABSTRACTION: hasilnya satu dict siap tampil. Template nggak tahu (dan nggak perlu tahu)
+        # bahwa angkanya berasal dari sembilan query COUNT yang berbeda.
         conn = database.get_connection()
 
         try:
@@ -798,7 +888,12 @@ class Admin(User):
     def tampilkan_menu(self):
         return ["Kelola Akun", "Kelola Jadwal", "Kelola Kelas", "Monitoring"]
 
-# dipanggil pas login / get_current_user, tinggal kasih row, objek yang cocok keluar sendiri
+# dipanggil pas login / get_current_user, tinggal kasih row, objek yang cocok keluar sendiri.
+# POLYMORPHISM: ini "pabrik" objek — dari satu baris database bisa lahir Siswa, Pengajar,
+# atau Admin. Setelah keluar dari sini, pemanggil memperlakukan ketiganya sama saja
+# (semuanya User), dan tiap objek sendiri yang tahu versi method miliknya.
+# INHERITANCE: ketiga class yang dibuat di sini sama-sama turunan User, jadi apa pun
+# hasilnya pasti punya cek_password(), ganti_password(), dan tampilkan_menu().
 def buat_objek_user(row):
     if not row:
         return None

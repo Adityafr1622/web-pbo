@@ -13,13 +13,17 @@
 <body class="{% block body_class %}{% endblock %}">
 {% block shell %}
 {# label menu (dari tampilkan_menu) -> endpoint, ikon, endpoint lain yang ikut menyalakan menu #}
+{# DIUBAH: + entri Monitoring (admin) & Monitoring Anak (siswa), + endpoint detail_materi #}
+{% set HAL_KELAS = ['detail_kelas','kelola_materi','detail_materi','daftar_tugas','detail_tugas'] %}
 {% set NAV = [
- ('Kelola Akun','kelola_akun','users',['biodata_akun']),
- ('Kelola Kelas','kelola_kelas','door',['detail_kelas','kelola_materi','daftar_tugas','detail_tugas']),
+ ('Kelola Akun','kelola_akun','users',['biodata_akun','profil_siswa','profil_pengajar']),
+ ('Kelola Kelas','kelola_kelas','door',HAL_KELAS),
  ('Kelola Jadwal','kelola_jadwal','calendar',[]),
+ ('Monitoring','monitoring','chart',['monitoring_siswa']),
  ('Profil','profil','user',[]),
- ('Kelas','lihat_kelas','door',['detail_kelas','kelola_materi','daftar_tugas','detail_tugas']),
- ('Jadwal','lihat_jadwal','calendar',[]) ] %}
+ ('Kelas','lihat_kelas','door',HAL_KELAS),
+ ('Jadwal','lihat_jadwal','calendar',[]),
+ ('Monitoring Anak','monitoring','chart',['monitoring_siswa']) ] %}
 <header class="topbar">
   <a class="brand" href="{{ url_for('dashboard') }}"><img src="{{ url_for('static', filename='images/logo-fluenglo.png') }}" alt="Fluenglo"></a>
   <nav class="nav">

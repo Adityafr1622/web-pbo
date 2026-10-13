@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import ic, kelas_head %}
+{% block title %}Presensi {{ kelas.nama_kelas }} · Fluenglo{% endblock %}
+
+{% block content %}
+{# data dari app.py: kelas, pengajar_list, siswa_list, presensi_list, user, tab
+   presensi_list: [{tanggal, label, status {siswa_id: 'hadir'|...}, materi}] #}
+{{ kelas_head(kelas, pengajar_list, tab, admin=(user.role == 'admin')) }}
+
+{% set STATUS = [('hadir', 'Hadir'), ('izin', 'Izin'), ('sakit', 'Sakit'), ('alfa', 'Alpha')] %}
+
+{% if not presensi_list %}
+<div class="empty-card">Belum ada pertemuan untuk kelas ini. Presensi mengikuti tanggal yang sudah dibuat di menu Jadwal.</div>
+
+{% elif user.role == 'siswa' %}
+{# ---------- siswa: rekap kehadiran dirinya sendiri, semua pertemuan sekaligus ---------- #}
+<div class="table-card"><div class="table-scroll">
+<table class="data-table">
+  <thead><tr><th class="th-left">Pertemuan</th><th>Materi</th><th>Kehadiran</th></tr></thead>
+  <tbody>
+  {% for p in presensi_list %}
+  {% set saya = p.status.get(user.id) %}
+  <tr>
+    <td class="td-left td-strong">{{ p.label }}</td>
+    <td>{{ p.materi or '-' }}</td>
+    <td>
+      {% if saya == 'hadir' %}<span class="badge badge-ok">{{ ic('check', 13) }} Hadir</span>
+      {% elif saya %}<span class="badge badge-kuning">{{ saya|capitalize }}</span>
+      {% else %}<span class="badge badge-abu">Belum dicatat</span>{% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table></div></div>
+
+{% else %}
+{# ---------- pengajar (bisa mengisi) & admin (lihat saja) ---------- #}
+<div class="presensi-pick">
+  <label for="pilih-tanggal">Tanggal</label>
+  <div class="select-wrap">
+    <select id="pilih-tanggal" data-presensi-pick>
+      {% for p in presensi_list %}
+      <option value="panel-{{ p.tanggal }}">{{ p.label }}{% if p.materi %} · {{ p.materi }}{% endif %}</option>
+      {% endfor %}
+    </select>
+    {{ ic('chevron', 18) }}
+  </div>
+</div>
+
+{% for p in presensi_list %}
+<form class="presensi-panel" id="panel-{{ p.tanggal }}" method="post"
+      action="{{ url_for('simpan_presensi', kelas_id=kelas.id) }}" {{ 'hidden' if not loop.first }}>
+  <input type="hidden" name="tanggal" value="{{ p.tanggal }}">
+  <div class="table-card"><div class="table-scroll">
+  <table class="data-table presensi-table">
+    <thead><tr>
+      <th class="th-left">Nama Siswa</th>
+      {% for kode, nama in STATUS %}
+      <th>
+        {{ nama }}
+        {% if kode == 'hadir' and user.role == 'pengajar' %}
+        <label class="chk-semua"><input type="checkbox" data-semua-hadir><span class="chk"></span> Semua</label>
+        {% endif %}
+      </th>
+      {% endfor %}
+      <th>Aksi</th>
+    </tr></thead>
+    <tbody>
+    {% for s in siswa_list %}
+    <tr>
+      <td class="td-left td-strong">{{ s.nama }}</td>
+      {% for kode, nama in STATUS %}
+      <td>
+        <label class="chk-wrap">
+          <input type="radio" name="st_{{ s.id }}" value="{{ kode }}"
+                 {{ 'checked' if p.status.get(s.id) == kode }}
+                 {{ 'disabled' if user.role != 'pengajar' }}>
+          <span class="chk">{{ ic('check', 13) }}</span>
+          <span class="sr-only">{{ nama }} {{ s.nama }}</span>
+        </label>
+      </td>
+      {% endfor %}
+      <td><a class="link-profil" href="{{ url_for('profil_siswa', siswa_id=s.id) }}">Buka Profil</a></td>
+    </tr>
+    {% else %}<tr class="row-empty"><td colspan="6">Belum ada siswa di kelas ini.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div></div>
+  {% if user.role == 'pengajar' and siswa_list %}
+  <div class="presensi-foot"><button class="btn btn-navy">Simpan Presensi</button></div>
+  {% endif %}
+</form>
+{% endfor %}
+{% endif %}
+{% endblock %}

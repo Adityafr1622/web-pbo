@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import ic, kelas_head %}
+{% block title %}{{ materi.judul }} · Fluenglo{% endblock %}
+
+{% block content %}
+{# data dari app.py: kelas, materi (objek Materi), baris (row database), nama_pengajar, user, tab #}
+{{ kelas_head(kelas, pengajar_list, tab, admin=(user.role == 'admin')) }}
+
+<a class="btn btn-light btn-sm back-btn" href="{{ url_for('kelola_materi', kelas_id=kelas.id) }}">{{ ic('arrow-left', 15) }} Kembali ke materi</a>
+
+<div class="feed-item static">
+  <span class="feed-ic feed-ic-book">{{ ic('book', 30) }}</span>
+  <span class="feed-text">
+    <strong class="big">{{ materi.judul }}</strong>
+    <small>{{ nama_pengajar }} · {{ baris|tgl_posting }}{% if materi.kategori %} · {{ materi.kategori }}{% endif %}</small>
+  </span>
+</div>
+
+{% if materi.file_path %}
+<div class="file-row">
+  <div class="file-info">
+    <strong>{{ materi.get_nama_asli() }}</strong>
+    <small>{{ materi.get_tipe() }} · {{ materi.get_ukuran() }} · Diunggah {{ materi.tanggal_upload|tgl(false) }}</small>
+  </div>
+  <div class="file-actions">
+    <a class="icon-btn" href="{{ url_for('static', filename='uploads/' ~ materi.file_path) }}" target="_blank" rel="noopener" title="Lihat berkas">{{ ic('eye', 20) }}</a>
+    <a class="icon-btn" href="{{ url_for('download_materi', materi_id=materi.id) }}" title="Unduh berkas">{{ ic('download', 20) }}</a>
+  </div>
+</div>
+{% else %}
+<div class="empty-card">Materi ini belum punya berkas yang bisa diunduh.</div>
+{% endif %}
+{% endblock %}

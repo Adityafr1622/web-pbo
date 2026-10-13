@@ -3,10 +3,20 @@
 {% block title %}Kelola Akun · Fluenglo{% endblock %}
 
 {% block content %}
-{% macro tgl(w) %}{{ w[8:10] }}/{{ w[5:7] }}/{{ w[:4] }}, {{ w[11:16] }}{% endmacro %}
 {# data dari app.py: users, kelas_list, riwayat_password (list), terakhir_ubah ({user_id: waktu}) #}
 {% set siswa = users|selectattr('role', 'equalto', 'siswa')|list %}
 {% set pengajar = users|selectattr('role', 'equalto', 'pengajar')|list %}
+
+{# BARU: satu sel password dipakai tabel siswa & pengajar.
+   Password disimpan ter-hash, jadi yang bisa ditampilkan ikon mata adalah hash-nya,
+   bukan password asli — password asli memang sudah tidak ada lagi di database. #}
+{% macro sel_password(u) %}
+<td><div class="pw-cell">
+  <span class="pw-mask">••••••••</span>
+  <code class="pw-hash" title="{{ u.password }}" hidden>{{ u.password }}</code>
+  <button type="button" class="pw-cell-btn" data-pw-cell aria-label="Tampilkan hash password">{{ ic('eye-off', 15) }}{{ ic('eye', 15) }}</button>
+</div></td>
+{% endmacro %}
 
 <div class="toolbar">
   <div class="seg">
@@ -19,14 +29,15 @@
 
 {# ===== tabel siswa ===== #}
 <div class="table-card" data-panel="siswa"><div class="table-scroll">
-<table class="data-table">
-  <thead><tr><th>Nama</th><th>Kelas</th><th>Username</th><th>Email</th><th>No. WhatsApp</th><th>Alamat</th><th>Password Diubah</th><th>Profil Lengkap</th><th>Aksi</th></tr></thead>
+<table class="data-table table-akun">
+  <thead><tr><th>Nama</th><th>Kelas</th><th>Username</th><th>Email</th><th>No. WhatsApp</th><th>Alamat</th><th>Password</th><th>Diubah</th><th>Profil Lengkap</th><th>Aksi</th></tr></thead>
   <tbody>
   {% for u in siswa %}
   <tr>
     <td class="td-strong">{{ u.nama }}</td><td>{{ u.kelas_nama or '-' }}</td><td>{{ u.username }}</td>
-    <td>{{ u.email or '-' }}</td><td>{{ u.no_whatsapp or '-' }}</td><td class="td-clip">{{ u.alamat or '-' }}</td>
-    <td>{{ tgl(terakhir_ubah[u.id]) if u.id in terakhir_ubah else 'Belum pernah' }}</td>
+    <td class="td-clip">{{ u.email or '-' }}</td><td>{{ u.no_whatsapp or '-' }}</td><td class="td-clip">{{ u.alamat or '-' }}</td>
+    {{ sel_password(u) }}
+    <td class="td-nowrap">{{ terakhir_ubah[u.id]|tgl_singkat if u.id in terakhir_ubah else 'Belum pernah' }}</td>
     <td><a class="link-profil" href="{{ url_for('biodata_akun', user_id=u.id) }}">Buka Profil</a></td>
     <td><div class="aksi">
       <button type="button" class="icon-btn icon-edit" title="Edit" data-edit="modal-edit-siswa"
@@ -36,21 +47,24 @@
         data-text="Yakin ingin menghapus akun {{ u.nama }}? Tindakan ini tidak dapat dibatalkan.">{{ ic('trash', 16) }}</button>
     </div></td>
   </tr>
-  {% else %}<tr class="row-empty"><td colspan="9">Belum ada akun siswa. Klik "Tambah Siswa" untuk membuat akun pertama.</td></tr>
+  {% else %}<tr class="row-empty"><td colspan="10">Belum ada akun siswa. Klik "Tambah Siswa" untuk membuat akun pertama.</td></tr>
   {% endfor %}
   </tbody>
 </table></div></div>
 
 {# ===== tabel pengajar ===== #}
 <div class="table-card" data-panel="pengajar" hidden><div class="table-scroll">
-<table class="data-table">
-  <thead><tr><th>Nama</th><th>Username</th><th>Email</th><th>No. WhatsApp</th><th>Alamat</th><th>NIK</th><th>Password Diubah</th><th>Profil Lengkap</th><th>Aksi</th></tr></thead>
+<table class="data-table table-akun">
+  <thead><tr><th>Nama</th><th>Username</th><th>Email</th><th>No. WhatsApp</th><th>Alamat</th><th>NIK</th><th>Password</th><th>Diubah</th><th>Profil Lengkap</th><th>Aksi</th></tr></thead>
   <tbody>
   {% for u in pengajar %}
   <tr>
-    <td class="td-strong">{{ u.nama }}</td><td>{{ u.username }}</td><td>{{ u.email or '-' }}</td>
-    <td>{{ u.no_whatsapp or '-' }}</td><td class="td-clip">{{ u.alamat or '-' }}</td><td>{{ u.nik or '-' }}</td>
-    <td>{{ tgl(terakhir_ubah[u.id]) if u.id in terakhir_ubah else 'Belum pernah' }}</td>
+    <td class="td-strong">{{ u.nama }}</td><td>{{ u.username }}</td><td class="td-clip">{{ u.email or '-' }}</td>
+    <td>{{ u.no_whatsapp or '-' }}</td><td class="td-clip">{{ u.alamat or '-' }}</td>
+    {# DIUBAH: NIK cuma 4 digit awal di tabel, lengkapnya di halaman Profil Lengkap #}
+    <td class="td-nowrap">{{ u.nik|samar }}</td>
+    {{ sel_password(u) }}
+    <td class="td-nowrap">{{ terakhir_ubah[u.id]|tgl_singkat if u.id in terakhir_ubah else 'Belum pernah' }}</td>
     <td><a class="link-profil" href="{{ url_for('biodata_akun', user_id=u.id) }}">Buka Profil</a></td>
     <td><div class="aksi">
       <button type="button" class="icon-btn icon-edit" title="Edit" data-edit="modal-edit-pengajar"
@@ -60,17 +74,19 @@
         data-text="Yakin ingin menghapus akun {{ u.nama }}? Tindakan ini tidak dapat dibatalkan.">{{ ic('trash', 16) }}</button>
     </div></td>
   </tr>
-  {% else %}<tr class="row-empty"><td colspan="9">Belum ada akun pengajar. Klik "Tambah Pengajar" untuk membuat akun pertama.</td></tr>
+  {% else %}<tr class="row-empty"><td colspan="10">Belum ada akun pengajar. Klik "Tambah Pengajar" untuk membuat akun pertama.</td></tr>
   {% endfor %}
   </tbody>
 </table></div></div>
+
+<p class="table-note">{{ ic('lock', 14) }} Password disimpan ter-hash satu arah, jadi password aslinya tidak tersimpan dan tidak bisa dibaca siapa pun — termasuk admin. Ikon mata menampilkan hash yang tersimpan. Untuk mengganti password pengguna, pakai tombol Edit. NIK ditampilkan 4 digit awal; lengkapnya ada di Profil Lengkap.</p>
 
 {# ===== riwayat password (data dari tabel riwayat_password) ===== #}
 <section class="card riwayat">
   <h2>Riwayat Perubahan Password</h2>
   <p class="muted">Tercatat saat siswa atau pengajar mengganti passwordnya sendiri. Isi password tidak ditampilkan.</p>
   {% if riwayat_password %}
-  <ul class="riwayat-list">{% for r in riwayat_password %}<li><strong>{{ r.nama }}</strong> ({{ r.role }}) mengganti password · {{ tgl(r.waktu) }}</li>{% endfor %}</ul>
+  <ul class="riwayat-list">{% for r in riwayat_password %}<li><strong>{{ r.nama }}</strong> ({{ r.role }}) mengganti password · {{ r.waktu|tgl_jam }}</li>{% endfor %}</ul>
   {% else %}<p class="empty-text">Belum ada perubahan password.</p>{% endif %}
 </section>
 
@@ -107,7 +123,9 @@
     {{ field('Nomor WhatsApp', 'whatsapp', '') }}
     {{ pwfield(req=false, ph='Kosongkan jika tidak diubah') }}
     {{ field('Alamat', 'alamat', '') }}
-  </div></div>
+  </div>
+  <p class="form-note">Password lama tidak pernah ditampilkan. Isi kolom password hanya kalau ingin menggantinya.</p>
+  </div>
   <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Simpan</button></div>
 </form>
 {% endcall %}
@@ -140,7 +158,9 @@
     {{ pwfield(req=false, ph='Kosongkan jika tidak diubah') }}
     {{ field('Alamat', 'alamat', '') }}
     <div class="field"><label>Photo Profil <span class="label-note">(kosong = tetap)</span></label><input type="file" name="foto" accept="image/*"></div>
-  </div></div>
+  </div>
+  <p class="form-note">Password lama tidak pernah ditampilkan. Isi kolom password hanya kalau ingin menggantinya.</p>
+  </div>
   <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Simpan</button></div>
 </form>
 {% endcall %}

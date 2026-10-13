@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import ic, avatar, modal, kelas_head %}
+{% block title %}{{ tugas.judul }} · Fluenglo{% endblock %}
+
+{% block content %}
+{# data dari app.py: tugas, kelas, pengumpulan (siswa), baris_siswa (pengajar/admin),
+   komentar ({siswa_id: [baris komentar]}), user, tab, sudah_lewat #}
+{{ kelas_head(kelas, pengajar_list, tab, admin=(user.role == 'admin')) }}
+
+<a class="btn btn-light btn-sm back-btn" href="{{ url_for('daftar_tugas', kelas_id=kelas.id) }}">{{ ic('arrow-left', 15) }} Kembali ke tugas</a>
+
+<div class="subtabs">
+  <button type="button" class="pill is-active" data-pane="petunjuk">Petunjuk</button>
+  <button type="button" class="pill" data-pane="siswa">{{ 'Pengumpulan Saya' if user.role == 'siswa' else 'Tugas Siswa' }}</button>
+</div>
+
+{# ===== panel petunjuk ===== #}
+<section data-pane-id="petunjuk">
+  <div class="card tugas-card">
+    <h2>{{ nama_pengajar }} memposting tugas baru: {{ tugas.judul }}</h2>
+    <p class="muted">{{ tugas|tgl_posting }}</p>
+    <div class="tugas-meta">
+      <span class="chip">100 poin</span>
+      <span class="muted">Tenggat: {{ tugas.deadline|tgl_jam }}</span>
+      {% if sudah_lewat %}<span class="badge badge-no">Tenggat lewat</span>{% endif %}
+    </div>
+    <h3>Petunjuk</h3>
+    <p class="pre-line">{{ tugas.deskripsi or 'Pengajar belum menuliskan petunjuk untuk tugas ini.' }}</p>
+  </div>
+</section>
+
+{# ===== panel tugas siswa ===== #}
+<section data-pane-id="siswa" hidden>
+{% if user.role == 'siswa' %}
+  {# ---------- tampilan siswa: pengumpulan sendiri + percakapan privat ---------- #}
+  <div class="card strip-title"><h2>Pengumpulan: {{ tugas.judul }}</h2></div>
+
+  <div class="card tugas-card">
+    {% if pengumpulan %}
+    <div class="file-row">
+      <div class="file-info">
+        <strong>{{ pengumpulan.file_jawaban|nama_berkas }}</strong>
+        <small>Dikumpulkan {{ pengumpulan.waktu_kumpul|tgl_jam }}</small>
+      </div>
+      <div class="file-actions">
+        <a class="icon-btn" href="{{ url_for('static', filename='uploads/' ~ pengumpulan.file_jawaban) }}" target="_blank" rel="noopener" title="Lihat berkas">{{ ic('eye', 20) }}</a>
+      </div>
+    </div>
+    <div class="tugas-meta">
+      {% if pengumpulan.nilai is not none %}
+        <span class="badge badge-ok">{{ ic('check', 13) }} Sudah dinilai</span>
+        <strong class="nilai-besar">{{ pengumpulan.nilai|round|int }}<span class="muted">/100</span></strong>
+      {% else %}
+        <span class="badge badge-no">Belum dinilai</span>
+      {% endif %}
+    </div>
+    {% else %}
+    <p class="muted">Kamu belum mengumpulkan tugas ini.</p>
+    {% endif %}
+
+    <form class="kumpul-form" method="post" action="{{ url_for('kumpul_tugas', tugas_id=tugas.id) }}" enctype="multipart/form-data">
+      <div class="field"><label>{{ 'Ganti berkas jawaban' if pengumpulan else 'Berkas jawaban' }}</label>
+        <input type="file" name="file_jawaban" required></div>
+      <button class="btn btn-navy">{{ ic('upload', 16) }} {{ 'Kumpulkan Ulang' if pengumpulan else 'Kumpulkan' }}</button>
+      {% if pengumpulan %}<p class="form-note">Mengumpulkan ulang akan menghapus nilai lama, jadi pengajar perlu menilai lagi.</p>{% endif %}
+    </form>
+  </div>
+
+  {# percakapan privat siswa ini dengan pengajar #}
+  <section class="card kom-card">
+    <h2>Komentar</h2>
+    <p class="muted">Percakapan privat antara kamu dan pengajar. Siswa lain tidak bisa membacanya.</p>
+    <div class="kom-list">
+      {% for k in komentar.get(user.id, []) %}
+      <div class="kom {{ 'kom-pengajar' if k.user_role == 'pengajar' }}">
+        <header><strong>{{ k.user_nama }}</strong> <span class="role">({{ k.user_role|capitalize }})</span> · <time>{{ k.waktu|tgl_jam }}</time></header>
+        <p>{{ k.isi_komentar }}</p>
+      </div>
+      {% else %}<div class="empty">Belum ada komentar. Tulis pertanyaan atau catatanmu di bawah.</div>{% endfor %}
+    </div>
+    <form class="kom-form" method="post" action="{{ url_for('tambah_komentar_tugas', tugas_id=tugas.id) }}">
+      <textarea name="isi_komentar" rows="2" placeholder="Tulis komentar untuk pengajar…" required></textarea>
+      <button class="btn btn-yellow">Kirim</button>
+    </form>
+  </section>
+
+{% else %}
+  {# ---------- tampilan pengajar & admin: seluruh siswa kelas ---------- #}
+  <div class="card strip-title"><h2>Pengumpulan: {{ tugas.judul }}</h2></div>
+
+  <div class="table-card"><div class="table-scroll">
+  <table class="data-table">
+    <thead><tr><th class="th-left">Siswa</th><th>Berkas</th><th>Nilai</th><th>Komentar</th><th>Profil</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for b in baris_siswa %}
+    <tr>
+      <td class="td-left td-strong">{{ b.siswa_nama }}</td>
+      <td>
+        {% if b.file_jawaban %}
+        <a class="link-profil" href="{{ url_for('static', filename='uploads/' ~ b.file_jawaban) }}" target="_blank" rel="noopener">{{ b.file_jawaban|nama_berkas }}</a>
+        {% else %}<span class="muted">Belum mengumpulkan</span>{% endif %}
+      </td>
+      <td>
+        {% if user.role == 'pengajar' and b.pengumpulan_id %}
+        <form class="nilai-form" method="post" action="{{ url_for('beri_nilai_tugas', pengumpulan_id=b.pengumpulan_id) }}">
+          <input type="number" name="nilai" min="0" max="100" step="1" value="{{ b.nilai|round|int if b.nilai is not none else '' }}" placeholder="—" aria-label="Nilai {{ b.siswa_nama }}">
+          <span class="muted">/100</span>
+          <button class="btn btn-yellow btn-sm">Simpan</button>
+        </form>
+        {% else %}
+        {{ b.nilai|round|int if b.nilai is not none else '—' }} <span class="muted">/100</span>
+        {% endif %}
+      </td>
+      <td>
+        <button type="button" class="link-profil link-btn" data-open="modal-kom-{{ b.siswa_id }}">Komentar ({{ komentar.get(b.siswa_id, [])|length }})</button>
+      </td>
+      <td><a class="link-profil" href="{{ url_for('profil_siswa', siswa_id=b.siswa_id) }}">Buka Profil</a></td>
+      <td>
+        {% if b.nilai is not none %}<span class="badge badge-ok">{{ ic('check', 13) }} Dinilai</span>
+        {% elif b.file_jawaban %}<span class="badge badge-no">Belum dinilai</span>
+        {% else %}<span class="badge badge-abu">Belum kumpul</span>{% endif %}
+      </td>
+    </tr>
+    {% else %}<tr class="row-empty"><td colspan="6">Belum ada siswa di kelas ini.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div></div>
+
+  {# satu modal percakapan privat per siswa #}
+  {% for b in baris_siswa %}
+  {% call modal('modal-kom-' ~ b.siswa_id, 'Komentar · ' ~ b.siswa_nama, 'modal-lg') %}
+  <div class="modal-body">
+    <p class="muted">{{ tugas.judul }} · Percakapan privat antara {{ b.siswa_nama.split()[0] }} dan pengajar.</p>
+    <div class="kom-list">
+      {% for k in komentar.get(b.siswa_id, []) %}
+      <div class="kom {{ 'kom-pengajar' if k.user_role == 'pengajar' }}">
+        <header><strong>{{ k.user_nama }}</strong> <span class="role">({{ k.user_role|capitalize }})</span> · <time>{{ k.waktu|tgl_jam }}</time></header>
+        <p>{{ k.isi_komentar }}</p>
+      </div>
+      {% else %}<div class="empty">Belum ada komentar untuk siswa ini.</div>{% endfor %}
+    </div>
+    {% if user.role == 'pengajar' %}
+    <form class="kom-form" method="post" action="{{ url_for('tambah_komentar_tugas', tugas_id=tugas.id) }}">
+      <input type="hidden" name="siswa_id" value="{{ b.siswa_id }}">
+      <textarea name="isi_komentar" rows="2" placeholder="Tulis masukan untuk {{ b.siswa_nama.split()[0] }}…" required></textarea>
+      <button class="btn btn-yellow">Kirim</button>
+    </form>
+    {% endif %}
+  </div>
+  <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Tutup</button></div>
+  {% endcall %}
+  {% endfor %}
+{% endif %}
+</section>
+{% endblock %}

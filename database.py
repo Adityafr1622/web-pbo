@@ -1,5 +1,21 @@
+# PEMBAGIAN TUGAS DI database.py
+# Penanggung jawab utama: JULPA (koneksi + query users), modul lain menambah query-nya sendiri.
+#
+# 4 PILAR OOP DI FILE INI (cari komentar ENCAPSULATION / ABSTRACTION / INHERITANCE / POLYMORPHISM):
+#  - ABSTRACTION   : ini lapisan penyembunyi SQL. Semua class di models/ cuma manggil fungsi
+#                    di sini (ambil_user_by_id, tambah_materi, dst) dan nggak pernah nulis
+#                    query sendiri, jadi kalau databasenya diganti cukup file ini yang diubah.
+#  - ENCAPSULATION : aturan "kolom apa yang boleh diubah" dan "password wajib di-hash dulu"
+#                    dikunci di sini, bukan dipercayakan ke pemanggil.
+#  - INHERITANCE   : nggak ada di file ini — isinya fungsi, bukan class.
+#                    Pewarisan ada di models/user.py (Siswa/Pengajar/Admin turunan User).
+#  - POLYMORPHISM  : nggak ada di file ini. Perbedaan perilaku per role diurus models/user.py.
+
 import os
 import sqlite3
+from datetime import datetime
+# DIUBAH: password sekarang disimpan ter-hash (satu arah), bukan apa adanya lagi.
+from werkzeug.security import generate_password_hash
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # path absolut, jadi nggak peduli app dijalankan dari folder mana
@@ -9,6 +25,25 @@ def get_connection():
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+# BARU: waktu lokal (WITA/WIB sesuai komputer), bukan UTC-nya CURRENT_TIMESTAMP,
+# biar jam yang tampil di komentar & materi sama dengan jam di jam dinding.
+def sekarang():
+    return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+
+# ENCAPSULATION: cara password diamankan disembunyikan di balik satu fungsi. Pemanggil
+# nggak perlu tau algoritmanya apa, dan kalau nanti algoritmanya diganti cukup di sini.
+# BARU: satu-satunya tempat password diubah jadi hash. Dipakai tambah_user & edit_user,
+# jadi semua jalur (tambah akun, admin reset, ganti password sendiri) otomatis ter-hash.
+def hash_password(password):
+    return generate_password_hash(password)
+
+
+def password_sudah_hash(nilai):
+    """True kalau nilai di kolom password memang hash, bukan password lama yang polos."""
+    return isinstance(nilai, str) and nilai.startswith(('pbkdf2:', 'scrypt:', 'argon2'))
 
 def migrasi():
     """Samain fluenglo.db lama dengan schema terbaru (aman dijalankan berulang kali).
@@ -32,6 +67,13 @@ def migrasi():
             ('users', 'nik', 'TEXT'),
             ('users', 'email', 'TEXT'),
             ('kelas', 'deskripsi', 'TEXT'),
+            # BARU: tanggal posting & tanggal edit materi/tugas (dipakai di feed kelas)
+            ('materi', 'tanggal_upload', 'TEXT'),
+            ('materi', 'tanggal_edit', 'TEXT'),
+            ('tugas', 'tanggal_dibuat', 'TEXT'),
+            ('tugas', 'tanggal_edit', 'TEXT'),
+            # BARU: komentar jadi percakapan privat per siswa, bukan satu kelas ramai-ramai
+            ('komentar', 'siswa_id', 'INTEGER'),
         ]
         for tabel, nama, tipe in tambahan:
             ada = kolom(tabel)
@@ -79,7 +121,8 @@ def tambah_user(nama, username, password, role, foto=None, no_whatsapp=None, bio
             INSERT INTO users (nama, username, password, role, foto, no_whatsapp, biodata,
                                kelas_id, alamat, nik, email)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (nama, username, password, role, foto or 'default_avatar.png', no_whatsapp,
+        ''', (nama, username, hash_password(password), role,  # DIUBAH: password di-hash dulu
+              foto or 'default_avatar.png', no_whatsapp,
               biodata, kelas_id, alamat, nik, email))
         conn.commit()
         return cursor.lastrowid
@@ -91,6 +134,8 @@ def tambah_user(nama, username, password, role, foto=None, no_whatsapp=None, bio
 
 def edit_user(user_id, **kwargs):
     """Memperbarui kolom user yang diizinkan saja."""
+    # ENCAPSULATION: daftar putih kolom. Walaupun fungsinya menerima **kwargs bebas,
+    # kolom di luar daftar ini ditolak, jadi nggak ada yang bisa menulis sembarang kolom.
     kolom_diizinkan = {
         "nama", "username", "password", "role", "foto",
         "no_whatsapp", "biodata", "kelas_id", "alamat",
@@ -106,6 +151,11 @@ def edit_user(user_id, **kwargs):
             "Kolom user tidak diizinkan: "
             + ", ".join(sorted(kolom_tidak_valid))
         )
+
+    # DIUBAH: password apa pun yang lewat sini otomatis di-hash, jadi nggak ada satu pun
+    # jalur (admin reset / ganti password sendiri) yang bisa kelupaan nge-hash.
+    if kwargs.get("password"):
+        kwargs = dict(kwargs, password=hash_password(kwargs["password"]))
 
     kolom = list(kwargs.keys())
     assignments = ", ".join(f"{nama} = ?" for nama in kolom)
@@ -270,7 +320,8 @@ def hapus_kelas(kelas_id):
 
 def ambil_siswa_by_kelas(kelas_id):
     conn = get_connection()
-    rows = conn.execute('SELECT * FROM users WHERE role = "siswa" AND kelas_id = ?', (kelas_id,)).fetchall()
+    rows = conn.execute('SELECT * FROM users WHERE role = "siswa" AND kelas_id = ? ORDER BY nama',
+                        (kelas_id,)).fetchall()  # DIUBAH: urut nama biar presensi stabil urutannya
     conn.close()
     return rows
 
@@ -378,6 +429,9 @@ def hapus_jadwal(jadwal_id):
 
 def _cek_pengajar_kelas(conn, kelas_id, pengajar_id):
     """Pastikan kelas ada dan pengajar ini guru 1 / guru 2 di kelas tsb."""
+    # ENCAPSULATION: awalan underscore = dipakai internal file ini saja.
+    # Aturan hak akses pengajar dicek lagi di lapisan database, jadi walaupun ada route
+    # yang lupa mengecek, data tetap tidak bisa masuk ke kelas yang bukan miliknya.
     kelas = conn.execute(
         "SELECT pengajar_id, pengajar_id2 FROM kelas WHERE id = ?",
         (kelas_id,)
@@ -397,9 +451,9 @@ def tambah_materi(kelas_id, pengajar_id, judul, kategori, file_path):
 
         cursor = conn.execute("""
             INSERT INTO materi
-                (kelas_id, pengajar_id, judul, kategori, file_path)
-            VALUES (?, ?, ?, ?, ?)
-        """, (kelas_id, pengajar_id, judul, kategori, file_path))
+                (kelas_id, pengajar_id, judul, kategori, file_path, tanggal_upload)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (kelas_id, pengajar_id, judul, kategori, file_path, sekarang()))  # DIUBAH: + tanggal upload
 
         conn.commit()
         return cursor.lastrowid
@@ -436,14 +490,15 @@ def edit_materi(materi_id, judul, kategori, file_path=None):
     """Ubah judul/kategori materi. file_path diisi kalau pengajar upload file pengganti."""
     conn = get_connection()
     try:
+        # DIUBAH: tiap edit mencatat tanggal_edit, dipakai label "(Diedit 03 Oktober)" di feed
         if file_path:
             cursor = conn.execute(
-                "UPDATE materi SET judul = ?, kategori = ?, file_path = ? WHERE id = ?",
-                (judul, kategori, file_path, materi_id))
+                "UPDATE materi SET judul = ?, kategori = ?, file_path = ?, tanggal_edit = ? WHERE id = ?",
+                (judul, kategori, file_path, sekarang(), materi_id))
         else:
             cursor = conn.execute(
-                "UPDATE materi SET judul = ?, kategori = ? WHERE id = ?",
-                (judul, kategori, materi_id))
+                "UPDATE materi SET judul = ?, kategori = ?, tanggal_edit = ? WHERE id = ?",
+                (judul, kategori, sekarang(), materi_id))
         conn.commit()
         return cursor.rowcount > 0
     finally:
@@ -471,12 +526,39 @@ def tambah_tugas(kelas_id, pengajar_id, judul, deskripsi, deadline):
 
         cursor = conn.execute("""
             INSERT INTO tugas
-                (kelas_id, pengajar_id, judul, deskripsi, deadline)
-            VALUES (?, ?, ?, ?, ?)
-        """, (kelas_id, pengajar_id, judul, deskripsi, deadline))
+                (kelas_id, pengajar_id, judul, deskripsi, deadline, tanggal_dibuat)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (kelas_id, pengajar_id, judul, deskripsi, deadline, sekarang()))  # DIUBAH: + tanggal dibuat
 
         conn.commit()
         return cursor.lastrowid
+    finally:
+        conn.close()
+
+
+def edit_tugas(tugas_id, judul, deskripsi, deadline):
+    """BARU: ubah tugas yang sudah ada. Tanggal edit dicatat buat label '(Diedit ...)'."""
+    conn = get_connection()
+    try:
+        cursor = conn.execute("""
+            UPDATE tugas SET judul = ?, deskripsi = ?, deadline = ?, tanggal_edit = ?
+            WHERE id = ?
+        """, (judul, deskripsi, deadline, sekarang(), tugas_id))
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+
+def hapus_tugas(tugas_id):
+    """BARU: hapus tugas beserta pengumpulan & komentarnya, biar tidak ada data yatim."""
+    conn = get_connection()
+    try:
+        conn.execute("DELETE FROM komentar WHERE tugas_id = ?", (tugas_id,))
+        conn.execute("DELETE FROM pengumpulan WHERE tugas_id = ?", (tugas_id,))
+        cursor = conn.execute("DELETE FROM tugas WHERE id = ?", (tugas_id,))
+        conn.commit()
+        return cursor.rowcount > 0
     finally:
         conn.close()
 
@@ -534,22 +616,23 @@ def simpan_pengumpulan(tugas_id, siswa_id, file_jawaban):
             WHERE tugas_id = ? AND siswa_id = ?
         """, (tugas_id, siswa_id)).fetchone()
 
+        # DIUBAH: pakai waktu lokal, bukan CURRENT_TIMESTAMP yang UTC (beda 8 jam di WITA)
         if existing:
             # jawaban diganti = nilai lama nggak berlaku lagi, pengajar perlu menilai ulang
             conn.execute("""
                 UPDATE pengumpulan
                 SET file_jawaban = ?,
                     nilai = NULL,
-                    waktu_kumpul = CURRENT_TIMESTAMP
+                    waktu_kumpul = ?
                 WHERE id = ?
-            """, (file_jawaban, existing["id"]))
+            """, (file_jawaban, sekarang(), existing["id"]))
             pengumpulan_id = existing["id"]
         else:
             cursor = conn.execute("""
                 INSERT INTO pengumpulan
                     (tugas_id, siswa_id, file_jawaban, waktu_kumpul)
-                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-            """, (tugas_id, siswa_id, file_jawaban))
+                VALUES (?, ?, ?, ?)
+            """, (tugas_id, siswa_id, file_jawaban, sekarang()))
             pengumpulan_id = cursor.lastrowid
 
         conn.commit()
@@ -581,6 +664,25 @@ def ambil_pengumpulan_by_tugas(tugas_id):
             WHERE p.tugas_id = ?
             ORDER BY u.nama
         """, (tugas_id,)).fetchall()
+    finally:
+        conn.close()
+
+
+def ambil_pengumpulan_lengkap(tugas_id, kelas_id):
+    """BARU: SEMUA siswa kelas tsb + pengumpulannya (kalau ada), buat tabel 'Tugas Siswa'.
+    Siswa yang belum mengumpulkan tetap muncul dengan file_jawaban/nilai NULL,
+    jadi pengajar langsung kelihatan siapa yang belum setor."""
+    conn = get_connection()
+    try:
+        return conn.execute("""
+            SELECT u.id AS siswa_id, u.nama AS siswa_nama, u.username AS siswa_username,
+                   u.foto AS siswa_foto,
+                   p.id AS pengumpulan_id, p.file_jawaban, p.nilai, p.waktu_kumpul
+            FROM users u
+            LEFT JOIN pengumpulan p ON p.siswa_id = u.id AND p.tugas_id = ?
+            WHERE u.role = 'siswa' AND u.kelas_id = ?
+            ORDER BY u.nama
+        """, (tugas_id, kelas_id)).fetchall()
     finally:
         conn.close()
 
@@ -624,7 +726,9 @@ def update_nilai_pengumpulan(pengumpulan_id, nilai):
         conn.close()
 
 
-def tambah_komentar(tugas_id, user_id, isi):
+def tambah_komentar(tugas_id, user_id, isi, siswa_id):
+    """DIUBAH: komentar sekarang selalu menempel ke satu siswa (percakapan privat),
+    jadi siswa_id wajib diisi. Siswa harus anggota kelas tugas tersebut."""
     isi = (isi or "").strip()
     if not isi:
         raise ValueError("Isi komentar tidak boleh kosong.")
@@ -632,7 +736,7 @@ def tambah_komentar(tugas_id, user_id, isi):
     conn = get_connection()
     try:
         tugas = conn.execute(
-            "SELECT id FROM tugas WHERE id = ?",
+            "SELECT id, kelas_id FROM tugas WHERE id = ?",
             (tugas_id,)
         ).fetchone()
 
@@ -641,16 +745,27 @@ def tambah_komentar(tugas_id, user_id, isi):
             (user_id,)
         ).fetchone()
 
+        siswa = conn.execute(
+            "SELECT id, kelas_id, role FROM users WHERE id = ?",
+            (siswa_id,)
+        ).fetchone()
+
         if not tugas:
             raise ValueError("Tugas tidak ditemukan.")
 
         if not pengguna:
             raise ValueError("Pengguna tidak ditemukan.")
 
+        if not siswa or siswa["role"] != "siswa":
+            raise ValueError("Siswa tujuan komentar tidak ditemukan.")
+
+        if siswa["kelas_id"] != tugas["kelas_id"]:
+            raise ValueError("Siswa bukan anggota kelas tugas ini.")
+
         cursor = conn.execute("""
-            INSERT INTO komentar (tugas_id, user_id, isi_komentar)
-            VALUES (?, ?, ?)
-        """, (tugas_id, user_id, isi))
+            INSERT INTO komentar (tugas_id, user_id, siswa_id, isi_komentar, waktu)
+            VALUES (?, ?, ?, ?, ?)
+        """, (tugas_id, user_id, siswa_id, isi, sekarang()))
 
         conn.commit()
         return cursor.lastrowid
@@ -658,16 +773,31 @@ def tambah_komentar(tugas_id, user_id, isi):
         conn.close()
 
 
-def ambil_komentar_tugas(tugas_id):
+def ambil_komentar_tugas(tugas_id, siswa_id):
+    """DIUBAH: cuma percakapan milik siswa tsb yang keluar, bukan komentar sekelas."""
     conn = get_connection()
     try:
         return conn.execute("""
-            SELECT k.*, u.nama AS user_nama, u.role AS user_role
+            SELECT k.*, u.nama AS user_nama, u.role AS user_role, u.foto AS user_foto
             FROM komentar k
             JOIN users u ON u.id = k.user_id
-            WHERE k.tugas_id = ?
+            WHERE k.tugas_id = ? AND k.siswa_id = ?
             ORDER BY k.id ASC
+        """, (tugas_id, siswa_id)).fetchall()
+    finally:
+        conn.close()
+
+
+def hitung_komentar_tugas(tugas_id):
+    """BARU: {siswa_id: jumlah komentar}, buat kolom 'Komentar (n)' di tabel pengumpulan."""
+    conn = get_connection()
+    try:
+        rows = conn.execute("""
+            SELECT siswa_id, COUNT(*) AS jumlah FROM komentar
+            WHERE tugas_id = ? AND siswa_id IS NOT NULL
+            GROUP BY siswa_id
         """, (tugas_id,)).fetchall()
+        return {r["siswa_id"]: r["jumlah"] for r in rows}
     finally:
         conn.close()
 
@@ -911,7 +1041,8 @@ def ambil_monitoring_semua_siswa():
     conn = get_connection()
     try:
         return conn.execute("""
-            SELECT u.id AS siswa_id, u.nama AS nama_siswa, k.nama AS nama_kelas,
+            SELECT u.id AS siswa_id, u.nama AS nama_siswa, u.foto AS foto_siswa,
+                   k.id AS kelas_id, k.nama AS nama_kelas,
                    (SELECT ROUND(AVG(nilai), 2) FROM pengumpulan WHERE siswa_id = u.id) AS rata_rata,
                    (SELECT COUNT(*) FROM presensi WHERE siswa_id = u.id AND LOWER(status) = 'hadir') AS hadir,
                    (SELECT COUNT(*) FROM presensi WHERE siswa_id = u.id AND LOWER(status) = 'izin') AS izin,
@@ -964,16 +1095,16 @@ def tambah_catatan_akhir(siswa_id, kelas_id, pengajar_id, catatan):
         if catatan_lama:
             conn.execute("""
                 UPDATE catatan_akhir
-                SET catatan = ?, pengajar_id = ?, tanggal_dibuat = CURRENT_TIMESTAMP
+                SET catatan = ?, pengajar_id = ?, tanggal_dibuat = ?
                 WHERE id = ?
-            """, (catatan, pengajar_id, catatan_lama["id"]))
+            """, (catatan, pengajar_id, sekarang(), catatan_lama["id"]))  # DIUBAH: waktu lokal
             hasil = catatan_lama["id"]
         else:
             cursor = conn.execute("""
                 INSERT INTO catatan_akhir
-                    (siswa_id, kelas_id, pengajar_id, catatan)
-                VALUES (?, ?, ?, ?)
-            """, (siswa_id, kelas_id, pengajar_id, catatan))
+                    (siswa_id, kelas_id, pengajar_id, catatan, tanggal_dibuat)
+                VALUES (?, ?, ?, ?, ?)
+            """, (siswa_id, kelas_id, pengajar_id, catatan, sekarang()))
             hasil = cursor.lastrowid
 
         conn.commit()

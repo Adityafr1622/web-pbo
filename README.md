@@ -6,63 +6,80 @@ Proyek UTS PBO — Kelompok B3
 
 ```
 pip install -r requirements.txt
-python seed.py       # sekali saja, bikin database + akun admin pertama
+python seed.py       # SEKALI SAJA untuk database baru (menghapus data lama!)
 python app.py
 ```
 
-Buka `http://127.0.0.1:5000`
+Buka `http://127.0.0.1:5000` — akun admin pertama: `admin` / `admin123`.
 
-## Sudah jalan (Julpa)
+> **Sudah punya `fluenglo.db` dari sebelumnya? JANGAN jalankan `seed.py`.**
+> Cukup `python app.py`. Fungsi `database.migrasi()` otomatis menambahkan tabel dan
+> kolom baru tanpa menghapus data, dan password lama yang masih polos otomatis
+> berubah jadi hash begitu pemiliknya login sekali.
 
-- Login & Logout (session, bukan dummy lagi)
-- Kelola Akun: lihat daftar, tambah akun, hapus akun — semua sudah
-  tersambung ke database asli (`fluenglo.db`)
-- Semua halaman Siswa (Jadwal, Materi, Tugas, Monitoring) — masih pakai
-  data contoh, menyusul disambungkan ke database oleh Anggota 1/2/3
+## Keamanan password
 
-## Struktur folder & siapa mengerjakan apa
+Password **tidak pernah disimpan apa adanya**. `database.tambah_user()` dan
+`database.edit_user()` meng-hash lewat `werkzeug.security.generate_password_hash`,
+dan `User.cek_password()` memverifikasinya dengan `check_password_hash`. Artinya
+password asli tidak bisa dibaca siapa pun — termasuk admin.
+
+Di halaman Kelola Akun, kolom Password menampilkan titik-titik; ikon mata membuka
+**hash** yang tersimpan (bukan password asli, karena password aslinya memang sudah
+tidak ada). Untuk mengganti password pengguna, admin memakai tombol Edit. Waktu
+pengguna mengganti passwordnya sendiri dicatat di tabel `riwayat_password` —
+yang disimpan hanya waktunya, bukan isinya.
+
+Lupa password **tidak memakai OTP WhatsApp**: pengguna menghubungi admin lewat
+kontak di tab "Tentang Kami". Alasannya skala kursus kecil, tanpa biaya dan
+ketergantungan pihak ketiga; OTP tetap butuh jalur admin kalau nomornya salah.
+
+NIK pengajar hanya dikirim ke admin dan pengajar yang bersangkutan, tidak pernah
+ke siswa (`Pengajar.profil_publik()` memang tidak memuatnya). Di tabel Kelola Akun
+NIK tampil 4 digit awal saja; lengkapnya di halaman Profil Lengkap. Fotokopi KTP
+sengaja tidak disimpan (prinsip minimisasi data).
+
+## Struktur folder
 
 ```
 fluenglo/
-├── app.py              # Julpa — route sudah ada semua. Bagian Siswa &
-│                        # Admin/Kelola Akun sudah jalan, sisanya TODO
-│                        # per nama di komentar.
-├── database.py         # Julpa — koneksi + query users() sudah jalan.
-│                        # Anggota lain isi query modulnya di bagian TODO.
-├── schema.sql           # Julpa — jangan diubah sendiri, diskusi dulu
-├── seed.py              # Julpa — sudah jalan, buat akun admin pertama
+├── app.py                 # route Flask + filter tampilan (samar, tgl, tgl_jam, ...)
+├── database.py            # SATU-SATUNYA tempat SQL ditulis
+├── schema.sql             # struktur tabel
+├── seed.py                # bikin database + akun admin pertama
 ├── models/
-│   ├── user.py          # Siswa & Pengajar: isi TODO (Anggota 1/2/3/4)
-│   ├── akademik.py      # ANGGOTA 1 (Kelas, Jadwal) + ANGGOTA 2 (Materi, Tugas, Komentar)
-│   └── presensi.py      # ANGGOTA 4 (Presensi, CatatanPengajar)
-├── templates/            # AYA — 4 halaman Siswa sudah selesai.
-│                          # admin_akun.html masih polos (belum ada desain),
-│                          # tinggal distyle tanpa ubah nama field form.
-└── static/
+│   ├── user.py            # User (ABC) -> Siswa, Pengajar, Admin
+│   ├── akademik.py        # Kelas, Jadwal, Materi, Tugas, Pengumpulan, Komentar
+│   └── presensi.py        # Presensi, CatatanPengajar
+├── templates/             # Jinja; _macros.html berisi macro bersama
+└── static/                # style.css, app.js, images/, uploads/
 ```
 
-Tiap method yang masih kosong ditandai `pass` + komentar `TODO (Anggota n)`.
-Jangan ubah nama method/parameter tanpa bilang di grup dulu, karena
-`app.py` dan file lain sudah memanggil method-method itu persis seperti itu.
+## 4 pilar OOP — di mana melihatnya
+
+Cari komentar bertanda di kode (`grep -rn ENCAPSULATION .`):
+
+| Pilar | Contoh paling jelas |
+|---|---|
+| **Encapsulation** | `User.__password` private; hanya bisa diperiksa lewat `cek_password()` dan diubah lewat `ganti_password()`. `database.edit_user()` punya daftar putih kolom. |
+| **Abstraction** | `User` adalah Abstract Base Class dengan `@abstractmethod tampilkan_menu()`. `database.py` menyembunyikan seluruh SQL dari models dan route. |
+| **Inheritance** | `Siswa`, `Pengajar`, `Admin` mewarisi `User` beserta `cek_password()`, `ganti_password()`, dan aturan kontak `cek_kontak()`. |
+| **Polymorphism** | `tampilkan_menu()`, `lihat_profil()`, `boleh_akses_kelas()`, `boleh_lihat_siswa()`, `boleh_lihat_pengajar()` di-override tiap role — route memanggilnya tanpa `if role == ...`. |
+
+## Alur halaman
+
+- **Admin**: Kelola Akun → Kelola Kelas → Kelola Jadwal → Monitoring
+- **Pengajar**: Profil, Kelas, Jadwal. Materi/Tugas/Presensi dibuka dari dalam kelas.
+- **Siswa**: Profil, Kelas, Jadwal, Monitoring Anak.
+- Di dalam sebuah kelas ada tiga tab: **Materi | Tugas | Presensi**.
+- Komentar tugas adalah **percakapan privat** antara satu siswa dan pengajarnya
+  (kolom `komentar.siswa_id`); siswa lain tidak bisa membacanya.
 
 ## Pembagian backend per modul
 
-- **Anggota 1**: Kelola Kelas & Jadwal → `models/akademik.py` (Kelas, Jadwal)
-  + `Admin.kelola_kelas()` / `Admin.kelola_jadwal()` di `models/user.py`
-- **Anggota 2**: Materi & Tugas → `models/akademik.py` (Materi, Tugas, Komentar)
-  + method terkait di `Siswa`/`Pengajar` (`kumpul_tugas`, `komentar_tugas`, dst)
-- **Anggota 3**: Penilaian & Monitoring → `Pengumpulan.beri_nilai()` di
-  `akademik.py` + `Admin.monitoring_sistem()` / `Siswa.lihat_monitoring()`
-- **Anggota 4**: Presensi & Catatan → `models/presensi.py` (Presensi, CatatanPengajar)
-
-## Alur kerja
-
-1. Isi method di modulmu (lihat TODO).
-2. Tes modulmu sendiri dulu sebelum bilang "selesai" — bisa jalankan
-   file-nya langsung atau coba lewat Python interaktif.
-3. Push ke branch sendiri, bikin Pull Request, Julpa yang merge.
-4. Setelah di-merge, `git pull` dulu sebelum lanjut kerja.
-
-## Akun demo (dari seed.py)
-
-- Admin: `admin` / `admin123` (ganti sebelum deploy publik)
+- **Julpa**: arsitektur PBO, auth, `app.py`, Kelola Akun
+- **Aya**: UI/UX, template HTML, CSS
+- **Anggota 1**: Kelola Kelas & Jadwal → `Kelas`, `Jadwal` di `akademik.py`
+- **Larry**: Materi & Tugas → `Materi`, `Tugas`, `Komentar`, `Pengumpulan`
+- **Anggota 3**: Penilaian & Monitoring → `beri_nilai()`, `monitoring_sistem()`, `lihat_monitoring()`
+- **Anggota 4**: Presensi & Catatan Akhir → `presensi.py`

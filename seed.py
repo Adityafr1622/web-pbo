@@ -15,10 +15,13 @@ def init_db():
     cursor.execute('DELETE FROM jadwal')
 
     # Seed Hanya Akun Admin Utama
+    # DIUBAH: password admin ikut di-hash lewat database.hash_password(), jadi di tabel users
+    # yang tersimpan hash-nya, bukan teks 'admin123'. Login tetap pakai admin123.
     cursor.execute('''
         INSERT INTO users (nama, username, password, role, foto, no_whatsapp, biodata)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', ('Fluenglo Admin', 'admin', 'admin123', 'admin', 'default_avatar.png', None, None))
+    ''', ('Fluenglo Admin', 'admin', database.hash_password('admin123'), 'admin',
+          'default_avatar.png', None, None))
 
     conn.commit()
     conn.close()

@@ -65,6 +65,18 @@
       const l = $('.multi-list', el.parentElement); l.hidden = !l.hidden;
       el.setAttribute('aria-expanded', String(!l.hidden)); return;
     }
+    // BARU: ikon mata di kolom Password (Kelola Akun). Yang ditampilkan adalah HASH
+    // yang tersimpan di database, bukan password asli — password aslinya memang
+    // sudah tidak ada lagi karena di-hash satu arah.
+    if ((el = up('[data-pw-cell]'))) {
+      const sel = el.parentElement, tampil = $('.pw-hash', sel).hidden;
+      $('.pw-mask', sel).hidden = tampil;
+      $('.pw-hash', sel).hidden = !tampil;
+      el.classList.toggle('is-shown', tampil);
+      el.setAttribute('aria-label', tampil ? 'Sembunyikan hash password' : 'Tampilkan hash password');
+      return;
+    }
+
     if ((el = up('[data-flash-x]'))) el.closest('.flash').remove();
   });
 
@@ -76,6 +88,25 @@
     }
     if (t.matches('[data-auto-hari]') && t.value && t.form.elements.hari) {   // hari otomatis dari tanggal
       t.form.elements.hari.value = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][new Date(t.value + 'T00:00').getDay()];
+    }
+
+    // BARU: pilih tanggal pertemuan -> tampilkan tabel presensi tanggal tersebut
+    if (t.matches('[data-presensi-pick]')) {
+      $$('.presensi-panel').forEach(f => f.hidden = f.id !== t.value);
+      return;
+    }
+
+    // BARU: centang "Semua" di kolom Hadir -> semua siswa ditandai hadir sekaligus
+    if (t.matches('[data-semua-hadir]')) {
+      const form = t.closest('form');
+      $$('input[type=radio][value=hadir]', form).forEach(r => { if (!r.disabled) r.checked = t.checked; });
+      return;
+    }
+
+    // kalau satu baris diubah manual, centang "Semua" dilepas biar nggak menyesatkan
+    if (t.type === 'radio' && t.name.startsWith('st_') && t.value !== 'hadir') {
+      const semua = $('[data-semua-hadir]', t.closest('form') || document);
+      if (semua) semua.checked = false;
     }
   });
 

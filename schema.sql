@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS jadwal (
     FOREIGN KEY(pengajar_id) REFERENCES users(id)
 );
 
+-- tanggal_upload & tanggal_edit dipakai feed kelas: "02 Oktober (Diedit 03 Oktober)"
 CREATE TABLE IF NOT EXISTS materi (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     judul TEXT NOT NULL,
@@ -51,6 +52,8 @@ CREATE TABLE IF NOT EXISTS materi (
     file_path TEXT,
     kelas_id INTEGER NOT NULL,
     pengajar_id INTEGER NOT NULL,
+    tanggal_upload TEXT,
+    tanggal_edit TEXT,
     FOREIGN KEY(kelas_id) REFERENCES kelas(id),
     FOREIGN KEY(pengajar_id) REFERENCES users(id)
 );
@@ -62,6 +65,8 @@ CREATE TABLE IF NOT EXISTS tugas (
     deadline TEXT,
     kelas_id INTEGER NOT NULL,
     pengajar_id INTEGER NOT NULL,
+    tanggal_dibuat TEXT,
+    tanggal_edit TEXT,
     FOREIGN KEY(kelas_id) REFERENCES kelas(id),
     FOREIGN KEY(pengajar_id) REFERENCES users(id)
 );
@@ -80,14 +85,19 @@ CREATE TABLE IF NOT EXISTS pengumpulan (
     UNIQUE (tugas_id, siswa_id)
 );
 
+-- Komentar tugas = percakapan PRIVAT antara satu siswa dan pengajar kelasnya.
+-- siswa_id menandai percakapan ini milik siapa; user_id tetap penulis komentarnya
+-- (bisa siswa itu sendiri, bisa pengajar). Jadi siswa lain tidak ikut membaca.
 CREATE TABLE IF NOT EXISTS komentar (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     tugas_id INTEGER NOT NULL,
     user_id INTEGER NOT NULL,
+    siswa_id INTEGER,
     isi_komentar TEXT NOT NULL,
-    waktu TEXT DEFAULT CURRENT_TIMESTAMP,
+    waktu TEXT DEFAULT (datetime('now', 'localtime')),
     FOREIGN KEY (tugas_id) REFERENCES tugas(id),
-    FOREIGN KEY (user_id) REFERENCES users(id)
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (siswa_id) REFERENCES users(id)
 );
 
 CREATE TABLE IF NOT EXISTS presensi (

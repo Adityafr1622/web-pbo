@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import ic, avatar, pwfield, modal %}
+{% block title %}Profil Pengajar · Fluenglo{% endblock %}
+
+{% block content %}
+{# data dari app.py: data (dict profil pengajar), lengkap (NIK ikut ditampilkan?), bisa_ubah
+   CATATAN: field Password sengaja TIDAK ditampilkan di sini — beda dari desain Canva.
+   Password disimpan ter-hash, jadi tidak ada yang bisa ditampilkan selain titik-titik kosong. #}
+<div class="page-head">
+  <div>
+    <h1>Profil Pengajar</h1>
+    <p class="sub">{{ 'Profil kamu di Fluenglo.' if bisa_ubah else 'Lihat informasi profil' }}</p>
+  </div>
+</div>
+
+<section class="card profile-card">
+  <div class="profile-col">
+    <p class="col-title">Profil</p>
+    <div class="profile-body">
+      {{ avatar(data.foto, data.nama, 'avatar-xl') }}
+      <div class="profile-fields">
+        <div class="field"><span class="field-label">Nama Lengkap</span><div class="read strong">{{ data.nama }}</div></div>
+        <div class="field"><span class="field-label">Username</span><div class="read">{{ data.username }}</div></div>
+        {% if data.biodata %}
+        <div class="field"><span class="field-label">Biodata</span><div class="read pre-line">{{ data.biodata }}</div></div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="profile-col profile-col-right">
+    <p class="col-title">Informasi Akun &amp; Kontak</p>
+    <div class="field"><span class="field-label">Nomor WhatsApp</span><div class="read white">{{ data.whatsapp or '-' }}</div></div>
+    <div class="field"><span class="field-label">Email</span>
+      <div class="read white {{ 'is-empty' if not data.email }}">{{ data.email or 'Belum diisi (opsional)' }}</div></div>
+    <div class="field"><span class="field-label">Alamat</span>
+      <div class="read white {{ 'is-empty' if not data.alamat }}">{{ data.alamat or 'Belum diisi' }}</div></div>
+    {% if lengkap %}
+    {# NIK hanya dikirim ke admin dan pengajar yang bersangkutan, tidak pernah ke siswa #}
+    <div class="field"><span class="field-label">NIK <span class="label-note">(hanya admin &amp; pengajar ybs)</span></span>
+      <div class="read">{{ data.nik or '-' }}</div></div>
+    {% endif %}
+
+    {% if bisa_ubah %}
+    <div class="profile-actions">
+      <button type="button" class="btn btn-light" data-open="modal-ganti-password">{{ ic('lock', 16) }} Ganti Password</button>
+      <button type="button" class="btn btn-yellow" data-open="modal-ubah-profil">{{ ic('pencil', 16) }} Ubah Profil</button>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+{% if bisa_ubah %}
+{% call modal('modal-ubah-profil', 'Ubah Profil') %}
+<form method="post" action="{{ url_for('ubah_profil') }}" enctype="multipart/form-data">
+  <div class="modal-body"><div class="form-grid">
+    <div class="field"><label>Nomor WhatsApp</label>
+      <input type="text" name="whatsapp" value="{{ data.whatsapp or '' }}" placeholder="Contoh: 08123456789" required></div>
+    <div class="field"><label>Email <span class="label-note">(opsional)</span></label>
+      <input type="email" name="email" value="{{ data.email or '' }}" placeholder="nama@email.com"></div>
+    <div class="field span-2"><label>Alamat</label>
+      <input type="text" name="alamat" value="{{ data.alamat or '' }}" placeholder="Masukkan alamat" required></div>
+    <div class="field span-2"><label>Photo Profil <span class="label-note">(kosong = tetap)</span></label>
+      <input type="file" name="foto" accept="image/*"></div>
+  </div>
+  <p class="form-note">NIK hanya bisa diubah oleh admin lewat menu Kelola Akun.</p>
+  </div>
+  <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Simpan</button></div>
+</form>
+{% endcall %}
+
+{% call modal('modal-ganti-password', 'Ganti Password') %}
+<form method="post" action="{{ url_for('ganti_password') }}">
+  <div class="modal-body">
+    {{ pwfield('Password Lama', 'password_lama', true, 'Masukkan password lama') }}
+    {{ pwfield('Password Baru', 'password_baru', true, 'Min. 8 karakter, huruf + angka') }}
+    {{ pwfield('Konfirmasi Password Baru', 'konfirmasi_password', true, 'Ulangi password baru') }}
+    <p class="form-note">Waktu penggantian password dicatat sistem, tetapi isi passwordnya tidak pernah disimpan maupun ditampilkan.</p>
+  </div>
+  <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Simpan</button></div>
+</form>
+{% endcall %}
+{% endif %}
+{% endblock %}

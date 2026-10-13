@@ -1,0 +1,135 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import ic, avatar, ta, modal %}
+{% block title %}Monitoring · Fluenglo{% endblock %}
+
+{% block content %}
+{# data dari app.py:
+   mode daftar  -> daftar (semua siswa), ringkasan (khusus admin)
+   mode satu anak -> data (presensi, nilai, daftar_nilai, catatan_akhir), siswa, bisa_beri_catatan #}
+
+{% if daftar is not none %}
+{# ================= daftar siswa (admin & pengajar) ================= #}
+<div class="page-head">
+  <div>
+    <h1>Monitoring</h1>
+    <p class="sub">{{ 'Rekap nilai, presensi, dan catatan akhir seluruh siswa.' if user.role == 'admin' else 'Rekap siswa di kelas yang kamu ajar.' }}</p>
+  </div>
+</div>
+
+{% if ringkasan %}
+<div class="stat-grid">
+  <div class="stat"><span class="stat-angka">{{ ringkasan.total_siswa }}</span><span class="stat-label">Siswa</span></div>
+  <div class="stat"><span class="stat-angka">{{ ringkasan.total_pengajar }}</span><span class="stat-label">Pengajar</span></div>
+  <div class="stat"><span class="stat-angka">{{ ringkasan.total_kelas }}</span><span class="stat-label">Kelas</span></div>
+  <div class="stat"><span class="stat-angka">{{ ringkasan.total_materi }}</span><span class="stat-label">Materi</span></div>
+  <div class="stat"><span class="stat-angka">{{ ringkasan.total_tugas }}</span><span class="stat-label">Tugas</span></div>
+  <div class="stat"><span class="stat-angka">{{ ringkasan.total_penilaian }}</span><span class="stat-label">Tugas Dinilai</span></div>
+  <div class="stat"><span class="stat-angka">{{ ringkasan.total_presensi }}</span><span class="stat-label">Catatan Presensi</span></div>
+  <div class="stat"><span class="stat-angka">{{ ringkasan.total_catatan_akhir }}</span><span class="stat-label">Catatan Akhir</span></div>
+</div>
+{% endif %}
+
+<div class="table-card"><div class="table-scroll">
+<table class="data-table">
+  <thead><tr><th class="th-left">Nama Siswa</th><th>Kelas</th><th>Rata-rata Nilai</th><th>Hadir</th><th>Izin</th><th>Sakit</th><th>Alpha</th><th>Catatan Akhir</th><th>Aksi</th></tr></thead>
+  <tbody>
+  {% for d in daftar %}
+  <tr>
+    <td class="td-left td-strong">{{ d.nama_siswa }}</td>
+    <td>{{ d.nama_kelas or '-' }}</td>
+    <td>{{ d.rata_rata if d.rata_rata is not none else '-' }}</td>
+    <td>{{ d.hadir }}</td><td>{{ d.izin }}</td><td>{{ d.sakit }}</td><td>{{ d.alfa }}</td>
+    <td>{% if d.jumlah_catatan %}<span class="badge badge-ok">{{ ic('check', 13) }} Ada</span>{% else %}<span class="badge badge-abu">Belum ada</span>{% endif %}</td>
+    <td><a class="link-profil" href="{{ url_for('monitoring_siswa', siswa_id=d.siswa_id) }}">Lihat Monitoring</a></td>
+  </tr>
+  {% else %}<tr class="row-empty"><td colspan="9">Belum ada siswa yang bisa dimonitor.</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div></div>
+
+{% else %}
+{# ================= monitoring satu anak ================= #}
+{% set p = data.presensi %}
+{% set total_hadir = p.hadir + p.izin + p.sakit + p.alfa %}
+<div class="page-head">
+  <div>
+    <h1>Monitoring Anak</h1>
+    <p class="sub">{{ 'Rekap presensi, nilai, dan catatan akhir dari pengajar.' if user.id == siswa.id else 'Rekap untuk ' ~ siswa.nama }}</p>
+  </div>
+  {% if user.role != 'siswa' %}
+  <a class="btn btn-light" href="{{ url_for('profil_siswa', siswa_id=siswa.id) }}">{{ ic('user', 16) }} Buka Profil</a>
+  {% endif %}
+</div>
+
+<section class="card mon-card">
+  <h2>Rekap Presensi</h2>
+  <div class="stat-grid stat-presensi">
+    <div class="stat stat-hijau"><span class="stat-angka">{{ p.hadir }}</span><span class="stat-label">Hadir</span></div>
+    <div class="stat stat-kuning"><span class="stat-angka">{{ p.izin }}</span><span class="stat-label">Izin</span></div>
+    <div class="stat stat-biru"><span class="stat-angka">{{ p.sakit }}</span><span class="stat-label">Sakit</span></div>
+    <div class="stat stat-merah"><span class="stat-angka">{{ p.alfa }}</span><span class="stat-label">Alpha</span></div>
+  </div>
+  <p class="muted mon-note">
+    {% if total_hadir %}Dari {{ total_hadir }} pertemuan yang tercatat, kehadiran {{ (p.hadir * 100 / total_hadir)|round(1) }}%.
+    {% else %}Belum ada pertemuan yang tercatat.{% endif %}
+  </p>
+</section>
+
+<section class="card mon-card">
+  <h2>Rekap Nilai</h2>
+  <div class="stat-grid">
+    <div class="stat"><span class="stat-angka">{{ data.nilai.jumlah_tugas_dinilai or 0 }}</span><span class="stat-label">Tugas Dinilai</span></div>
+    <div class="stat"><span class="stat-angka">{{ data.nilai.rata_rata if data.nilai.rata_rata is not none else '-' }}</span><span class="stat-label">Rata-rata</span></div>
+    <div class="stat"><span class="stat-angka">{{ data.nilai.nilai_tertinggi|round|int if data.nilai.nilai_tertinggi is not none else '-' }}</span><span class="stat-label">Tertinggi</span></div>
+    <div class="stat"><span class="stat-angka">{{ data.nilai.nilai_terendah|round|int if data.nilai.nilai_terendah is not none else '-' }}</span><span class="stat-label">Terendah</span></div>
+  </div>
+
+  <div class="table-card mon-table"><div class="table-scroll">
+  <table class="data-table">
+    <thead><tr><th class="th-left">Tugas</th><th>Tenggat</th><th>Dikumpulkan</th><th>Nilai</th></tr></thead>
+    <tbody>
+    {% for n in data.daftar_nilai %}
+    <tr>
+      <td class="td-left td-strong">{{ n.judul_tugas }}</td>
+      <td>{{ n.deadline|tgl_jam }}</td>
+      <td>{% if n.waktu_kumpul %}{{ n.waktu_kumpul|tgl_jam }}{% else %}<span class="muted">Belum dikumpulkan</span>{% endif %}</td>
+      <td>{% if n.nilai is not none %}<strong>{{ n.nilai|round|int }}</strong> <span class="muted">/100</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+    </tr>
+    {% else %}<tr class="row-empty"><td colspan="4">Belum ada tugas di kelas ini.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div></div>
+</section>
+
+<section class="card mon-card">
+  <h2>Catatan Akhir dari Pengajar</h2>
+  <p class="muted">Ditulis pengajar setelah seluruh pertemuan selesai. Catatan per pertemuan disampaikan lewat Komentar Tugas.</p>
+  {% for c in data.catatan_akhir %}
+  <div class="catatan-item">
+    <header><strong>{{ c.nama_pengajar }}</strong> · {{ c.nama_kelas }} · <time class="muted">{{ c.tanggal_dibuat|tgl_jam }}</time></header>
+    <p class="pre-line">{{ c.catatan }}</p>
+  </div>
+  {% else %}
+  <p class="empty-text">Belum ada catatan akhir untuk siswa ini.</p>
+  {% endfor %}
+
+  {% if bisa_beri_catatan and kelas_id %}
+  <div class="profile-actions">
+    <button type="button" class="btn btn-yellow" data-open="modal-catatan">{{ ic('note', 16) }} Tulis / Ubah Catatan Akhir</button>
+  </div>
+  {% endif %}
+</section>
+
+{% if bisa_beri_catatan and kelas_id %}
+{% call modal('modal-catatan', 'Catatan Akhir · ' ~ siswa.nama) %}
+<form method="post" action="{{ url_for('simpan_catatan_akhir', kelas_id=kelas_id, siswa_id=siswa.id) }}">
+  <div class="modal-body">
+    {{ ta('Catatan perkembangan siswa', 'catatan', 'Tulis perkembangan siswa selama kursus…', true, 6) }}
+    <p class="form-note">Satu siswa punya satu catatan akhir per kelas. Menyimpan lagi akan memperbarui catatan yang sudah ada.</p>
+  </div>
+  <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Simpan</button></div>
+</form>
+{% endcall %}
+{% endif %}
+{% endif %}
+{% endblock %}

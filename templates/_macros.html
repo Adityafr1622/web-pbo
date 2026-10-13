@@ -1,4 +1,4 @@
-{# Macro bersama: ikon SVG, avatar, field form, modal, multi-select pengajar #}
+{# Macro bersama: ikon SVG, avatar, field form, modal, multi-select pengajar, header kelas #}
 {% macro ic(name, size=18) -%}
 {%- set P = {
 'arrow-left':'<path d="M19 12H5M12 19l-7-7 7-7"/>',
@@ -17,7 +17,17 @@
 'logout':'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
 'mail':'<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 6 10 7 10-7"/>',
 'instagram':'<rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><path d="M17.5 6.5h.01"/>',
-'whatsapp':'<path d="M3 21l1.7-5A9 9 0 1 1 8 19.3z"/><path d="M9 9c0 3 3 6 6 6l1.5-1.5-2-1-1 .8c-1-.4-2-1.4-2.4-2.4l.8-1-1-2z"/>'
+'whatsapp':'<path d="M3 21l1.7-5A9 9 0 1 1 8 19.3z"/><path d="M9 9c0 3 3 6 6 6l1.5-1.5-2-1-1 .8c-1-.4-2-1.4-2.4-2.4l.8-1-1-2z"/>',
+'book':'<path d="M3 4.5A1.5 1.5 0 0 1 4.5 3H9a3 3 0 0 1 3 3v13a2.5 2.5 0 0 0-2.5-2.5H3z"/><path d="M21 4.5A1.5 1.5 0 0 0 19.5 3H15a3 3 0 0 0-3 3v13a2.5 2.5 0 0 1 2.5-2.5H21z"/><path d="m15.5 13.5 1.5 1.5 3-3"/>',
+'pen':'<path d="M12 19.5 19.5 12a2.8 2.8 0 0 0-4-4L8 15.5 6.5 21z"/><path d="m14.5 6.5 3 3"/>',
+'download':'<path d="M12 3v12M7 11l5 5 5-5"/><path d="M4 20h16"/>',
+'file':'<path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5"/>',
+'chat':'<path d="M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-6.4A8 8 0 1 1 21 12z"/>',
+'check':'<path d="m4 12 5 5L20 6"/>',
+'clock':'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+'chart':'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+'note':'<path d="M5 3h14a1 1 0 0 1 1 1v12l-5 5H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M20 16h-4a1 1 0 0 0-1 1v4"/><path d="M8 8h8M8 12h5"/>',
+'upload':'<path d="M12 21V9M7 13l5-5 5 5"/><path d="M4 4h16"/>'
 } -%}
 <svg class="ic ic-{{ name }}" width="{{ size }}" height="{{ size }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ P[name]|safe }}</svg>
 {%- endmacro %}
@@ -33,6 +43,12 @@
 {% macro field(label, name, ph='', type='text', req=true, cls='') -%}
 <div class="field {{ cls }}"><label>{{ label }}</label>
 <input type="{{ type }}" name="{{ name }}" placeholder="{{ ph }}" {{ 'required' if req }} {% if type == 'date' %}data-auto-hari{% endif %}></div>
+{%- endmacro %}
+
+{# BARU: textarea, dipakai deskripsi/petunjuk tugas dan catatan akhir #}
+{% macro ta(label, name, ph='', req=true, rows=4, cls='') -%}
+<div class="field {{ cls }}"><label>{{ label }}</label>
+<textarea name="{{ name }}" rows="{{ rows }}" placeholder="{{ ph }}" {{ 'required' if req }}></textarea></div>
 {%- endmacro %}
 
 {% macro pwfield(label='Password', name='password', req=true, ph='Masukkan password') -%}
@@ -58,4 +74,30 @@
 {% for p in pengajar_list %}<label class="multi-opt"><input type="checkbox" value="{{ p.id }}" data-name="{{ p.nama }}"><span class="box"></span>{{ p.nama }}</label>
 {% else %}<div class="multi-empty">Belum ada akun pengajar.</div>{% endfor %}
 </div></div></div>
+{%- endmacro %}
+
+{# BARU: banner kelas + tab Materi | Tugas | Presensi. Dipakai bareng oleh
+   materi.html, detail_materi.html, tugas.html, detail_tugas.html, detail_kelas.html. #}
+{% macro kelas_head(kelas, pengajar_list, tab, admin=false) -%}
+<div class="page-head">
+  <div>
+    <h1>{{ 'Kelola Kelas' if admin else 'Kelas' }}</h1>
+    <p class="sub">{{ 'Administrator dapat menambahkan kelas untuk siswa dan pengajar.' if admin else 'Materi, tugas, dan presensi kelas kamu.' }}</p>
+  </div>
+</div>
+
+<article class="kelas-card kelas-bg kelas-banner">
+  <h2 class="kelas-title">{{ kelas.nama_kelas or kelas.nama }}</h2>
+  <div class="kelas-guru">
+    {% for p in pengajar_list %}<a href="{{ url_for('profil_pengajar', pengajar_id=p.id) }}">{{ p.nama }}</a>{% endfor %}
+  </div>
+</article>
+
+<nav class="kelas-tabs">
+  <a href="{{ url_for('kelola_materi', kelas_id=kelas.id) }}" class="{{ 'is-active' if tab == 'materi' }}">Materi</a>
+  <span class="sep">|</span>
+  <a href="{{ url_for('daftar_tugas', kelas_id=kelas.id) }}" class="{{ 'is-active' if tab == 'tugas' }}">Tugas</a>
+  <span class="sep">|</span>
+  <a href="{{ url_for('detail_kelas', kelas_id=kelas.id) }}" class="{{ 'is-active' if tab == 'presensi' }}">Presensi</a>
+</nav>
 {%- endmacro %}

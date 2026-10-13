@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import ic, field, ta, modal, kelas_head %}
+{% block title %}Materi {{ kelas.nama_kelas }} · Fluenglo{% endblock %}
+
+{% block content %}
+{# data dari app.py: kelas, materi_list, user, tab, pengajar_list #}
+{{ kelas_head(kelas, pengajar_list, tab, admin=(user.role == 'admin')) }}
+
+{% if user.role == 'pengajar' %}
+<div class="tab-actions">
+  <button type="button" class="btn btn-yellow" data-open="modal-tambah-materi">{{ ic('plus', 16) }} Unggah Materi</button>
+</div>
+{% endif %}
+
+<div class="feed">
+  {% for m in materi_list %}
+  <div class="feed-row">
+    <a class="feed-item" href="{{ url_for('detail_materi', materi_id=m.id) }}">
+      <span class="feed-ic feed-ic-book">{{ ic('book', 30) }}</span>
+      <span class="feed-text">
+        <strong>{{ m.nama_pengajar or 'Pengajar' }} memposting materi baru: {{ m.judul }}</strong>
+        <small>{{ m|tgl_posting }}{% if m.kategori %} · {{ m.kategori }}{% endif %}</small>
+      </span>
+    </a>
+    {% if user.role == 'pengajar' %}
+    <div class="aksi feed-aksi">
+      <button type="button" class="icon-btn icon-edit" title="Edit materi" data-edit="modal-edit-materi"
+        data-action="{{ url_for('edit_materi', materi_id=m.id) }}"
+        data-fill='{{ {"judul": m.judul, "kategori": m.kategori}|tojson }}'>{{ ic('pencil', 16) }}</button>
+      <button type="button" class="icon-btn icon-del" title="Hapus materi" data-confirm="{{ url_for('hapus_materi', materi_id=m.id) }}"
+        data-text="Yakin ingin menghapus materi {{ m.judul }}? Tindakan ini tidak dapat dibatalkan.">{{ ic('trash', 16) }}</button>
+    </div>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="empty-card">Belum ada materi di kelas ini.{% if user.role == 'pengajar' %} Klik "Unggah Materi" untuk menambahkan.{% endif %}</div>
+  {% endfor %}
+</div>
+
+{% if user.role == 'pengajar' %}
+{% call modal('modal-tambah-materi', 'Unggah Materi') %}
+<form method="post" action="{{ url_for('kelola_materi', kelas_id=kelas.id) }}" enctype="multipart/form-data">
+  <div class="modal-body">
+    {{ field('Judul Materi', 'judul', 'Contoh: Modul 1 - Descriptive Text') }}
+    {{ field('Kategori', 'kategori', 'Contoh: Grammar, Reading, Writing', 'text', false) }}
+    <div class="field"><label>Berkas Materi</label><input type="file" name="file_materi" required></div>
+  </div>
+  <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Unggah</button></div>
+</form>
+{% endcall %}
+
+{% call modal('modal-edit-materi', 'Edit Materi') %}
+<form method="post" enctype="multipart/form-data">
+  <div class="modal-body">
+    {{ field('Judul Materi', 'judul', '') }}
+    {{ field('Kategori', 'kategori', '', 'text', false) }}
+    <div class="field"><label>Ganti Berkas <span class="label-note">(kosong = berkas lama tetap dipakai)</span></label><input type="file" name="file_materi"></div>
+  </div>
+  <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Simpan</button></div>
+</form>
+{% endcall %}
+{% endif %}
+{% endblock %}

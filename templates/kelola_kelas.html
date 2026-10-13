@@ -15,7 +15,8 @@
 <div class="kelas-grid">
   {% for k in kelas_list %}
   <article class="kelas-card kelas-bg">
-    <h2 class="kelas-title"><a class="stretched" href="{{ url_for('detail_kelas', kelas_id=k.id) }}">{{ k.nama_kelas }}</a></h2>
+    {# DIUBAH: kartu kelas membuka tab Materi (halaman pertama kelas), sesuai desain #}
+    <h2 class="kelas-title"><a class="stretched" href="{{ url_for('kelola_materi', kelas_id=k.id) }}">{{ k.nama_kelas }}</a></h2>
     <div class="kelas-guru">
       {% for p in k.pengajar_list %}<a href="{{ url_for('profil_pengajar', pengajar_id=p.id) }}">{{ p.nama }}</a>{% endfor %}
     </div>

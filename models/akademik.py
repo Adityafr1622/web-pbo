@@ -4,6 +4,7 @@
 # Pengumpulan.submit_jawaban       -> LARRY
 # Pengumpulan.beri_nilai           -> ANGGOTA 3 (Penilaian)
 
+import os
 import re
 from datetime import date, datetime, time
 import database
@@ -102,6 +103,8 @@ class Kelas:
 
     def tambah_siswa(self, siswa):
         """siswa boleh objek Siswa atau id-nya."""
+        # POLYMORPHISM: satu method menerima objek Siswa maupun id-nya (duck typing getattr).
+        # ENCAPSULATION: aturan "satu siswa cuma boleh di satu kelas" dijaga di sini.
         siswa_id = _ke_int(getattr(siswa, "id", siswa), "Siswa")
         row = database.ambil_user_by_id(siswa_id)
         if row is None or row["role"] != "siswa":
@@ -124,6 +127,8 @@ class Kelas:
         database.hapus_siswa_dari_kelas(self.id, siswa_id)
         self.daftar_siswa.remove(siswa_id)
 
+    # ENCAPSULATION: jumlah siswa dibaca lewat method, bukan dengan mengintip daftar_siswa
+    # langsung dari luar, jadi cara menyimpannya bebas diubah tanpa merusak pemanggil.
     def get_total_siswa(self):
         return len(self.daftar_siswa)
 
@@ -145,6 +150,8 @@ class Jadwal:
                    row["tanggal"] if _punya(row, "tanggal") else None,
                    row["materi"] if _punya(row, "materi") else None)
 
+    # ABSTRACTION: pemanggil cukup minta "infonya", nggak perlu tahu tanggalnya disimpan
+    # sebagai teks YYYY-MM-DD dan harus diterjemahkan dulu ke nama bulan Indonesia.
     def get_info_jadwal(self):
         """'Senin, 5 Oktober 2026, 08.00 - 09.30' (tanpa tanggal: 'Senin, 08.00 - 09.30')."""
         if self.tanggal:
@@ -232,18 +239,23 @@ class Jadwal:
 
 class Materi:
     # ENCAPSULATION: info materi + cara bikin link filenya dibungkus di sini.
-    def __init__(self, id, judul, kategori, file_path, kelas_id, pengajar_id):
+    def __init__(self, id, judul, kategori, file_path, kelas_id, pengajar_id,
+                 tanggal_upload=None, tanggal_edit=None):  # DIUBAH: + tanggal upload & edit
         self.id = id
         self.judul = judul
         self.kategori = kategori
         self.file_path = file_path
         self.kelas_id = kelas_id
         self.pengajar_id = pengajar_id
+        self.tanggal_upload = tanggal_upload
+        self.tanggal_edit = tanggal_edit
 
     @classmethod
     def dari_row(cls, row):
         return cls(row["id"], row["judul"], row["kategori"], row["file_path"],
-                   row["kelas_id"], row["pengajar_id"])
+                   row["kelas_id"], row["pengajar_id"],
+                   row["tanggal_upload"] if _punya(row, "tanggal_upload") else None,
+                   row["tanggal_edit"] if _punya(row, "tanggal_edit") else None)
 
     @classmethod
     def muat(cls, materi_id):
@@ -260,23 +272,51 @@ class Materi:
         """Nama file tanpa awalan unik 8 karakter yang ditambah simpan_file() di app.py."""
         return re.sub(r"^[0-9a-f]{8}_", "", self.file_path or "")
 
+    # ENCAPSULATION: urusan "file ini tipenya apa dan ukurannya berapa" ikut dibungkus
+    # di class Materi, jadi template tinggal menampilkan, nggak ngitung sendiri.
+    def get_tipe(self):
+        """Ekstensi huruf besar buat label di halaman materi, contoh: 'PDF'."""
+        ekstensi = os.path.splitext(self.file_path or "")[1].lstrip(".")
+        return ekstensi.upper() or "FILE"
+
+    def get_ukuran(self):
+        """Ukuran file terbaca manusia ('1,2 MB'), atau '-' kalau filenya sudah tidak ada."""
+        if not self.file_path:
+            return "-"
+        lokasi = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                              "static", "uploads", self.file_path)
+        try:
+            ukuran = os.path.getsize(lokasi)
+        except OSError:
+            return "-"
+        for satuan in ("B", "KB", "MB", "GB"):
+            if ukuran < 1024 or satuan == "GB":
+                angka = f"{ukuran:.1f}".replace(".", ",") if satuan in ("MB", "GB") else f"{ukuran:.0f}"
+                return f"{angka} {satuan}"
+            ukuran /= 1024
+
 
 class Tugas:
     # ENCAPSULATION: aturan deadline (format + cek kedaluwarsa) ada di class Tugas.
     FORMAT_DEADLINE = ("%Y-%m-%d", "%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M")
 
-    def __init__(self, id, judul, deskripsi, deadline, kelas_id, pengajar_id):
+    def __init__(self, id, judul, deskripsi, deadline, kelas_id, pengajar_id,
+                 tanggal_dibuat=None, tanggal_edit=None):  # DIUBAH: + tanggal dibuat & edit
         self.id = id
         self.judul = judul
         self.deskripsi = deskripsi
         self.deadline = deadline  # string dari database (atau date/datetime)
         self.kelas_id = kelas_id
         self.pengajar_id = pengajar_id
+        self.tanggal_dibuat = tanggal_dibuat
+        self.tanggal_edit = tanggal_edit
 
     @classmethod
     def dari_row(cls, row):
         return cls(row["id"], row["judul"], row["deskripsi"], row["deadline"],
-                   row["kelas_id"], row["pengajar_id"])
+                   row["kelas_id"], row["pengajar_id"],
+                   row["tanggal_dibuat"] if _punya(row, "tanggal_dibuat") else None,
+                   row["tanggal_edit"] if _punya(row, "tanggal_edit") else None)
 
     @classmethod
     def muat(cls, tugas_id):
@@ -285,6 +325,8 @@ class Tugas:
             raise ValueError("Tugas tidak ditemukan.")
         return cls.dari_row(row)
 
+    # POLYMORPHISM: deadline boleh datang sebagai datetime, date, atau teks dengan tiga
+    # format berbeda — satu method ini menangani semuanya dan mengembalikan datetime.
     @staticmethod
     def parse_deadline(deadline):
         """Deadline di database berupa teks, jadi diubah dulu ke datetime.
@@ -304,6 +346,7 @@ class Tugas:
             return hasil
         raise ValueError("Format deadline tidak valid.")
 
+    # ABSTRACTION: template cukup tanya "sudah lewat belum?" tanpa mengurus parsing tanggal.
     def is_expired(self):
         try:
             batas = Tugas.parse_deadline(self.deadline)
@@ -347,6 +390,8 @@ class Pengumpulan:
         return self.id
 
     def beri_nilai(self, nilai):
+        # ENCAPSULATION: nilai cuma bisa masuk lewat method ini, jadi mustahil ada nilai
+        # di luar 0-100 atau bukan angka yang nyelip ke database.
         try:
             nilai = float(nilai)
         except (TypeError, ValueError):
@@ -366,27 +411,37 @@ class Pengumpulan:
 
 
 class Komentar:
-    # ENCAPSULATION: aturan komentar (nggak boleh kosong) dikunci di class ini.
-    def __init__(self, id, tugas_id, user_id, isi_komentar, waktu):
+    # ENCAPSULATION: aturan komentar (nggak boleh kosong, harus menempel ke satu siswa)
+    # dikunci di class ini.
+    # DIUBAH: tambah siswa_id — komentar sekarang percakapan PRIVAT antara seorang siswa
+    # dan pengajar kelasnya, bukan papan komentar yang dibaca satu kelas.
+    # user_id = penulis komentar, siswa_id = pemilik percakapan.
+    def __init__(self, id, tugas_id, user_id, isi_komentar, waktu, siswa_id=None):
         self.id = id
         self.tugas_id = tugas_id
         self.user_id = user_id
         self.isi_komentar = isi_komentar
         self.waktu = waktu
+        self.siswa_id = siswa_id
 
     @classmethod
     def dari_row(cls, row):
-        return cls(row["id"], row["tugas_id"], row["user_id"], row["isi_komentar"], row["waktu"])
+        return cls(row["id"], row["tugas_id"], row["user_id"], row["isi_komentar"], row["waktu"],
+                   row["siswa_id"] if _punya(row, "siswa_id") else None)
 
     def tambah_komentar(self):
         isi = (self.isi_komentar or "").strip()
         if not isi:
             raise ValueError("Isi komentar tidak boleh kosong.")
-        self.id = database.tambah_komentar(self.tugas_id, self.user_id, isi)
+        if self.siswa_id is None:
+            raise ValueError("Komentar harus ditujukan ke salah satu siswa.")
+        self.id = database.tambah_komentar(self.tugas_id, self.user_id, isi, self.siswa_id)
         self.isi_komentar = isi
         return self.id
 
     @staticmethod
-    def get_list_komentar(tugas_id):
+    def get_list_komentar(tugas_id, siswa_id):
+        """DIUBAH: isi percakapan satu siswa saja pada tugas tsb."""
         tugas_id = _ke_int(tugas_id, "Tugas")
-        return database.ambil_komentar_tugas(tugas_id)
+        siswa_id = _ke_int(siswa_id, "Siswa")
+        return database.ambil_komentar_tugas(tugas_id, siswa_id)
