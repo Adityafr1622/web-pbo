@@ -134,6 +134,20 @@ class Presensi:
         database.simpan_presensi_massal(kelas_id, tanggal, bersih)
         return len(bersih)
 
+    @staticmethod
+    def hapus_banyak(kelas_id, tanggal, siswa_ids):
+        """BARU: kosongkan kehadiran beberapa siswa pada satu pertemuan (centang dibatalkan).
+        ABSTRACTION: pemanggil cukup menyebut siswa mana yang dibatalkan; validasi tanggal
+        dan penghapusan barisnya diurus di sini."""
+        siswa_ids = [_ke_int(s, "Siswa") for s in siswa_ids]
+        if not siswa_ids:
+            return 0
+        kelas_id, tanggal = Presensi.cek_input(kelas_id, tanggal, siswa_ids)
+        jumlah = 0
+        for sid in siswa_ids:
+            jumlah += database.hapus_presensi(kelas_id, tanggal, sid)
+        return jumlah
+
     def simpan(self):
         """Simpan objek ini (insert, atau update kalau siswa+kelas+tanggal sudah ada)."""
         self.status = Presensi.normalisasi_status(self.status)

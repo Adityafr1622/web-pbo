@@ -65,15 +65,13 @@
       const l = $('.multi-list', el.parentElement); l.hidden = !l.hidden;
       el.setAttribute('aria-expanded', String(!l.hidden)); return;
     }
-    // BARU: ikon mata di kolom Password (Kelola Akun). Yang ditampilkan adalah HASH
-    // yang tersimpan di database, bukan password asli — password aslinya memang
-    // sudah tidak ada lagi karena di-hash satu arah.
+    // Ikon mata di kolom Password (Kelola Akun): buka/tutup password aslinya.
     if ((el = up('[data-pw-cell]'))) {
-      const sel = el.parentElement, tampil = $('.pw-hash', sel).hidden;
+      const sel = el.parentElement, tampil = $('.pw-asli', sel).hidden;
       $('.pw-mask', sel).hidden = tampil;
-      $('.pw-hash', sel).hidden = !tampil;
+      $('.pw-asli', sel).hidden = !tampil;
       el.classList.toggle('is-shown', tampil);
-      el.setAttribute('aria-label', tampil ? 'Sembunyikan hash password' : 'Tampilkan hash password');
+      el.setAttribute('aria-label', tampil ? 'Sembunyikan password' : 'Tampilkan password');
       return;
     }
 
@@ -108,6 +106,21 @@
       const semua = $('[data-semua-hadir]', t.closest('form') || document);
       if (semua) semua.checked = false;
     }
+  });
+
+  // BARU: centang presensi bisa dibatalkan. Radio bawaan browser nggak bisa dilepas
+  // sekali terpilih, jadi status "sudah tercentang sebelum diklik" diingat dulu di
+  // mousedown, lalu dilepas waktu klik-nya terjadi.
+  let radioSebelum = null;
+  document.addEventListener('mousedown', e => {
+    const w = e.target.closest ? e.target.closest('.chk-wrap') : null;
+    const i = w && $('input[type=radio]', w);
+    radioSebelum = (i && i.checked && !i.disabled) ? i : null;
+  });
+  document.addEventListener('click', e => {
+    const w = e.target.closest ? e.target.closest('.chk-wrap') : null;
+    const i = w && $('input[type=radio]', w);
+    if (i && i === radioSebelum) { i.checked = false; radioSebelum = null; }
   });
 
   document.addEventListener('keydown', e => {

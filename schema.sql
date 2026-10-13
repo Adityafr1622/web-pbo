@@ -24,11 +24,15 @@ CREATE TABLE IF NOT EXISTS kelas (
     FOREIGN KEY(pengajar_id2) REFERENCES users(id)
 );
 
--- Log kapan siswa/pengajar mengganti passwordnya sendiri (isi password TIDAK disimpan)
+-- Log penggantian password yang dilakukan siswa/pengajar sendiri.
+-- DIUBAH: password lama & barunya ikut dicatat supaya admin bisa melihat
+-- perubahannya di kartu "Riwayat Perubahan Password".
 CREATE TABLE IF NOT EXISTS riwayat_password (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
     waktu TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    password_lama TEXT,
+    password_baru TEXT,
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
@@ -118,6 +122,7 @@ CREATE TABLE IF NOT EXISTS catatan_akhir (
     pengajar_id INTEGER NOT NULL,
     catatan TEXT NOT NULL,
     tanggal_dibuat TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    lulus INTEGER DEFAULT 0,
     FOREIGN KEY (siswa_id) REFERENCES users(id),
     FOREIGN KEY (kelas_id) REFERENCES kelas(id),
     FOREIGN KEY (pengajar_id) REFERENCES users(id),

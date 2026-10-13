@@ -51,6 +51,9 @@
 <form class="presensi-panel" id="panel-{{ p.tanggal }}" method="post"
       action="{{ url_for('simpan_presensi', kelas_id=kelas.id) }}" {{ 'hidden' if not loop.first }}>
   <input type="hidden" name="tanggal" value="{{ p.tanggal }}">
+  {# BARU: daftar siswa yang tampil di form. Siswa yang centangnya dilepas akan
+     dihapus presensinya saat disimpan, bukan dibiarkan memakai nilai lama. #}
+  <input type="hidden" name="siswa_tampil" value="{{ siswa_list | map(attribute='id') | join(',') }}">
   <div class="table-card"><div class="table-scroll">
   <table class="data-table presensi-table">
     <thead><tr>

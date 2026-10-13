@@ -1,11 +1,14 @@
 {% extends 'base.html' %}
-{% from '_macros.html' import ic, avatar, pwfield, modal %}
+{# DIUBAH: tambah import wa_link #}
+{% from '_macros.html' import ic, avatar, pwfield, modal, wa_link %}
 {% block title %}Profil Pengajar · Fluenglo{% endblock %}
 
 {% block content %}
 {# data dari app.py: data (dict profil pengajar), lengkap (NIK ikut ditampilkan?), bisa_ubah
    CATATAN: field Password sengaja TIDAK ditampilkan di sini — beda dari desain Canva.
-   Password disimpan ter-hash, jadi tidak ada yang bisa ditampilkan selain titik-titik kosong. #}
+   Halaman ini bisa dibuka admin maupun pengajar lain, jadi passwordnya tidak ditaruh di sini.
+   Admin melihat password lewat menu Kelola Akun, pemiliknya menggantinya lewat tombol
+   "Ganti Password" di bawah. #}
 <div class="page-head">
   <div>
     <h1>Profil Pengajar</h1>
@@ -30,7 +33,9 @@
 
   <div class="profile-col profile-col-right">
     <p class="col-title">Informasi Akun &amp; Kontak</p>
-    <div class="field"><span class="field-label">Nomor WhatsApp</span><div class="read white">{{ data.whatsapp or '-' }}</div></div>
+    {# DIUBAH: nomor WA jadi tautan yang bisa dipencet #}
+    <div class="field"><span class="field-label">Nomor WhatsApp</span>
+      <div class="read white">{{ wa_link(data.whatsapp) }}</div></div>
     <div class="field"><span class="field-label">Email</span>
       <div class="read white {{ 'is-empty' if not data.email }}">{{ data.email or 'Belum diisi (opsional)' }}</div></div>
     <div class="field"><span class="field-label">Alamat</span>

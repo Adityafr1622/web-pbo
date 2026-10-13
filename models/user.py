@@ -5,7 +5,6 @@
 from abc import ABC, abstractmethod
 import re
 from datetime import date, datetime
-from werkzeug.security import check_password_hash  # BARU: verifikasi password ter-hash
 import database
 
 # ABSTRACTION: User jadi kerangka dasar, ga boleh dibuat objeknya langsung (ABC)
@@ -18,20 +17,21 @@ class User(ABC):
         self.__password = password
         self.role = role
 
-    # ENCAPSULATION: cuma bisa dicek lewat method ini, nilainya ga pernah keluar.
-    # DIUBAH: password disimpan sebagai hash satu arah, jadi yang dibandingkan hasil hash-nya,
-    # bukan teks aslinya. Dibalik apa pun, password asli nggak bisa dibaca lagi dari database.
+    # ENCAPSULATION: pencocokan password cuma lewat method ini, bukan dengan membandingkan
+    # atribut dari luar class.
+    # DIUBAH: password disimpan apa adanya supaya admin bisa membukanya lewat tombol mata
+    # di Kelola Akun (keputusan kelompok: skala kursus kecil, admin yang membagikan akun).
     def cek_password(self, password):
-        if database.password_sudah_hash(self.__password):
-            return check_password_hash(self.__password, password or "")
+        if not database.password_sudah_hash(self.__password):
+            return self.__password == password
 
-        # Akun lama (dibuat sebelum hashing) passwordnya masih polos: dicocokkan apa adanya
-        # SEKALI ini saja, lalu langsung ditulis ulang jadi hash. Jadi data lama tetap bisa
-        # login tanpa perlu seed ulang, dan otomatis ikut aman setelah login pertama.
-        if self.__password != password:
+        # Akun lama yang terlanjur tersimpan ter-hash: dicocokkan lewat hash SEKALI ini saja,
+        # lalu passwordnya ditulis ulang apa adanya. Jadi akun lama tetap bisa login dan
+        # otomatis kebaca admin setelah pemiliknya login sekali, tanpa perlu di-reset manual.
+        if not database.cocok_hash_lama(self.__password, password):
             return False
         database.edit_user(self.id, password=password)
-        self.__password = database.hash_password(password)
+        self.__password = password
         return True
 
     # ENCAPSULATION: satu-satunya pintu buat ganti password, lama diverifikasi dulu
@@ -42,9 +42,10 @@ class User(ABC):
             raise ValueError("Password minimal 8 karakter dan wajib kombinasi huruf + angka.")
         if password_baru == password_lama:
             raise ValueError("Password baru tidak boleh sama dengan password lama.")
-        database.edit_user(self.id, password=password_baru)  # di-hash di dalam edit_user
-        database.catat_riwayat_password(self.id)  # BARU: catat waktu ganti password (isi password tidak disimpan)
-        self.__password = database.hash_password(password_baru)  # DIUBAH: simpan hash, bukan teks asli
+        database.edit_user(self.id, password=password_baru)
+        # DIUBAH: password lama & barunya ikut dicatat, dipakai kartu Riwayat Perubahan Password
+        database.catat_riwayat_password(self.id, password_lama, password_baru)
+        self.__password = password_baru
 
     # ENCAPSULATION: aturan validasi ditaruh di class-nya sendiri
     @staticmethod
@@ -158,6 +159,24 @@ class Siswa(User):
         if foto:
             self.foto = foto
 
+    def lihat_semua_kelas(self):
+        """BARU: kelas aktif + kelas-kelas yang sudah ditamatkan (bertanda 'selesai').
+        Dipakai halaman Kelas dan pemilih kelas di halaman Jadwal."""
+        hasil, sudah = [], set()
+        aktif = self.lihat_kelas()
+        if aktif:
+            hasil.append(dict(aktif, selesai=False))
+            sudah.add(aktif["id"])
+        for row in database.ambil_kelas_lulus_siswa(self.id):
+            if row["id"] not in sudah:
+                hasil.append(dict(database.kelas_jadi_dict(row), selesai=True))
+                sudah.add(row["id"])
+        return hasil
+
+    def id_kelas_saya(self):
+        """BARU: semua kelas_id yang boleh dibuka siswa ini (aktif + yang sudah lulus)."""
+        return [k["id"] for k in self.lihat_semua_kelas()]
+
     # ABSTRACTION: siswa cukup bilang "tunjukkan kelasku"; join tabel users-kelas dan
     # pengumpulan daftar pengajarnya disembunyikan di database.py.
     def lihat_kelas(self):
@@ -167,10 +186,15 @@ class Siswa(User):
             return None
         return database.kelas_jadi_dict(kelas)
 
-    def lihat_jadwal(self):
-        if self.kelas_id is None:
+    def lihat_jadwal(self, kelas_id=None):
+        """DIUBAH: tanpa argumen = jadwal kelas aktif (diprioritaskan). Kalau siswa memilih
+        kelas lain yang pernah dia ikuti, jadwal kelas itu yang ditampilkan."""
+        pilihan = self.id_kelas_saya()
+        if not pilihan:
             return []
-        return database.ambil_jadwal_by_kelas(self.kelas_id)
+        if kelas_id is None or kelas_id not in pilihan:
+            kelas_id = self.kelas_id if self.kelas_id in pilihan else pilihan[0]
+        return database.ambil_jadwal_by_kelas(kelas_id)
 
     def kumpul_tugas(self, tugas, jawaban):
         """Mengumpulkan atau memperbarui jawaban tugas siswa."""
@@ -266,24 +290,29 @@ class Siswa(User):
             "catatan_akhir": [dict(item) for item in catatan],
         }
 
-    # POLYMORPHISM: siswa cuma boleh akses kelasnya sendiri
+    # POLYMORPHISM: siswa cuma boleh akses kelasnya sendiri —
+    # DIUBAH: termasuk kelas lama yang sudah dia tamatkan (masih boleh dilihat, bukan diubah)
     def boleh_akses_kelas(self, kelas_id):
-        return self.kelas_id is not None and self.kelas_id == kelas_id
+        return kelas_id in self.id_kelas_saya()
 
     def boleh_lihat_siswa(self, siswa_row):
         return siswa_row["id"] == self.id
 
     def boleh_lihat_pengajar(self, pengajar_id):
-        # siswa cuma boleh lihat profil pengajar kelasnya sendiri
-        kelas = database.ambil_kelas_by_id(self.kelas_id) if self.kelas_id else None
-        return kelas is not None and pengajar_id in [p["id"] for p in database.ambil_pengajar_kelas(kelas)]
+        # siswa cuma boleh lihat profil pengajar dari kelas-kelas yang pernah dia ikuti
+        for kelas_id in self.id_kelas_saya():
+            kelas = database.ambil_kelas_by_id(kelas_id)
+            if kelas and pengajar_id in [p["id"] for p in database.ambil_pengajar_kelas(kelas)]:
+                return True
+        return False
 
     # POLYMORPHISM: tampilkan_menu() di-override, isinya menu khusus siswa.
     # DIUBAH: "Materi" & "Tugas" dikeluarkan dari navbar karena dua halaman itu selalu
     # dibuka dari dalam sebuah kelas (butuh kelas_id), bukan dari menu atas. Sekarang
     # isinya persis seperti dokumen: Kelas, Jadwal, Monitoring Anak.
     def tampilkan_menu(self):
-        return ["Profil", "Kelas", "Jadwal", "Monitoring Anak"]
+        # DIUBAH: "Profil" dikeluarkan dari navbar, dibuka lewat dropdown nama pengguna
+        return ["Kelas", "Jadwal", "Monitoring Anak"]
 
 # INHERITANCE: Pengajar juga turunan User, plus atribut sendiri (foto, wa, alamat, email, nik)
 class Pengajar(User):
@@ -581,8 +610,10 @@ class Pengajar(User):
         tanggal = tanggal or date.today().isoformat()
         return self.catat_presensi_kelas(kelas_id, tanggal, {siswa_id: status})
 
-    def catat_presensi_kelas(self, kelas, tanggal, data_status):
-        """Catat presensi banyak siswa sekaligus. data_status: {siswa_id: status}."""
+    def catat_presensi_kelas(self, kelas, tanggal, data_status, kosongkan=None):
+        """Catat presensi banyak siswa sekaligus. data_status: {siswa_id: status}.
+        DIUBAH: + kosongkan, daftar siswa yang centangnya dilepas pengajar supaya
+        presensinya ikut terhapus, bukan tertinggal memakai status lama."""
         # ABSTRACTION: Pengajar cukup memanggil Presensi.simpan_massal(); detail SQL
         # dan transaksi disembunyikan di models/presensi.py dan database.py.
         from models.presensi import Presensi
@@ -593,10 +624,20 @@ class Pengajar(User):
             raise ValueError("Kelas tidak valid.")
         if not self.mengajar_kelas(kelas_id):
             raise ValueError("Kamu bukan pengajar di kelas ini.")
-        return Presensi.simpan_massal(kelas_id, tanggal, data_status)
 
-    def beri_catatan_akhir(self, kelas, siswa, isi):
-        """Membuat atau memperbarui catatan akhir siswa (satu siswa satu catatan per kelas)."""
+        kosongkan = list(kosongkan or [])
+        if not data_status and not kosongkan:
+            raise ValueError("Belum ada status kehadiran yang dipilih.")
+
+        jumlah = Presensi.simpan_massal(kelas_id, tanggal, data_status) if data_status else 0
+        if kosongkan:
+            Presensi.hapus_banyak(kelas_id, tanggal, kosongkan)
+        return jumlah
+
+    def beri_catatan_akhir(self, kelas, siswa, isi, lulus=False):
+        """Membuat atau memperbarui catatan akhir siswa (satu siswa satu catatan per kelas).
+        DIUBAH: + lulus. Pengajar mencentangnya kalau siswa sudah menamatkan seluruh
+        pertemuan kelas ini dan boleh lanjut ke tahap berikutnya."""
         # ABSTRACTION: pemanggil nggak perlu tau catatan ini insert baru atau update yang lama —
         # database.tambah_catatan_akhir() yang memutuskan, aturannya satu siswa satu catatan.
         kelas_id = getattr(kelas, "id", kelas)
@@ -619,7 +660,8 @@ class Pengajar(User):
             siswa_id=siswa_id,
             kelas_id=kelas_id,
             pengajar_id=self.id,
-            catatan=isi
+            catatan=isi,
+            lulus=lulus
         )
 
     def lihat_monitoring_siswa(self, siswa_id):
@@ -636,7 +678,8 @@ class Pengajar(User):
     # labelnya "Kelas dan Jadwal Mengajar" dkk yang tidak dikenal navbar, jadi pengajar cuma
     # kebagian menu Profil. Materi/Tugas/Presensi/Catatan Akhir tetap diakses dari dalam kelas.
     def tampilkan_menu(self):
-        return ["Profil", "Kelas", "Jadwal"]
+        # DIUBAH: "Profil" dikeluarkan dari navbar, dibuka lewat dropdown nama pengguna
+        return ["Kelas", "Jadwal"]
 
 # INHERITANCE: Admin turunan User juga
 class Admin(User):
@@ -765,12 +808,11 @@ class Admin(User):
         # ABSTRACTION: Admin cukup bilang mau "tambah"/"edit"/"hapus"; pengecekan nama kembar,
         # jumlah pengajar, dan data terkait dikerjakan class Kelas dan database.py.
         from models.akademik import Kelas
-        deskripsi = (data.get("deskripsi") or "").strip() or None  # BARU: deskripsi kelas (opsional)
         if aksi == "tambah":
             nama, pengajar_id, pengajar_id2 = Kelas.cek_input(
                 data["nama_kelas"], data["pengajar_id"], data.get("pengajar_id2")
             )
-            return database.tambah_kelas(nama, pengajar_id, pengajar_id2, deskripsi)  # DIUBAH: + deskripsi
+            return database.tambah_kelas(nama, pengajar_id, pengajar_id2)
 
         kelas = Kelas.muat(data["kelas_id"])
 
@@ -778,7 +820,7 @@ class Admin(User):
             nama, pengajar_id, pengajar_id2 = Kelas.cek_input(
                 data["nama_kelas"], data["pengajar_id"], data.get("pengajar_id2"), exclude_id=kelas.id
             )
-            return database.edit_kelas(kelas.id, nama, pengajar_id, pengajar_id2, deskripsi)  # DIUBAH: + deskripsi
+            return database.edit_kelas(kelas.id, nama, pengajar_id, pengajar_id2)
 
         elif aksi == "hapus":
             terkait = database.hitung_data_terkait_kelas(kelas.id)

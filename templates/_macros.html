@@ -40,6 +40,14 @@
 {%- endif %}
 {%- endmacro %}
 
+{# BARU: nomor WhatsApp yang bisa dipencet, langsung membuka chat di WhatsApp #}
+{% macro wa_link(nomor) -%}
+{% if nomor -%}
+<a class="link-wa" href="{{ nomor|wa }}" target="_blank" rel="noopener"
+   title="Chat {{ nomor }} lewat WhatsApp">{{ ic('whatsapp', 15) }}<span>{{ nomor }}</span></a>
+{%- else -%}-{%- endif %}
+{%- endmacro %}
+
 {% macro field(label, name, ph='', type='text', req=true, cls='') -%}
 <div class="field {{ cls }}"><label>{{ label }}</label>
 <input type="{{ type }}" name="{{ name }}" placeholder="{{ ph }}" {{ 'required' if req }} {% if type == 'date' %}data-auto-hari{% endif %}></div>

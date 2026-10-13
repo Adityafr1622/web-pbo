@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
-{% from '_macros.html' import ic, field, pwfield, modal %}
+{# DIUBAH: tambah import wa_link biar nomor WA di tabel bisa dipencet #}
+{% from '_macros.html' import ic, field, pwfield, modal, wa_link %}
 {% block title %}Kelola Akun · Fluenglo{% endblock %}
 
 {% block content %}
@@ -7,15 +8,27 @@
 {% set siswa = users|selectattr('role', 'equalto', 'siswa')|list %}
 {% set pengajar = users|selectattr('role', 'equalto', 'pengajar')|list %}
 
-{# BARU: satu sel password dipakai tabel siswa & pengajar.
-   Password disimpan ter-hash, jadi yang bisa ditampilkan ikon mata adalah hash-nya,
-   bukan password asli — password asli memang sudah tidak ada lagi di database. #}
-{% macro sel_password(u) %}
-<td><div class="pw-cell">
+{# Password tampil titik-titik; tombol mata membukanya. Yang ditampilkan selalu
+   password TERBARU: kalau penggunanya pernah menggantinya sendiri, yang muncul
+   yang baru; kalau belum pernah, yang muncul password yang dibuat admin. #}
+{% macro pw_kotak(nilai) %}
+<span class="pw-cell">
   <span class="pw-mask">••••••••</span>
-  <code class="pw-hash" title="{{ u.password }}" hidden>{{ u.password }}</code>
-  <button type="button" class="pw-cell-btn" data-pw-cell aria-label="Tampilkan hash password">{{ ic('eye-off', 15) }}{{ ic('eye', 15) }}</button>
-</div></td>
+  <code class="pw-asli" hidden>{{ nilai }}</code>
+  <button type="button" class="pw-cell-btn" data-pw-cell aria-label="Tampilkan password">{{ ic('eye-off', 15) }}{{ ic('eye', 15) }}</button>
+</span>
+{% endmacro %}
+
+{% macro sel_password(u) %}
+<td>
+  {% if u.password|pw_hash %}
+  {# akun lama dari versi yang masih memakai hash: isinya memang tidak bisa dibaca lagi,
+     jadi admin perlu mengisinya sekali lewat tombol Edit di baris ini #}
+  <span class="badge badge-abu" title="Password akun ini dibuat waktu sistem masih menyimpannya terenkripsi, jadi isinya tidak bisa ditampilkan. Isi password baru lewat tombol Edit di baris ini, atau tunggu pemiliknya login sekali.">Belum terbaca</span>
+  {% else %}
+  {{ pw_kotak(u.password) }}
+  {% endif %}
+</td>
 {% endmacro %}
 
 <div class="toolbar">
@@ -34,8 +47,9 @@
   <tbody>
   {% for u in siswa %}
   <tr>
-    <td class="td-strong">{{ u.nama }}</td><td>{{ u.kelas_nama or '-' }}</td><td>{{ u.username }}</td>
-    <td class="td-clip">{{ u.email or '-' }}</td><td>{{ u.no_whatsapp or '-' }}</td><td class="td-clip">{{ u.alamat or '-' }}</td>
+    <td class="td-strong td-nama" title="{{ u.nama }}">{{ u.nama }}</td><td>{{ u.kelas_nama or '-' }}</td><td>{{ u.username }}</td>
+    {# DIUBAH: nomor WA jadi tautan wa.me, bukan teks biasa #}
+    <td class="td-clip">{{ u.email or '-' }}</td><td class="td-nowrap">{{ wa_link(u.no_whatsapp) }}</td><td class="td-clip">{{ u.alamat or '-' }}</td>
     {{ sel_password(u) }}
     <td class="td-nowrap">{{ terakhir_ubah[u.id]|tgl_singkat if u.id in terakhir_ubah else 'Belum pernah' }}</td>
     <td><a class="link-profil" href="{{ url_for('biodata_akun', user_id=u.id) }}">Buka Profil</a></td>
@@ -59,8 +73,9 @@
   <tbody>
   {% for u in pengajar %}
   <tr>
-    <td class="td-strong">{{ u.nama }}</td><td>{{ u.username }}</td><td class="td-clip">{{ u.email or '-' }}</td>
-    <td>{{ u.no_whatsapp or '-' }}</td><td class="td-clip">{{ u.alamat or '-' }}</td>
+    <td class="td-strong td-nama" title="{{ u.nama }}">{{ u.nama }}</td><td>{{ u.username }}</td><td class="td-clip">{{ u.email or '-' }}</td>
+    {# DIUBAH: nomor WA jadi tautan wa.me, bukan teks biasa #}
+    <td class="td-nowrap">{{ wa_link(u.no_whatsapp) }}</td><td class="td-clip">{{ u.alamat or '-' }}</td>
     {# DIUBAH: NIK cuma 4 digit awal di tabel, lengkapnya di halaman Profil Lengkap #}
     <td class="td-nowrap">{{ u.nik|samar }}</td>
     {{ sel_password(u) }}
@@ -79,14 +94,28 @@
   </tbody>
 </table></div></div>
 
-<p class="table-note">{{ ic('lock', 14) }} Password disimpan ter-hash satu arah, jadi password aslinya tidak tersimpan dan tidak bisa dibaca siapa pun — termasuk admin. Ikon mata menampilkan hash yang tersimpan. Untuk mengganti password pengguna, pakai tombol Edit. NIK ditampilkan 4 digit awal; lengkapnya ada di Profil Lengkap.</p>
-
 {# ===== riwayat password (data dari tabel riwayat_password) ===== #}
 <section class="card riwayat">
   <h2>Riwayat Perubahan Password</h2>
-  <p class="muted">Tercatat saat siswa atau pengajar mengganti passwordnya sendiri. Isi password tidak ditampilkan.</p>
+  <p class="muted">Tercatat saat siswa atau pengajar mengganti passwordnya sendiri, lengkap dengan password lama dan barunya.</p>
   {% if riwayat_password %}
-  <ul class="riwayat-list">{% for r in riwayat_password %}<li><strong>{{ r.nama }}</strong> ({{ r.role }}) mengganti password · {{ r.waktu|tgl_jam }}</li>{% endfor %}</ul>
+  <ul class="riwayat-list">
+    {% for r in riwayat_password %}
+    <li class="riwayat-item">
+      <div class="riwayat-siapa"><strong>{{ r.nama }}</strong> <span class="muted">({{ r.role }})</span></div>
+      <div class="riwayat-ubah">
+        {% if r.password_lama or r.password_baru %}
+        {{ pw_kotak(r.password_lama or '-') }}
+        <span class="riwayat-panah" aria-label="menjadi">&rarr;</span>
+        {{ pw_kotak(r.password_baru or '-') }}
+        {% else %}
+        <span class="muted">Perubahan lama, isi passwordnya tidak tercatat.</span>
+        {% endif %}
+      </div>
+      <time class="riwayat-waktu muted">{{ r.waktu|tgl_jam }}</time>
+    </li>
+    {% endfor %}
+  </ul>
   {% else %}<p class="empty-text">Belum ada perubahan password.</p>{% endif %}
 </section>
 

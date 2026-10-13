@@ -14,8 +14,10 @@
 import os
 import sqlite3
 from datetime import datetime
-# DIUBAH: password sekarang disimpan ter-hash (satu arah), bukan apa adanya lagi.
-from werkzeug.security import generate_password_hash
+# DIUBAH: password disimpan apa adanya supaya admin bisa membacanya lewat tombol mata
+# di Kelola Akun. check_password_hash cuma dipakai untuk membaca akun lama yang
+# terlanjur tersimpan ter-hash (lihat User.cek_password di models/user.py).
+from werkzeug.security import check_password_hash
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # path absolut, jadi nggak peduli app dijalankan dari folder mana
@@ -33,17 +35,21 @@ def sekarang():
     return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 
-# ENCAPSULATION: cara password diamankan disembunyikan di balik satu fungsi. Pemanggil
-# nggak perlu tau algoritmanya apa, dan kalau nanti algoritmanya diganti cukup di sini.
-# BARU: satu-satunya tempat password diubah jadi hash. Dipakai tambah_user & edit_user,
-# jadi semua jalur (tambah akun, admin reset, ganti password sendiri) otomatis ter-hash.
-def hash_password(password):
-    return generate_password_hash(password)
-
-
+# ENCAPSULATION: cara mengenali & mencocokkan password dibungkus di dua fungsi ini,
+# jadi pemanggil nggak perlu tau bentuk penyimpanannya.
+# DIUBAH: password baru disimpan apa adanya (tidak di-hash lagi).
 def password_sudah_hash(nilai):
-    """True kalau nilai di kolom password memang hash, bukan password lama yang polos."""
+    """True kalau nilai di kolom password masih berupa hash dari versi lama."""
     return isinstance(nilai, str) and nilai.startswith(('pbkdf2:', 'scrypt:', 'argon2'))
+
+
+def cocok_hash_lama(tersimpan, password):
+    """Cocokkan password dengan hash lama. Dipakai sekali saja waktu akun lama login,
+    setelah itu passwordnya ditulis ulang apa adanya supaya bisa dibaca admin."""
+    try:
+        return check_password_hash(tersimpan, password or "")
+    except Exception:
+        return False
 
 def migrasi():
     """Samain fluenglo.db lama dengan schema terbaru (aman dijalankan berulang kali).
@@ -74,6 +80,11 @@ def migrasi():
             ('tugas', 'tanggal_edit', 'TEXT'),
             # BARU: komentar jadi percakapan privat per siswa, bukan satu kelas ramai-ramai
             ('komentar', 'siswa_id', 'INTEGER'),
+            # BARU: penanda siswa sudah lulus kelas tsb (dicentang pengajar di catatan akhir)
+            ('catatan_akhir', 'lulus', 'INTEGER'),
+            # BARU: isi password lama & baru di riwayat penggantian password
+            ('riwayat_password', 'password_lama', 'TEXT'),
+            ('riwayat_password', 'password_baru', 'TEXT'),
         ]
         for tabel, nama, tipe in tambahan:
             ada = kolom(tabel)
@@ -121,7 +132,7 @@ def tambah_user(nama, username, password, role, foto=None, no_whatsapp=None, bio
             INSERT INTO users (nama, username, password, role, foto, no_whatsapp, biodata,
                                kelas_id, alamat, nik, email)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (nama, username, hash_password(password), role,  # DIUBAH: password di-hash dulu
+        ''', (nama, username, password, role,  # DIUBAH: password disimpan apa adanya
               foto or 'default_avatar.png', no_whatsapp,
               biodata, kelas_id, alamat, nik, email))
         conn.commit()
@@ -151,11 +162,6 @@ def edit_user(user_id, **kwargs):
             "Kolom user tidak diizinkan: "
             + ", ".join(sorted(kolom_tidak_valid))
         )
-
-    # DIUBAH: password apa pun yang lewat sini otomatis di-hash, jadi nggak ada satu pun
-    # jalur (admin reset / ganti password sendiri) yang bisa kelupaan nge-hash.
-    if kwargs.get("password"):
-        kwargs = dict(kwargs, password=hash_password(kwargs["password"]))
 
     kolom = list(kwargs.keys())
     assignments = ", ".join(f"{nama} = ?" for nama in kolom)
@@ -211,20 +217,25 @@ def hitung_keterkaitan_pengajar(pengajar_id):
     finally:
         conn.close()
 
-def catat_riwayat_password(user_id):
+def catat_riwayat_password(user_id, password_lama=None, password_baru=None):
+    """DIUBAH: + password lama & baru, supaya admin bisa melihat perubahannya."""
     conn = get_connection()
     try:
-        conn.execute('INSERT INTO riwayat_password (user_id) VALUES (?)', (user_id,))
+        conn.execute('''
+            INSERT INTO riwayat_password (user_id, waktu, password_lama, password_baru)
+            VALUES (?, ?, ?, ?)
+        ''', (user_id, sekarang(), password_lama, password_baru))
         conn.commit()
     finally:
         conn.close()
 
 def ambil_riwayat_password(limit=50):
-    """Riwayat terbaru di atas: waktu, nama, role, username."""
+    """Riwayat terbaru di atas: waktu, nama, role, username, password lama & baru."""
     conn = get_connection()
     try:
         return conn.execute('''
-            SELECT r.id, r.waktu, u.nama, u.role, u.username
+            SELECT r.id, r.waktu, r.password_lama, r.password_baru,
+                   u.nama, u.role, u.username
             FROM riwayat_password r JOIN users u ON u.id = r.user_id
             ORDER BY r.id DESC LIMIT ?
         ''', (limit,)).fetchall()
@@ -328,10 +339,10 @@ def ambil_siswa_by_kelas(kelas_id):
 def ambil_kelas_siswa(siswa_id):
     conn = get_connection()
     row = conn.execute('''
-        SELECT k.* FROM kelas k
+        SELECT k.*, k.nama AS nama_kelas FROM kelas k
         JOIN users u ON u.kelas_id = k.id
         WHERE u.id = ?
-    ''', (siswa_id,)).fetchone()
+    ''', (siswa_id,)).fetchone()  # DIUBAH: + alias nama_kelas, dipakai kartu kelas & pemilih jadwal
     conn.close()
     return row
 
@@ -872,6 +883,19 @@ def simpan_presensi_massal(kelas_id, tanggal, data_status):
     finally:
         conn.close()
 
+def hapus_presensi(kelas_id, tanggal, siswa_id):
+    """BARU: hapus catatan presensi seorang siswa pada satu pertemuan.
+    Dipakai waktu pengajar melepas centang yang terlanjur salah pencet."""
+    conn = get_connection()
+    try:
+        cursor = conn.execute('DELETE FROM presensi WHERE kelas_id = ? AND tanggal = ? AND siswa_id = ?',
+                              (kelas_id, tanggal, siswa_id))
+        conn.commit()
+        return cursor.rowcount
+    finally:
+        conn.close()
+
+
 def update_status_presensi(presensi_id, status):
     conn = get_connection()
     conn.execute('UPDATE presensi SET status = ? WHERE id = ?', (status, presensi_id))
@@ -1058,8 +1082,9 @@ def ambil_monitoring_semua_siswa():
     finally:
         conn.close()
 
-def tambah_catatan_akhir(siswa_id, kelas_id, pengajar_id, catatan):
-    """Satu siswa satu catatan akhir per kelas. Sudah ada = diedit (guru 1 & guru 2 sama-sama bisa edit)."""
+def tambah_catatan_akhir(siswa_id, kelas_id, pengajar_id, catatan, lulus=0):
+    """Satu siswa satu catatan akhir per kelas. Sudah ada = diedit (guru 1 & guru 2 sama-sama bisa edit).
+    DIUBAH: + lulus, penanda siswa sudah menamatkan kelas ini."""
     catatan = (catatan or "").strip()
     if not catatan:
         raise ValueError("Catatan akhir tidak boleh kosong.")
@@ -1095,22 +1120,38 @@ def tambah_catatan_akhir(siswa_id, kelas_id, pengajar_id, catatan):
         if catatan_lama:
             conn.execute("""
                 UPDATE catatan_akhir
-                SET catatan = ?, pengajar_id = ?, tanggal_dibuat = ?
+                SET catatan = ?, pengajar_id = ?, tanggal_dibuat = ?, lulus = ?
                 WHERE id = ?
-            """, (catatan, pengajar_id, sekarang(), catatan_lama["id"]))  # DIUBAH: waktu lokal
+            """, (catatan, pengajar_id, sekarang(), 1 if lulus else 0, catatan_lama["id"]))
             hasil = catatan_lama["id"]
         else:
             cursor = conn.execute("""
                 INSERT INTO catatan_akhir
-                    (siswa_id, kelas_id, pengajar_id, catatan, tanggal_dibuat)
-                VALUES (?, ?, ?, ?, ?)
-            """, (siswa_id, kelas_id, pengajar_id, catatan, sekarang()))
+                    (siswa_id, kelas_id, pengajar_id, catatan, tanggal_dibuat, lulus)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (siswa_id, kelas_id, pengajar_id, catatan, sekarang(), 1 if lulus else 0))
             hasil = cursor.lastrowid
 
         conn.commit()
         return hasil
     finally:
         conn.close()
+
+def ambil_kelas_lulus_siswa(siswa_id):
+    """BARU: kelas-kelas yang sudah DITAMATKAN siswa (ditandai lulus oleh pengajar).
+    Dipakai buat menampilkan kelas lama bertanda 'Selesai' dan jadwalnya yang masih bisa dilihat."""
+    conn = get_connection()
+    try:
+        rows = conn.execute("""
+            SELECT k.*, k.nama AS nama_kelas, c.tanggal_dibuat AS tanggal_lulus
+            FROM catatan_akhir c JOIN kelas k ON k.id = c.kelas_id
+            WHERE c.siswa_id = ? AND c.lulus = 1
+            ORDER BY c.tanggal_dibuat DESC
+        """, (siswa_id,)).fetchall()
+    finally:
+        conn.close()
+    return rows
+
 
 def ambil_catatan_akhir_by_siswa(siswa_id):
     conn = get_connection()

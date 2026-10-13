@@ -3,7 +3,7 @@
 {% block title %}Kelola Kelas · Fluenglo{% endblock %}
 
 {% block content %}
-{# data dari app.py: kelas_list (id, nama_kelas, deskripsi, pengajar_list[]), pengajar_list, bisa_kelola #}
+{# data dari app.py: kelas_list (id, nama_kelas, pengajar_list[], selesai), pengajar_list, bisa_kelola #}
 <div class="page-head">
   <div>
     <h1>{{ 'Kelola Kelas' if bisa_kelola else 'Kelas' }}</h1>
@@ -14,19 +14,20 @@
 
 <div class="kelas-grid">
   {% for k in kelas_list %}
-  <article class="kelas-card kelas-bg">
+  <article class="kelas-card kelas-bg {{ 'kelas-selesai' if k.selesai }}">
     {# DIUBAH: kartu kelas membuka tab Materi (halaman pertama kelas), sesuai desain #}
+    {# BARU: kelas yang sudah ditamatkan siswa diberi tanda Selesai #}
+    {% if k.selesai %}<span class="tanda-selesai">{{ ic('check', 14) }} Selesai</span>{% endif %}
     <h2 class="kelas-title"><a class="stretched" href="{{ url_for('kelola_materi', kelas_id=k.id) }}">{{ k.nama_kelas }}</a></h2>
     <div class="kelas-guru">
       {% for p in k.pengajar_list %}<a href="{{ url_for('profil_pengajar', pengajar_id=p.id) }}">{{ p.nama }}</a>{% endfor %}
     </div>
-    {% if k.deskripsi %}<div class="kelas-guru">{{ k.deskripsi }}</div>{% endif %}
     {% if bisa_kelola %}
     <button type="button" class="card-edit" aria-label="Edit {{ k.nama_kelas }}" data-edit="modal-edit-kelas"
       data-action="/admin/kelas/edit/{{ k.id }}"
       data-del="{{ url_for('hapus_kelas', kelas_id=k.id) }}"
       data-del-text="Yakin ingin menghapus kelas {{ k.nama_kelas }}? Kelas yang masih punya materi, tugas, atau presensi tidak bisa dihapus."
-      data-fill='{{ {"nama_kelas": k.nama_kelas, "deskripsi": k.deskripsi or "", "pengajar_ids": k.pengajar_list|map(attribute="id")|list}|tojson }}'>{{ ic('pencil', 22) }}</button>
+      data-fill='{{ {"nama_kelas": k.nama_kelas, "pengajar_ids": k.pengajar_list|map(attribute="id")|list}|tojson }}'>{{ ic('pencil', 22) }}</button>
     {% endif %}
   </article>
   {% else %}
@@ -39,7 +40,6 @@
 <form method="post" action="{{ url_for('kelola_kelas') }}">
   <div class="modal-body">
     {{ field('Nama Kelas', 'nama_kelas', 'Masukkan nama kelas') }}
-    {{ field('Deskripsi (opsional)', 'deskripsi', 'Masukkan deskripsi (opsional)', 'text', false) }}
     {{ multi(pengajar_list) }}
   </div>
   <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Tambahkan</button></div>
@@ -50,7 +50,6 @@
 <form method="post">
   <div class="modal-body">
     {{ field('Nama Kelas', 'nama_kelas', '') }}
-    {{ field('Deskripsi (opsional)', 'deskripsi', '', 'text', false) }}
     {{ multi(pengajar_list) }}
   </div>
   <div class="modal-foot split">

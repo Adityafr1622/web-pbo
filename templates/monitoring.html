@@ -4,8 +4,9 @@
 
 {% block content %}
 {# data dari app.py:
-   mode daftar  -> daftar (semua siswa), ringkasan (khusus admin)
-   mode satu anak -> data (presensi, nilai, daftar_nilai, catatan_akhir), siswa, bisa_beri_catatan #}
+   mode daftar    -> daftar (semua siswa), ringkasan (khusus admin)
+   mode satu anak -> data (presensi, nilai, daftar_nilai, catatan_akhir), siswa,
+                     kelas, pengajar_list, bisa_beri_catatan, kelas_id #}
 
 {% if daftar is not none %}
 {# ================= daftar siswa (admin & pengajar) ================= #}
@@ -50,81 +51,299 @@
 {% else %}
 {# ================= monitoring satu anak ================= #}
 {% set p = data.presensi %}
-{% set total_hadir = p.hadir + p.izin + p.sakit + p.alfa %}
+{% set total_temu = p.hadir + p.izin + p.sakit + p.alfa %}
+{% set persen = (p.hadir * 100 / total_temu)|round|int if total_temu else 0 %}
+
+{# Data grafik. daftar_nilai urutannya tugas terbaru dulu, dibalik jadi kronologis.
+   `semua` = seluruh tugas (dipakai sumbu X, termasuk yang belum dinilai),
+   `urut`  = yang sudah dinilai saja (dipakai rata-rata, tertinggi, terendah). #}
+{% set semua = data.daftar_nilai | list | reverse | list %}
+{% set urut = semua | selectattr('nilai', 'ne', none) | list %}
+{% set n = urut | length %}
+{% set n_semua = semua | length %}
+{% set step = (684 / (n_semua - 1)) if n_semua > 1 else 0 %}
+{% set rata = data.nilai.rata_rata %}
+
 <div class="page-head">
   <div>
     <h1>Monitoring Anak</h1>
-    <p class="sub">{{ 'Rekap presensi, nilai, dan catatan akhir dari pengajar.' if user.id == siswa.id else 'Rekap untuk ' ~ siswa.nama }}</p>
+    <p class="sub">Rekap presensi, perkembangan nilai, dan catatan akhir dari pengajar.</p>
   </div>
   {% if user.role != 'siswa' %}
   <a class="btn btn-light" href="{{ url_for('profil_siswa', siswa_id=siswa.id) }}">{{ ic('user', 16) }} Buka Profil</a>
   {% endif %}
 </div>
 
-<section class="card mon-card">
-  <h2>Rekap Presensi</h2>
-  <div class="stat-grid stat-presensi">
-    <div class="stat stat-hijau"><span class="stat-angka">{{ p.hadir }}</span><span class="stat-label">Hadir</span></div>
-    <div class="stat stat-kuning"><span class="stat-angka">{{ p.izin }}</span><span class="stat-label">Izin</span></div>
-    <div class="stat stat-biru"><span class="stat-angka">{{ p.sakit }}</span><span class="stat-label">Sakit</span></div>
-    <div class="stat stat-merah"><span class="stat-angka">{{ p.alfa }}</span><span class="stat-label">Alpha</span></div>
+{# ---------- identitas siswa ---------- #}
+<section class="card mon-siswa">
+  {{ avatar(siswa.foto, siswa.nama, 'avatar-lg') }}
+  <div class="mon-identitas">
+    <div class="mon-nama">{{ siswa.nama }}</div>
+    <div class="mon-meta">
+      {{ kelas.nama if kelas else 'Belum punya kelas' }} · {{ siswa.username }}
+      {%- if pengajar_list %} · Pengajar: {{ pengajar_list | map(attribute='nama') | join(' & ') }}{% endif %}
+    </div>
   </div>
-  <p class="muted mon-note">
-    {% if total_hadir %}Dari {{ total_hadir }} pertemuan yang tercatat, kehadiran {{ (p.hadir * 100 / total_hadir)|round(1) }}%.
-    {% else %}Belum ada pertemuan yang tercatat.{% endif %}
-  </p>
+  <div class="mon-chips">
+    <span class="chip chip-abu">{{ total_temu }} pertemuan</span>
+    <span class="chip">{{ n }} tugas dinilai</span>
+  </div>
 </section>
 
-<section class="card mon-card">
-  <h2>Rekap Nilai</h2>
-  <div class="stat-grid">
-    <div class="stat"><span class="stat-angka">{{ data.nilai.jumlah_tugas_dinilai or 0 }}</span><span class="stat-label">Tugas Dinilai</span></div>
-    <div class="stat"><span class="stat-angka">{{ data.nilai.rata_rata if data.nilai.rata_rata is not none else '-' }}</span><span class="stat-label">Rata-rata</span></div>
-    <div class="stat"><span class="stat-angka">{{ data.nilai.nilai_tertinggi|round|int if data.nilai.nilai_tertinggi is not none else '-' }}</span><span class="stat-label">Tertinggi</span></div>
-    <div class="stat"><span class="stat-angka">{{ data.nilai.nilai_terendah|round|int if data.nilai.nilai_terendah is not none else '-' }}</span><span class="stat-label">Terendah</span></div>
+{# ---------- 4 kartu ringkasan ---------- #}
+{% set tertinggi = (urut | sort(attribute='nilai') | last) if n else none %}
+{% set terendah = (urut | sort(attribute='nilai') | first) if n else none %}
+<div class="kpi-grid">
+  <div class="card kpi">
+    <span class="kpi-ic" style="background:#ece9fb; color:#6b5bd1">{{ ic('chart', 22) }}</span>
+    <div>
+      <div class="kpi-angka">{{ rata|string|replace('.', ',') if rata is not none else '-' }}</div>
+      <div class="kpi-label">Rata-rata Nilai</div>
+      <div class="kpi-sub">dari {{ n }} tugas yang dinilai</div>
+    </div>
   </div>
+  <div class="card kpi">
+    <span class="kpi-ic" style="background:#e7f8ec; color:#2fa855">{{ ic('check', 22) }}</span>
+    <div>
+      <div class="kpi-angka">{{ tertinggi.nilai|round|int if tertinggi else '-' }}</div>
+      <div class="kpi-label">Nilai Tertinggi</div>
+      <div class="kpi-sub">{{ tertinggi.judul_tugas if tertinggi else 'Belum ada nilai' }}</div>
+    </div>
+  </div>
+  <div class="card kpi">
+    <span class="kpi-ic" style="background:#fdecea; color:#d9453d">{{ ic('note', 22) }}</span>
+    <div>
+      <div class="kpi-angka">{{ terendah.nilai|round|int if terendah else '-' }}</div>
+      <div class="kpi-label">Nilai Terendah</div>
+      <div class="kpi-sub">{{ terendah.judul_tugas if terendah else 'Belum ada nilai' }}</div>
+    </div>
+  </div>
+  <div class="card kpi">
+    <span class="kpi-ic" style="background:#fff4cf; color:#c9981a">{{ ic('clock', 22) }}</span>
+    <div>
+      <div class="kpi-angka">{{ persen }}%</div>
+      <div class="kpi-label">Kehadiran</div>
+      <div class="kpi-sub">{{ p.hadir }} dari {{ total_temu }} pertemuan</div>
+    </div>
+  </div>
+</div>
 
-  <div class="table-card mon-table"><div class="table-scroll">
-  <table class="data-table">
-    <thead><tr><th class="th-left">Tugas</th><th>Tenggat</th><th>Dikumpulkan</th><th>Nilai</th></tr></thead>
-    <tbody>
-    {% for n in data.daftar_nilai %}
-    <tr>
-      <td class="td-left td-strong">{{ n.judul_tugas }}</td>
-      <td>{{ n.deadline|tgl_jam }}</td>
-      <td>{% if n.waktu_kumpul %}{{ n.waktu_kumpul|tgl_jam }}{% else %}<span class="muted">Belum dikumpulkan</span>{% endif %}</td>
-      <td>{% if n.nilai is not none %}<strong>{{ n.nilai|round|int }}</strong> <span class="muted">/100</span>{% else %}<span class="muted">—</span>{% endif %}</td>
-    </tr>
-    {% else %}<tr class="row-empty"><td colspan="4">Belum ada tugas di kelas ini.</td></tr>
+{# ---------- grafik nilai + donut presensi ---------- #}
+<div class="mon-row">
+
+  {# ===== GRAFIK PERKEMBANGAN NILAI (fitur baru) ===== #}
+  <section class="card">
+    <div class="card-head">
+      <div>
+        <h2>Perkembangan Nilai</h2>
+        <p class="muted">Nilai tiap tugas, diurutkan dari tugas paling awal.</p>
+      </div>
+      <span class="pick">{{ n }} dari {{ n_semua }} tugas dinilai</span>
+    </div>
+
+    {% if n_semua %}
+    {# Satu titik per tugas, SEMUA tugas ikut digambar dan garisnya menyambung penuh.
+       Tugas yang belum dinilai dihitung 0, jadi garisnya turun sampai dasar. #}
+    {% set ns = namespace(titik=[]) %}
+    {% for t in semua %}
+      {% set _ = ns.titik.append({
+          'x': (406 if n_semua == 1 else 64 + step * loop.index0) | round(1),
+          'y': (296 - (t.nilai or 0) * 2.4) | round(1),
+          'judul': t.judul_tugas, 'nilai': t.nilai, 'ke': loop.index }) %}
     {% endfor %}
-    </tbody>
-  </table></div></div>
-</section>
+    {% set lebar_hit = ([step, 48] | min) if n_semua > 1 else 48 %}
 
-<section class="card mon-card">
-  <h2>Catatan Akhir dari Pengajar</h2>
-  <p class="muted">Ditulis pengajar setelah seluruh pertemuan selesai. Catatan per pertemuan disampaikan lewat Komentar Tugas.</p>
-  {% for c in data.catatan_akhir %}
-  <div class="catatan-item">
-    <header><strong>{{ c.nama_pengajar }}</strong> · {{ c.nama_kelas }} · <time class="muted">{{ c.tanggal_dibuat|tgl_jam }}</time></header>
-    <p class="pre-line">{{ c.catatan }}</p>
-  </div>
-  {% else %}
-  <p class="empty-text">Belum ada catatan akhir untuk siswa ini.</p>
-  {% endfor %}
+    <div class="chart-scroll">
+    {# lebar minimum dipasang lewat class, bukan style inline, biar editor nggak
+       salah membaca {{ ... }} sebagai CSS #}
+    <svg class="chart-nilai {{ 'chart-panjang' if n_semua > 10 }}" viewBox="0 0 800 330"
+         role="img" aria-label="Grafik nilai {{ siswa.nama }} dari {{ n_semua }} tugas">
+      <defs>
+        <linearGradient id="isiNilai" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#2e3a66" stop-opacity=".17"/>
+          <stop offset="100%" stop-color="#2e3a66" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
 
-  {% if bisa_beri_catatan and kelas_id %}
-  <div class="profile-actions">
-    <button type="button" class="btn btn-yellow" data-open="modal-catatan">{{ ic('note', 16) }} Tulis / Ubah Catatan Akhir</button>
-  </div>
-  {% endif %}
-</section>
+      {# garis bantu + label sumbu Y (0-100 penuh, tidak dipotong biar tidak menyesatkan) #}
+      <g stroke="#e7eaf3" stroke-width="1">
+        <line x1="64" y1="56" x2="760" y2="56"/><line x1="64" y1="116" x2="760" y2="116"/>
+        <line x1="64" y1="176" x2="760" y2="176"/><line x1="64" y1="236" x2="760" y2="236"/>
+        <line x1="64" y1="296" x2="760" y2="296"/>
+      </g>
+      <g class="sumbu" text-anchor="end">
+        <text x="50" y="60">100</text><text x="50" y="120">75</text>
+        <text x="50" y="180">50</text><text x="50" y="240">25</text><text x="50" y="300">0</text>
+      </g>
+
+      {# garis rata-rata #}
+      {% if rata is not none %}
+      {% set y_rata = (296 - rata * 2.4) | round(1) %}
+      <line x1="64" y1="{{ y_rata }}" x2="760" y2="{{ y_rata }}" stroke="#e0a21a" stroke-width="2" stroke-dasharray="7 6"/>
+      <rect x="68" y="{{ y_rata - 32 }}" width="112" height="22" rx="11" fill="#fff4cf"/>
+      <text class="label-rata" x="124" y="{{ y_rata - 17 }}" text-anchor="middle">Rata-rata {{ rata|string|replace('.', ',') }}</text>
+      {% endif %}
+
+      {# area + garis utama, menyambung dari tugas pertama sampai terakhir #}
+      {% set pasangan = [] %}
+      {% for d in ns.titik %}{% set _ = pasangan.append(d.x ~ ',' ~ d.y) %}{% endfor %}
+      <path d="M{{ pasangan | join(' L') }} L{{ ns.titik[-1].x }},296 L{{ ns.titik[0].x }},296 Z" fill="url(#isiNilai)"/>
+      <polyline points="{{ pasangan | join(' ') }}" fill="none" stroke="#2e3a66" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round"/>
+
+      {# titik + tooltip (CSS :hover, tanpa JS) #}
+      {% for d in ns.titik %}
+        {% set ke_bawah = d.y < 120 %}
+        <g class="pt">
+          <line class="pt-garis" x1="{{ d.x }}" y1="{{ d.y }}" x2="{{ d.x }}" y2="296"/>
+          <circle class="pt-dot {{ 'kosong' if d.nilai is none }}" cx="{{ d.x }}" cy="{{ d.y }}" r="5"/>
+          <rect class="pt-hit" x="{{ (d.x - lebar_hit / 2) | round(1) }}" y="56"
+                width="{{ lebar_hit | round(1) }}" height="240" fill="transparent"/>
+          <foreignObject class="pt-tip" x="{{ [[d.x - 90, 2] | max, 616] | min }}"
+                         y="{{ (d.y + 16) if ke_bawah else (d.y - 74) }}" width="182" height="60">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="tip-box">
+              <span class="tip-judul">{{ d.judul }}</span>
+              {% if d.nilai is not none %}<strong>Nilai {{ d.nilai | round | int }}</strong>
+              {% else %}<strong class="tip-kosong">Belum dinilai</strong>{% endif %}
+            </div>
+          </foreignObject>
+        </g>
+      {% endfor %}
+
+      {# angka ditulis hanya di titik pertama & terakhir, bukan di semua titik #}
+      {% if n_semua > 1 %}
+      <text class="label-titik" x="{{ ns.titik[0].x }}" y="{{ ns.titik[0].y + 22 }}" text-anchor="middle">{{ (ns.titik[0].nilai or 0) | round | int }}</text>
+      <text class="label-titik kuat" x="{{ ns.titik[-1].x }}" y="{{ ns.titik[-1].y - 14 }}" text-anchor="middle">{{ (ns.titik[-1].nilai or 0) | round | int }}</text>
+      {% endif %}
+
+      {# label sumbu X, bertambah mengikuti jumlah tugas #}
+      <g class="sumbu" text-anchor="middle">
+        {% for d in ns.titik %}
+        <text x="{{ d.x }}" y="320">Tugas {{ d.ke }}</text>
+        {% endfor %}
+      </g>
+    </svg>
+    </div>
+    {% else %}
+    <div class="empty-card" style="margin-top:14px">Belum ada tugas di kelas ini, jadi grafiknya belum bisa ditampilkan.</div>
+    {% endif %}
+  </section>
+
+  {# ===== REKAP PRESENSI ===== #}
+  <section class="card">
+    <div class="card-head">
+      <div><h2>Rekap Presensi</h2><p class="muted">{{ total_temu }} pertemuan tercatat.</p></div>
+    </div>
+
+    {# tiap status bawa warna (buat atribut stroke donut) DAN nama class (buat titik legenda) #}
+    {% set STATUS = [('Hadir', '#2fa855', 'd-hadir', p.hadir), ('Izin', '#e0a21a', 'd-izin', p.izin),
+                     ('Sakit', '#3b82c4', 'd-sakit', p.sakit), ('Alpha', '#d9453d', 'd-alpha', p.alfa)] %}
+    {% if total_temu %}
+    <div class="donut-wrap">
+      <svg width="190" height="190" viewBox="0 0 190 190" role="img" aria-label="Kehadiran {{ persen }} persen">
+        {% set K = 364.42 %}
+        {% set nd = namespace(mulai=0) %}
+        <g transform="rotate(-90 95 95)" fill="none" stroke-width="20">
+          {% for nama, warna, kelas, jml in STATUS %}
+            {% set seg = jml / total_temu * K %}
+            {% if jml %}
+            <circle cx="95" cy="95" r="58" stroke="{{ warna }}"
+                    stroke-dasharray="{{ (seg - 3)|round(2) if seg > 4 else seg|round(2) }} {{ (K - seg + 3)|round(2) }}"
+                    stroke-dashoffset="-{{ nd.mulai|round(2) }}"/>
+            {% endif %}
+            {% set nd.mulai = nd.mulai + seg %}
+          {% endfor %}
+        </g>
+        <text class="donut-angka" x="95" y="90" text-anchor="middle">{{ persen }}%</text>
+        <text class="donut-label" x="95" y="111" text-anchor="middle">Kehadiran</text>
+      </svg>
+    </div>
+    {% endif %}
+
+    <div class="legend">
+      {% for nama, warna, kelas, jml in STATUS %}
+      <div class="legend-row">
+        <span class="legend-dot {{ kelas }}"></span>{{ nama }}
+        <span class="legend-n">{{ jml }}</span>
+        <span class="legend-p">{{ (jml * 100 / total_temu)|round|int if total_temu else 0 }}%</span>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+
+{# ---------- daftar nilai + catatan akhir ---------- #}
+<div class="mon-row">
+  <section class="card">
+    <div class="card-head">
+      <div><h2>Daftar Nilai</h2><p class="muted">Rincian tiap tugas, terbaru di atas.</p></div>
+    </div>
+    <div class="table-scroll mon-tabel">
+    <table class="data-table">
+      <thead><tr><th class="th-left">Tugas</th><th>Tenggat</th><th>Dikumpulkan</th><th>Nilai</th></tr></thead>
+      <tbody>
+      {% for t in data.daftar_nilai %}
+      <tr>
+        <td class="td-left td-strong">{{ t.judul_tugas }}</td>
+        <td class="td-nowrap">{{ t.deadline|tgl_jam }}</td>
+        <td class="td-nowrap">{% if t.waktu_kumpul %}{{ t.waktu_kumpul|tgl_jam }}{% else %}<span class="muted">Belum dikumpulkan</span>{% endif %}</td>
+        <td>
+          {% if t.nilai is not none %}
+          <span class="nilai-pill {{ 'n-baik' if t.nilai >= 85 else ('n-cukup' if t.nilai >= 70 else 'n-kurang') }}">{{ t.nilai|round|int }}</span>
+          {% else %}<span class="muted">—</span>{% endif %}
+        </td>
+      </tr>
+      {% else %}<tr class="row-empty"><td colspan="4">Belum ada tugas di kelas ini.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <div><h2>Catatan Akhir</h2><p class="muted">Ditulis pengajar setelah seluruh pertemuan selesai.</p></div>
+    </div>
+    {% for c in data.catatan_akhir %}
+    <div class="mon-catatan">
+      {{ avatar(none, c.nama_pengajar, 'avatar-sm2') }}
+      <div>
+        <div class="catatan-nama">{{ c.nama_pengajar }}
+          {% if c.lulus %}<span class="badge badge-ok">{{ ic('check', 12) }} Lulus</span>{% endif %}
+        </div>
+        <div class="catatan-waktu">{{ c.nama_kelas }} · {{ c.tanggal_dibuat|tgl_jam }}</div>
+        <p class="pre-line">{{ c.catatan }}</p>
+      </div>
+    </div>
+    {% else %}
+    <p class="empty-text">Belum ada catatan akhir untuk siswa ini.</p>
+    {% endfor %}
+    <p class="muted mon-kaki">Catatan per pertemuan disampaikan lewat Komentar Tugas.</p>
+
+    {% if bisa_beri_catatan and kelas_id %}
+    <div class="profile-actions">
+      <button type="button" class="btn btn-yellow" data-open="modal-catatan">{{ ic('note', 16) }} Tulis / Ubah Catatan Akhir</button>
+    </div>
+    {% endif %}
+  </section>
+</div>
 
 {% if bisa_beri_catatan and kelas_id %}
+{# catatan yang sudah ada untuk kelas ini, biar form-nya terisi (bukan mulai dari kosong) #}
+{% set catatan_kelas = data.catatan_akhir | selectattr('kelas_id', 'equalto', kelas_id) | list | first %}
 {% call modal('modal-catatan', 'Catatan Akhir · ' ~ siswa.nama) %}
 <form method="post" action="{{ url_for('simpan_catatan_akhir', kelas_id=kelas_id, siswa_id=siswa.id) }}">
   <div class="modal-body">
-    {{ ta('Catatan perkembangan siswa', 'catatan', 'Tulis perkembangan siswa selama kursus…', true, 6) }}
+    <div class="field"><label>Catatan perkembangan siswa</label>
+      <textarea name="catatan" rows="6" placeholder="Tulis perkembangan siswa selama kursus…" required>{{ catatan_kelas.catatan if catatan_kelas }}</textarea></div>
+    {# BARU: konfirmasi kelulusan dilakukan di sini, sekalian waktu menulis catatan akhir #}
+    <label class="cek-lulus">
+      <input type="checkbox" name="lulus" value="1" {{ 'checked' if catatan_kelas and catatan_kelas.lulus }}><span class="chk">{{ ic('check', 13) }}</span>
+      <span>
+        <strong>Tandai sudah lulus kelas ini</strong>
+        <small>Siswa dianggap sudah menamatkan seluruh pertemuan dan boleh lanjut ke kelas berikutnya. Kelas ini akan bertanda “Selesai” di daftar kelasnya.</small>
+      </span>
+    </label>
     <p class="form-note">Satu siswa punya satu catatan akhir per kelas. Menyimpan lagi akan memperbarui catatan yang sudah ada.</p>
   </div>
   <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Simpan</button></div>

@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
-{% from '_macros.html' import ic, avatar, field, pwfield, modal %}
+{# DIUBAH: tambah import wa_link #}
+{% from '_macros.html' import ic, avatar, field, pwfield, modal, wa_link %}
 {% block title %}Profil Siswa · Fluenglo{% endblock %}
 
 {% block content %}
@@ -26,18 +27,21 @@
 
   <div class="profile-col profile-col-right">
     <p class="col-title">Informasi Akun &amp; Kontak</p>
-    <div class="field"><span class="field-label">Nomor WhatsApp</span><div class="read white">{{ data.whatsapp or '-' }}</div></div>
+    {# DIUBAH: nomor WA jadi tautan yang bisa dipencet #}
+    <div class="field"><span class="field-label">Nomor WhatsApp</span>
+      <div class="read white">{{ wa_link(data.whatsapp) }}</div></div>
     <div class="field"><span class="field-label">Email</span>
       <div class="read white {{ 'is-empty' if not data.email }}">{{ data.email or 'Belum diisi (opsional)' }}</div></div>
     <div class="field"><span class="field-label">Alamat</span>
       <div class="read white {{ 'is-empty' if not data.alamat }}">{{ data.alamat or 'Belum diisi' }}</div></div>
 
+    {# DIUBAH (revisi no. 8): tombol "Buka Menu Monitoring" dihapus,
+       karena menu Monitoring Anak sudah ada di navbar #}
     <div class="profile-actions">
       {% if bisa_ubah %}
       <button type="button" class="btn btn-light" data-open="modal-ganti-password">{{ ic('lock', 16) }} Ganti Password</button>
       <button type="button" class="btn btn-yellow" data-open="modal-ubah-profil">{{ ic('pencil', 16) }} Ubah Profil</button>
       {% endif %}
-      <a class="btn btn-navy" href="{{ url_for('monitoring_siswa', siswa_id=siswa_id) }}">{{ ic('chart', 16) }} Buka Menu Monitoring</a>
     </div>
   </div>
 </section>

@@ -25,9 +25,21 @@
 {% endmacro %}
 
 <div class="page-head">
-  <div><h1>Jadwal</h1><p class="sub">Jadwal mengajar per minggu.</p></div>
+  <div><h1>Jadwal</h1><p class="sub">{{ 'Jadwal mengajar per minggu.' if bisa_kelola else 'Jadwal kelas per minggu.' }}</p></div>
   {% if bisa_kelola %}<button type="button" class="btn btn-yellow" data-open="modal-tambah-jadwal">+ Buat Jadwal</button>{% endif %}
 </div>
+
+{# BARU: pilih kelas mana yang jadwalnya ditampilkan. Admin dapat semua kelas,
+   pengajar hanya kelas yang dia ajar, siswa hanya kelas yang pernah dia ikuti. #}
+{% if kelas_list|length > 1 %}
+<div class="seg seg-kelas">
+  <a class="seg-btn {{ 'is-active' if not kelas_pilih }}" href="{{ url_for(request.endpoint, kelas='') }}">Semua Kelas</a>
+  {% for k in kelas_list %}
+  <a class="seg-btn {{ 'is-active' if kelas_pilih == k.id }}" href="{{ url_for(request.endpoint, kelas=k.id) }}">
+    {{ k.nama_kelas }}{% if k.selesai %} <span class="seg-tanda">selesai</span>{% endif %}</a>
+  {% endfor %}
+</div>
+{% endif %}
 
 {% for minggu, items in jadwal_list|groupby('minggu') %}
 <section class="jadwal-group">
