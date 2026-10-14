@@ -10,19 +10,6 @@ from models.akademik import Jadwal, Materi, Tugas, HARI_VALID  # DIUBAH: + Mater
 from models.user import buat_objek_user
 from models.presensi import Presensi
 
-# Perubahan terbaru ditandai komentar "# BARU" / "# DIUBAH".
-#
-# 4 PILAR OOP DI FILE INI (cari komentar ENCAPSULATION / ABSTRACTION / INHERITANCE / POLYMORPHISM):
-#  - POLYMORPHISM  : paling kelihatan di sini. Route nggak pernah nanya "ini role apa?" lalu
-#                    bercabang if-else panjang; cukup panggil user.tampilkan_menu(),
-#                    user.lihat_profil(), user.boleh_akses_kelas(), dan objeknya sendiri
-#                    yang tahu harus berbuat apa sesuai rolenya.
-#  - ABSTRACTION   : route cuma mengurus HTTP (ambil form, panggil method, kirim ke template).
-#                    Perhitungan dan SQL-nya disembunyikan di models/ dan database.py.
-#  - ENCAPSULATION : aturan penyimpanan file upload dan penyamaran data sensitif dikunci
-#                    di helper (simpan_file, filter samar) biar seragam di semua halaman.
-#  - INHERITANCE   : objek yang dipakai route semuanya turunan User, jadi method warisan
-#                    (cek_password, ganti_password) bisa dipanggil tanpa peduli rolenya.
 
 app = Flask(__name__)
 app.secret_key = 'fluenglo_secret_key_pbo'
@@ -105,7 +92,6 @@ def wa(nomor):
 
 # BARU: isian form yang ditolak server disimpan sebentar di session, lalu dipakai sekali
 # oleh halaman berikutnya untuk membuka ulang modalnya lengkap dengan isi terakhir.
-# ENCAPSULATION: cuma lewat fungsi ini, jadi bentuk datanya seragam di semua route.
 def ingat_isian(modal, aksi=None, **isian):
     session['isian_ulang'] = {
         'modal': modal,
@@ -152,8 +138,6 @@ def tgl_posting(baris):
 def simpan_file(field, ekstensi_boleh=None):
     """Simpan file upload ke folder uploads dengan nama unik (biar file orang lain nggak
     ketimpa kalau namanya sama). Balikin nama file tersimpan, atau None kalau nggak ada file."""
-    # ENCAPSULATION: semua aturan upload (nama diamankan, dikasih awalan unik, ekstensi
-    # dibatasi) dikumpulkan di satu fungsi, jadi tiap route nggak bikin aturannya sendiri.
     file = request.files.get(field)
     if not file or not file.filename:
         return None
@@ -182,8 +166,6 @@ def hapus_file(nama):
 
 
 def get_current_user():
-    # POLYMORPHISM: yang balik dari sini bisa objek Siswa, Pengajar, atau Admin. Route
-    # memperlakukannya sama rata — perbedaan perilakunya ditentukan class masing-masing.
     if 'user_id' not in session:
         return None
     row = database.ambil_user_by_id(session['user_id'])
@@ -211,8 +193,6 @@ def login():
         user_row = database.ambil_user_by_username(username)
         if user_row:
             user_obj = buat_objek_user(user_row)
-            # INHERITANCE: cek_password() ditulis sekali di class User dan diwarisi
-            # Siswa, Pengajar, maupun Admin — login ketiganya lewat jalur yang sama.
             if user_obj and user_obj.cek_password(password):
                 session.clear()
                 session['user_id'] = user_obj.id

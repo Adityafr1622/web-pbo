@@ -2,14 +2,6 @@
 # Presensi                      -> ANGGOTA 4 (Backend Presensi)
 # CatatanPengajar (Catatan Akhir) -> ANGGOTA 3 (Monitoring)
 
-# 4 PILAR OOP di file ini (cari komentar ENCAPSULATION / ABSTRACTION / INHERITANCE / POLYMORPHISM):
-#  - ENCAPSULATION : Presensi & CatatanPengajar bungkus data + aturan validasi + perilakunya sendiri
-#  - ABSTRACTION   : pemanggil (route / Pengajar) cukup panggil method, tanpa tau SQL-nya
-#  - INHERITANCE   : class di file ini nggak mewarisi apa-apa. Fitur presensi & catatan akhir
-#                    dipakai lewat Pengajar yang turunan User (models/user.py)
-#  - POLYMORPHISM  : Pengajar.catat_presensi() nerima objek Kelas/Siswa atau id-nya,
-#                    jadi satu method bisa nangani bentuk input yang beda
-
 from datetime import datetime
 import database
 
@@ -26,7 +18,7 @@ def _ke_int(nilai, nama):
 
 
 class Presensi:
-    # ENCAPSULATION: data kehadiran (id, tanggal, siswa_id, kelas_id, status) dan
+    # data kehadiran (id, tanggal, siswa_id, kelas_id, status) dan
     # perilakunya (simpan, update_status, rekap) ada dalam SATU class.
     # Aturan status (STATUS_VALID/_ALIAS) disimpan di sini, bukan nyebar di route.
     STATUS_DEFAULT = "Belum Hadir"
@@ -44,7 +36,6 @@ class Presensi:
         self.status = status
 
     # ---------- pembuatan objek ----------
-    # ABSTRACTION: dari_row / muat / ambil_kelas / riwayat_siswa nyembunyiin proses baca database.
     # Pemanggil cukup terima objek Presensi, nggak perlu tau tabel & kolomnya.
     @classmethod
     def dari_row(cls, row):
@@ -76,7 +67,7 @@ class Presensi:
         return [cls.dari_row(r) for r in database.ambil_presensi_siswa(_ke_int(siswa_id, "Siswa"))]
 
     # ---------- validasi ----------
-    # ENCAPSULATION: semua aturan validasi presensi dikunci di class ini,
+    # semua aturan validasi presensi dikunci di class ini,
     # jadi data yang masuk database pasti lolos pemeriksaan yang sama.
     @staticmethod
     def normalisasi_status(status):
@@ -117,7 +108,6 @@ class Presensi:
         return kelas_id, tanggal
 
     # ---------- aksi ----------
-    # ABSTRACTION: simpan_massal() = satu pintu simpel buat nyimpan presensi.
     # Di dalamnya ada validasi, upsert (nggak duplikat), dan transaksi database,
     # tapi pemanggil (Pengajar / route Flask) nggak perlu tau.
     @staticmethod
@@ -156,7 +146,7 @@ class Presensi:
         return self.id
 
     def update_status(self, status):
-        # ENCAPSULATION: status cuma diubah lewat method ini, jadi selalu divalidasi dulu
+        # status cuma diubah lewat method ini, jadi selalu divalidasi dulu
         # (Hadir/Izin/Sakit/Alfa) sebelum masuk ke objek & database.
         self.status = Presensi.normalisasi_status(status)
         if self.id:
@@ -183,7 +173,6 @@ class Presensi:
         return len(daftar_presensi)
 
     # ---------- rekap ----------
-    # ABSTRACTION: rekap_siswa()/rekap_kelas() ngembaliin hasil siap pakai
     # (jumlah per status, persen hadir) tanpa buka detail query GROUP BY ke pemanggil.
     @staticmethod
     def _status_baku(status):
@@ -220,7 +209,7 @@ class Presensi:
 class CatatanPengajar:
     # Catatan akhir: 1 catatan per siswa per kelas, ditulis pengajar setelah seluruh pertemuan
     # selesai, tampil di Monitoring Anak.
-    # ENCAPSULATION: isi catatan + aturan simpan/ubah dibungkus di class ini.
+    # isi catatan + aturan simpan/ubah dibungkus di class ini.
     def __init__(self, id, siswa_id, pengajar_id, kelas_id, isi_catatan, tanggal=None):
         self.id = id
         self.siswa_id = siswa_id
@@ -229,7 +218,6 @@ class CatatanPengajar:
         self.isi_catatan = isi_catatan
         self.tanggal = tanggal
 
-    # ABSTRACTION: semua akses data lewat fungsi di database.py, class ini nggak nulis SQL sendiri
     # (aturan "guru 1 & guru 2 kelas tsb boleh nulis" dan "siswa harus anggota kelas" sudah dicek di sana).
     @classmethod
     def dari_row(cls, row):

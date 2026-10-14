@@ -9,16 +9,6 @@ import re
 from datetime import date, datetime, time
 import database
 
-# PILAR OOP (cari komentar ENCAPSULATION / ABSTRACTION / INHERITANCE / POLYMORPHISM):
-# ENCAPSULATION: Kelas/Jadwal/Materi/Tugas/Pengumpulan/Komentar masing-masing bungkus
-#                datanya + aturan validasinya sendiri, route tinggal pakai.
-# ABSTRACTION: route & Admin/Pengajar cukup panggil cek_input(), submit_jawaban(), dst,
-#              nggak perlu tau query SQL-nya.
-# INHERITANCE: nggak ada di file ini, class-class di sini berdiri sendiri.
-#              Pewarisan ada di models/user.py (Siswa/Pengajar/Admin turunan User).
-# POLYMORPHISM: nggak ada di file ini, polymorphism ada di user.py
-#               (tampilkan_menu, boleh_akses_kelas, dll beda tiap role).
-
 HARI_VALID = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
 BULAN = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli",
          "Agustus", "September", "Oktober", "November", "Desember"]
@@ -48,8 +38,8 @@ def _punya(row, kolom):
 
 
 class Kelas:
-    # ENCAPSULATION: data kelas (nama, 1-2 pengajar, daftar siswa) + aturan tambah/hapus
-    # siswa ditaruh satu class, bukan nyebar di route.
+    # data kelas (nama, 1-2 pengajar, daftar siswa) + aturan tambah/hapus
+
     def __init__(self, id, nama_kelas, pengajar_id, pengajar_id2=None):
         self.id = id
         self.nama_kelas = nama_kelas
@@ -73,7 +63,7 @@ class Kelas:
             raise ValueError("Kelas tidak ditemukan.")
         return cls.dari_row(row)
 
-    # ENCAPSULATION: validasi input kelas dikunci di sini, Admin.kelola_kelas() tinggal manggil.
+    # validasi input kelas dikunci di sini, Admin.kelola_kelas() tinggal manggil.
     @staticmethod
     def cek_input(nama_kelas, pengajar_id, pengajar_id2=None, exclude_id=None):
         nama = (nama_kelas or "").strip()
@@ -103,8 +93,6 @@ class Kelas:
 
     def tambah_siswa(self, siswa):
         """siswa boleh objek Siswa atau id-nya."""
-        # POLYMORPHISM: satu method menerima objek Siswa maupun id-nya (duck typing getattr).
-        # ENCAPSULATION: aturan "satu siswa cuma boleh di satu kelas" dijaga di sini.
         siswa_id = _ke_int(getattr(siswa, "id", siswa), "Siswa")
         row = database.ambil_user_by_id(siswa_id)
         if row is None or row["role"] != "siswa":
@@ -127,14 +115,14 @@ class Kelas:
         database.hapus_siswa_dari_kelas(self.id, siswa_id)
         self.daftar_siswa.remove(siswa_id)
 
-    # ENCAPSULATION: jumlah siswa dibaca lewat method, bukan dengan mengintip daftar_siswa
-    # langsung dari luar, jadi cara menyimpannya bebas diubah tanpa merusak pemanggil.
+    # jumlah siswa disediakan lewat method, jadi kalau nanti cara menyimpan
+    # daftar siswanya diubah (misal jadi query langsung), pemanggil tidak ikut rusak.
     def get_total_siswa(self):
         return len(self.daftar_siswa)
 
 
 class Jadwal:
-    # ENCAPSULATION: hari, tanggal, jam, materi + aturan bentrok dibungkus di class Jadwal.
+    # hari, tanggal, jam, materi + aturan bentrok dibungkus di class Jadwal.
     def __init__(self, id, hari, jam, kelas_id, pengajar_id, tanggal=None, materi=None):
         self.id = id
         self.hari = hari
@@ -150,8 +138,6 @@ class Jadwal:
                    row["tanggal"] if _punya(row, "tanggal") else None,
                    row["materi"] if _punya(row, "materi") else None)
 
-    # ABSTRACTION: pemanggil cukup minta "infonya", nggak perlu tahu tanggalnya disimpan
-    # sebagai teks YYYY-MM-DD dan harus diterjemahkan dulu ke nama bulan Indonesia.
     def get_info_jadwal(self):
         """'Senin, 5 Oktober 2026, 08.00 - 09.30' (tanpa tanggal: 'Senin, 08.00 - 09.30')."""
         if self.tanggal:
@@ -179,8 +165,6 @@ class Jadwal:
         mulai, selesai = Jadwal.parse_jam(jam)
         return f"{mulai // 60:02d}:{mulai % 60:02d}", f"{selesai // 60:02d}:{selesai % 60:02d}"
 
-    # ABSTRACTION: Admin.kelola_jadwal() cukup panggil cek_input(); validasi hari/tanggal/jam
-    # dan pengecekan bentrok (kelas atau pengajar sama + jam numpuk) disembunyiin di sini.
     @staticmethod
     def cek_input(hari, jam_mulai, jam_selesai, kelas_id, pengajar_id, exclude_id=None,
                   tanggal=None, materi=None, pengganti=False):  # DIUBAH: + pengganti
@@ -254,7 +238,12 @@ class Jadwal:
 
 
 class Materi:
-    # ENCAPSULATION: info materi + cara bikin link filenya dibungkus di sini.
+    # data materi + SEMUA perilaku yang menyangkut
+    # berkasnya (link, nama asli, tipe, ukuran) dikumpulkan jadi satu class, jadi template
+    # dan route tinggal memanggil, tidak menghitung sendiri.
+    # CATATAN JUJUR: atribut di sini sengaja publik karena cuma dibaca untuk ditampilkan.
+    # Penyembunyian data (atribut private) ada di models/user.py -> User.__password dan
+    # Pengajar.profil_publik(), karena di sanalah ada data yang memang tidak boleh dilihat.
     def __init__(self, id, judul, kategori, file_path, kelas_id, pengajar_id,
                  tanggal_upload=None, tanggal_edit=None):  # DIUBAH: + tanggal upload & edit
         self.id = id
@@ -288,7 +277,7 @@ class Materi:
         """Nama file tanpa awalan unik 8 karakter yang ditambah simpan_file() di app.py."""
         return re.sub(r"^[0-9a-f]{8}_", "", self.file_path or "")
 
-    # ENCAPSULATION: urusan "file ini tipenya apa dan ukurannya berapa" ikut dibungkus
+    # urusan "file ini tipenya apa dan ukurannya berapa" ikut dibungkus
     # di class Materi, jadi template tinggal menampilkan, nggak ngitung sendiri.
     def get_tipe(self):
         """Ekstensi huruf besar buat label di halaman materi, contoh: 'PDF'."""
@@ -313,7 +302,7 @@ class Materi:
 
 
 class Tugas:
-    # ENCAPSULATION: aturan deadline (format + cek kedaluwarsa + cek terlambat) ada di class Tugas.
+    # aturan deadline (format + cek kedaluwarsa + cek terlambat) ada di class Tugas.
     # DIUBAH: + format berjam-menit-detik, karena waktu_kumpul dari database bentuknya begitu
     # dan sekarang ikut diparse di sini (buat menentukan pengumpulan terlambat atau tidak).
     FORMAT_DEADLINE = ("%Y-%m-%d", "%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S")
@@ -343,8 +332,6 @@ class Tugas:
             raise ValueError("Tugas tidak ditemukan.")
         return cls.dari_row(row)
 
-    # POLYMORPHISM: deadline boleh datang sebagai datetime, date, atau teks dengan tiga
-    # format berbeda — satu method ini menangani semuanya dan mengembalikan datetime.
     @staticmethod
     def parse_deadline(deadline):
         """Deadline di database berupa teks, jadi diubah dulu ke datetime.
@@ -364,7 +351,6 @@ class Tugas:
             return hasil
         raise ValueError("Format deadline tidak valid.")
 
-    # ABSTRACTION: template cukup tanya "sudah lewat belum?" tanpa mengurus parsing tanggal.
     def is_expired(self):
         try:
             batas = Tugas.parse_deadline(self.deadline)
@@ -388,13 +374,14 @@ class Tugas:
             return False  # salah satunya rusak -> jangan menuduh siswa terlambat
         return masuk > batas
 
-    # ABSTRACTION: versi method biasa, buat kode yang sudah punya objek Tugas.
+    # Versi method biasa, buat kode yang sudah punya objek Tugas (isinya memanggil
+    # staticmethod di atas). Bukan contoh pilar, cuma jalan pintas biar enak dipakai.
     def telat(self, waktu_kumpul):
         return Tugas.kumpul_terlambat(self.deadline, waktu_kumpul)
 
 
 class Pengumpulan:
-    # ENCAPSULATION: file jawaban & nilai cuma berubah lewat submit_jawaban() / beri_nilai(),
+    # file jawaban & nilai cuma berubah lewat submit_jawaban() / beri_nilai(),
     # jadi selalu lewat validasi dulu.
     def __init__(self, id, tugas_id, siswa_id, file_jawaban=None, nilai=None, waktu_kumpul=None):
         self.id = id
@@ -416,8 +403,6 @@ class Pengumpulan:
             raise ValueError("Pengumpulan tugas tidak ditemukan.")
         return cls.dari_row(row)
 
-    # ABSTRACTION: Siswa.kumpul_tugas() cukup panggil submit_jawaban(); insert vs update
-    # (kumpul ulang) diurus database.simpan_pengumpulan().
     def submit_jawaban(self, file_jawaban):
         file_jawaban = (file_jawaban or "").strip()
         if not file_jawaban:
@@ -428,7 +413,7 @@ class Pengumpulan:
         return self.id
 
     def beri_nilai(self, nilai):
-        # ENCAPSULATION: nilai cuma bisa masuk lewat method ini, jadi mustahil ada nilai
+        # nilai cuma bisa masuk lewat method ini, jadi mustahil ada nilai
         # di luar 0-100 atau bukan angka yang nyelip ke database.
         try:
             nilai = float(nilai)
@@ -449,8 +434,12 @@ class Pengumpulan:
 
 
 class Komentar:
-    # ENCAPSULATION: aturan komentar (nggak boleh kosong, harus menempel ke satu siswa)
-    # dikunci di class ini.
+    # komentar cuma bisa masuk ke database lewat
+    # tambah_komentar(), dan method itu selalu memeriksa ulang isinya saat dipanggil —
+    # tidak boleh kosong dan wajib menempel ke satu siswa. Jadi walaupun atributnya diubah
+    # dari luar, aturannya tetap tidak bisa dilewati.
+    # CATATAN JUJUR: ini penjagaan aturan, bukan penyembunyian data. Atribut private
+    # yang sesungguhnya ada di models/user.py (User.__password).
     # DIUBAH: tambah siswa_id — komentar sekarang percakapan PRIVAT antara seorang siswa
     # dan pengajar kelasnya, bukan papan komentar yang dibaca satu kelas.
     # user_id = penulis komentar, siswa_id = pemilik percakapan.

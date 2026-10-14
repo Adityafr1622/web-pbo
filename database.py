@@ -1,15 +1,6 @@
 # PEMBAGIAN TUGAS DI database.py
 # Penanggung jawab utama: JULPA (koneksi + query users), modul lain menambah query-nya sendiri.
 #
-# 4 PILAR OOP DI FILE INI (cari komentar ENCAPSULATION / ABSTRACTION / INHERITANCE / POLYMORPHISM):
-#  - ABSTRACTION   : ini lapisan penyembunyi SQL. Semua class di models/ cuma manggil fungsi
-#                    di sini (ambil_user_by_id, tambah_materi, dst) dan nggak pernah nulis
-#                    query sendiri, jadi kalau databasenya diganti cukup file ini yang diubah.
-#  - ENCAPSULATION : aturan "kolom apa yang boleh diubah" dan "password wajib di-hash dulu"
-#                    dikunci di sini, bukan dipercayakan ke pemanggil.
-#  - INHERITANCE   : nggak ada di file ini — isinya fungsi, bukan class.
-#                    Pewarisan ada di models/user.py (Siswa/Pengajar/Admin turunan User).
-#  - POLYMORPHISM  : nggak ada di file ini. Perbedaan perilaku per role diurus models/user.py.
 
 import os
 import sqlite3
@@ -35,9 +26,6 @@ def sekarang():
     return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 
-# ENCAPSULATION: cara mengenali & mencocokkan password dibungkus di dua fungsi ini,
-# jadi pemanggil nggak perlu tau bentuk penyimpanannya.
-# DIUBAH: password baru disimpan apa adanya (tidak di-hash lagi).
 def password_sudah_hash(nilai):
     """True kalau nilai di kolom password masih berupa hash dari versi lama."""
     return isinstance(nilai, str) and nilai.startswith(('pbkdf2:', 'scrypt:', 'argon2'))
@@ -146,8 +134,6 @@ def tambah_user(nama, username, password, role, foto=None, no_whatsapp=None, bio
 
 def edit_user(user_id, **kwargs):
     """Memperbarui kolom user yang diizinkan saja."""
-    # ENCAPSULATION: daftar putih kolom. Walaupun fungsinya menerima **kwargs bebas,
-    # kolom di luar daftar ini ditolak, jadi nggak ada yang bisa menulis sembarang kolom.
     kolom_diizinkan = {
         "nama", "username", "password", "role", "foto",
         "no_whatsapp", "biodata", "kelas_id", "alamat",
@@ -457,7 +443,6 @@ def hapus_jadwal(jadwal_id):
 
 def _cek_pengajar_kelas(conn, kelas_id, pengajar_id):
     """Pastikan kelas ada dan pengajar ini guru 1 / guru 2 di kelas tsb."""
-    # ENCAPSULATION: awalan underscore = dipakai internal file ini saja.
     # Aturan hak akses pengajar dicek lagi di lapisan database, jadi walaupun ada route
     # yang lupa mengecek, data tetap tidak bisa masuk ke kelas yang bukan miliknya.
     kelas = conn.execute(
