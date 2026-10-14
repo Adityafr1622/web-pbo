@@ -38,7 +38,12 @@
     </button>
     <div class="user-dropdown" hidden>
       {% if session.get('role') != 'admin' %}<a href="{{ url_for('profil') }}">{{ ic('user', 20) }} Lihat Profil</a>{% endif %}
-      <a class="dd-logout" href="{{ url_for('logout') }}">{{ ic('logout', 20) }} Logout</a>
+      {# DIUBAH: logout lewat konfirmasi dulu, biar nggak kelepasan pencet waktu lagi
+         mengisi presensi atau menulis komentar. Modalnya modal yang sama dengan tombol
+         hapus, cuma judul & tombolnya diganti lewat data-judul / data-ok / data-warna. #}
+      <button type="button" class="dd-logout" data-confirm="{{ url_for('logout') }}"
+        data-judul="Keluar dari Akun" data-ok="Ya, Keluar" data-warna="btn-navy"
+        data-text="Keluar dari akun {{ nama_login }}? Pekerjaan yang belum disimpan akan hilang.">{{ ic('logout', 20) }} Logout</button>
     </div>
   </div>
 </header>
@@ -50,9 +55,12 @@
   <div class="flash flash-{{ cat }}" role="alert"><span>{{ m }}</span><button type="button" class="flash-x" data-flash-x aria-label="Tutup">{{ ic('x', 16) }}</button></div>
 {% endfor %}</div>{% endif %}{% endwith %}
 
-{# modal konfirmasi hapus, dipakai semua tombol [data-confirm] #}
+{# modal konfirmasi, dipakai semua tombol [data-confirm].
+   DIUBAH: judul & tombolnya tidak lagi terkunci "Hapus Data". Tombol pemanggil boleh
+   mengganti lewat data-judul / data-ok / data-warna; kalau tidak diisi, tetap memakai
+   bunyi lama, jadi semua tombol hapus yang sudah ada tidak perlu diubah. #}
 <div class="modal" id="modal-confirm" hidden><div class="modal-box modal-sm">
-  <div class="modal-head"><h2>Hapus Data</h2><button type="button" class="modal-x" data-close aria-label="Tutup">{{ ic('x', 16) }}</button></div>
+  <div class="modal-head"><h2 id="confirm-judul">Hapus Data</h2><button type="button" class="modal-x" data-close aria-label="Tutup">{{ ic('x', 16) }}</button></div>
   <div class="modal-body center" id="confirm-text"></div>
   <div class="modal-foot center"><button type="button" class="btn btn-light" data-close>Batal</button><a class="btn btn-red" id="confirm-ok" href="#">Ya, Hapus</a></div>
 </div></div>

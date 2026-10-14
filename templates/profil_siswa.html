@@ -39,10 +39,15 @@
        karena menu Monitoring Anak sudah ada di navbar #}
     <div class="profile-actions">
       {% if bisa_ubah %}
+      {# Tombol "Buka Menu Monitoring" sengaja TIDAK ada di sini: siswa sudah punya
+         menu "Monitoring Anak" sendiri di navbar, jadi tombol ini cuma bikin dobel. #}
       <button type="button" class="btn btn-light" data-open="modal-ganti-password">{{ ic('lock', 16) }} Ganti Password</button>
       <button type="button" class="btn btn-yellow" data-open="modal-ubah-profil">{{ ic('pencil', 16) }} Ubah Profil</button>
+      {% else %}
+      {# DIUBAH: admin & pengajar butuh jalan pintas ke monitoring anak dari halaman profilnya,
+         karena di navbar mereka tidak punya menu monitoring per anak. #}
+      <a class="btn btn-yellow" href="{{ url_for('monitoring_siswa', siswa_id=siswa_id) }}">{{ ic('chart', 16) }} Buka Menu Monitoring</a>
       {% endif %}
-    </div>
   </div>
 </section>
 
@@ -71,7 +76,6 @@
     {{ pwfield('Password Lama', 'password_lama', true, 'Masukkan password lama') }}
     {{ pwfield('Password Baru', 'password_baru', true, 'Min. 8 karakter, huruf + angka') }}
     {{ pwfield('Konfirmasi Password Baru', 'konfirmasi_password', true, 'Ulangi password baru') }}
-    <p class="form-note">Waktu penggantian password dicatat sistem, tetapi isi passwordnya tidak pernah disimpan maupun ditampilkan.</p>
   </div>
   <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Simpan</button></div>
 </form>

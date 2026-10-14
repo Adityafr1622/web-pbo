@@ -435,7 +435,9 @@ a.feed-item:hover, button.feed-item:hover { background: #e4e6f1; }
 .kom header { font-size: 13px; margin-bottom: 4px; }
 .kom .role, .kom time { color: var(--muted); }
 .kom p { white-space: pre-line; }
-.kom-pengajar { margin-left: auto; background: #fff0c2; }
+/* DIUBAH: dulu .kom-pengajar (selalu pengajar di kanan). Sekarang yang di kanan adalah
+   komentar milik akun yang sedang login, siapa pun dia. */
+.kom-saya { margin-left: auto; background: #fff0c2; }
 .kom-list .empty { color: var(--muted); text-align: center; padding: 30px 0; }
 
 /* presensi */
@@ -810,3 +812,45 @@ a.seg-btn {
 .link-wa:hover { background: #e7f8ec; color: #1c6b36; }
 .link-wa:hover span { text-decoration: underline; }
 .read .link-wa { margin: 0; padding: 0; }
+
+/* ---------- penanda pengumpulan terlambat ---------- */
+/* Jingga, bukan merah: terlambat itu peringatan, bukan gagal — merah sudah dipakai
+   badge "Belum dinilai" dan "Tenggat lewat", jadi biar nggak ketuker. */
+.badge-telat { background: #f0a01e; color: #4a2c00; }
+.badge-tumpuk { display: inline-flex; flex-direction: column; align-items: center; gap: 5px; }
+.blok { display: block; margin-top: 2px; font-size: 11.5px; }
+.note-telat {
+    display: flex; align-items: flex-start; gap: 7px;
+    background: #fff5e2; border: 1px solid #f3d9a4; color: #7a4e07;
+    padding: 9px 13px; border-radius: 10px; margin-top: 10px;
+}
+.note-telat .ic { flex: none; margin-top: 2px; color: #c47d06; }
+
+/* ---------- pesan kesalahan di dalam form / modal ---------- */
+.form-error {
+    display: flex; align-items: flex-start; gap: 8px;
+    background: #fdeceb; border: 1px solid #f3b7b3; color: #9b241c;
+    padding: 10px 14px; border-radius: 10px; margin: 0 0 16px;
+    font-size: 13.5px; font-weight: 500;
+}
+.form-error::before { content: '!'; flex: none; width: 17px; height: 17px; margin-top: 1px;
+    background: #e5453d; color: #fff; border-radius: 50%; font-size: 12px; font-weight: 700;
+    display: grid; place-items: center; }
+/* ditulis selengkap aturan input di atas, kalau tidak warnanya kalah dan tidak kelihatan */
+.field input.is-salah:not([type=checkbox]):not([type=radio]):not([type=file]),
+.field select.is-salah, .field textarea.is-salah, .input-pass input.is-salah {
+    border-color: #e5453d; background: #fffafa;
+    box-shadow: 0 0 0 3px rgba(229, 69, 61, .13);
+}
+
+/* ---------- guru pengganti di jadwal ---------- */
+.badge-ganti { background: #e8ecfa; color: var(--navy); margin-left: 7px; font-size: 10.5px; }
+.field-ganti { background: #f6f8fd; border: 1px solid #e2e7f5; border-radius: 12px; padding: 12px 14px; }
+.chk-ganti { display: flex; align-items: flex-start; gap: 9px; cursor: pointer; font-weight: 600; font-size: 14px; }
+.chk-ganti input { margin-top: 2px; width: 16px; height: 16px; accent-color: var(--navy); flex: none; }
+.field-ganti .form-note { margin: 7px 0 0 25px; }
+
+/* ---------- tombol hapus catatan akhir ---------- */
+/* .mon-catatan sudah flex; tombolnya didorong ke kanan dan tetap sejajar baris pertama. */
+.mon-catatan > div:not([class]) { flex: 1; min-width: 0; }
+.catatan-hapus { flex: none; align-self: flex-start; }

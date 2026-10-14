@@ -103,6 +103,23 @@ def wa(nomor):
         digit = '62' + digit
     return 'https://wa.me/' + digit
 
+# BARU: isian form yang ditolak server disimpan sebentar di session, lalu dipakai sekali
+# oleh halaman berikutnya untuk membuka ulang modalnya lengkap dengan isi terakhir.
+# ENCAPSULATION: cuma lewat fungsi ini, jadi bentuk datanya seragam di semua route.
+def ingat_isian(modal, aksi=None, **isian):
+    session['isian_ulang'] = {
+        'modal': modal,
+        'aksi': aksi,
+        'data': {k: (v if v is not None else '') for k, v in isian.items()},
+    }
+
+@app.template_filter('telat')
+def telat(waktu_kumpul, deadline):
+    """BARU: dipakai badge "Terlambat". Aturannya tetap milik class Tugas — filter ini
+    cuma jembatan supaya template bisa memanggilnya tanpa mengimpor apa-apa.
+    Pemakaian: {% if b.waktu_kumpul|telat(tugas.deadline) %}"""
+    return Tugas.kumpul_terlambat(deadline, waktu_kumpul)
+
 @app.template_filter('pw_hash')
 def pw_hash(nilai):
     """BARU: True kalau password akun itu masih tersimpan ter-hash dari versi lama,
@@ -351,6 +368,9 @@ def kelola_akun():
         kelas_id = request.form.get('kelas_id', '')
 
         foto_filename = 'default_avatar.png'
+        # DIUBAH: tab yang sedang dibuka ikut dibawa pulang lewat ?tab=, biar admin yang
+        # sedang menambah pengajar nggak terlempar balik ke tab Siswa.
+        tab = role if role in ('siswa', 'pengajar') else 'siswa'
         try:
             if role == 'pengajar':
                 foto_filename = simpan_foto() or foto_filename
@@ -362,14 +382,20 @@ def kelola_akun():
             if foto_filename != 'default_avatar.png':
                 hapus_file(foto_filename)
             flash(str(e), 'danger')
+            # BARU: isian yang ditolak disimpan sebentar, supaya modalnya kebuka lagi
+            # dengan isi yang sama dan admin tinggal membetulkan bagian yang salah.
+            ingat_isian('modal-tambah-' + tab, nama=nama, username=username, password=password,
+                        whatsapp=whatsapp, alamat=alamat, nik=nik, kelas_id=kelas_id)
 
-        return redirect(url_for('kelola_akun'))
+        return redirect(url_for('kelola_akun', tab=tab))
 
     users = database.ambil_semua_user()
     # DIUBAH: + riwayat_password (kartu Riwayat Perubahan Password) dan terakhir_ubah (kolom Password Diubah)
+    # DIUBAH: + isian_ulang, dipakai membuka kembali modal yang isinya ditolak
     return render_template('kelola_akun.html', users=users, kelas_list=database.ambil_semua_kelas(),
                            riwayat_password=database.ambil_riwayat_password(),
-                           terakhir_ubah=database.ambil_terakhir_ubah_password())
+                           terakhir_ubah=database.ambil_terakhir_ubah_password(),
+                           isian_ulang=session.pop('isian_ulang', None))
 
 
 @app.route('/admin/users/edit/<int:user_id>', methods=['POST'])
@@ -383,6 +409,7 @@ def edit_akun(user_id):
         flash('Akun tidak ditemukan.', 'danger')
         return redirect(url_for('kelola_akun'))
 
+    tab = target['role']  # DIUBAH: balik ke tab asal akun yang barusan diedit
     foto = None
     try:
         foto = simpan_foto() if target['role'] == 'pengajar' else None
@@ -399,7 +426,17 @@ def edit_akun(user_id):
     except ValueError as e:
         hapus_file(foto)
         flash(str(e), 'danger')
-    return redirect(url_for('kelola_akun'))
+        # BARU: modal edit dibuka lagi dengan isian terakhir + action-nya, jadi tombol
+        # Simpan tetap menuju akun yang sama.
+        ingat_isian('modal-edit-' + tab, aksi=url_for('edit_akun', user_id=user_id),
+                    nama=request.form.get('nama', ''),
+                    username=request.form.get('username', ''),
+                    password=request.form.get('password', ''),
+                    whatsapp=request.form.get('whatsapp', ''),
+                    alamat=request.form.get('alamat', ''),
+                    nik=request.form.get('nik', ''),
+                    kelas_id=request.form.get('kelas_id', ''))
+    return redirect(url_for('kelola_akun', tab=tab))
 
 
 @app.route('/admin/users/delete/<int:user_id>')
@@ -407,12 +444,15 @@ def hapus_akun(user_id):
     user = get_current_user()
     if not user or user.role != 'admin':
         return redirect(url_for('login'))
+    # DIUBAH: role dibaca dulu sebelum akunnya hilang, buat menentukan tab tujuan
+    target = database.ambil_user_by_id(user_id)
+    tab = target['role'] if target and target['role'] in ('siswa', 'pengajar') else 'siswa'
     try:
         user.kelola_akun('hapus', user_id=user_id)
         flash('Akun berhasil dihapus!', 'success')
     except ValueError as e:
         flash(str(e), 'danger')
-    return redirect(url_for('kelola_akun'))
+    return redirect(url_for('kelola_akun', tab=tab))
 
 
 @app.route('/admin/users/<int:user_id>/biodata')
@@ -545,9 +585,16 @@ def detail_kelas(kelas_id):
     if user.role == 'siswa':
         siswa_list = [s for s in siswa_list if s['id'] == user.id]
 
+    # BARU: guru pengganti cuma boleh mengisi presensi pada tanggal pertemuan yang
+    # dijadwalkan untuk dia. None = guru tetap/admin, tidak dibatasi tanggal.
+    tanggal_boleh = None
+    if user.role == 'pengajar' and not user.mengajar_kelas(kelas_id):
+        tanggal_boleh = sorted(user.tanggal_pengganti(kelas_id))
+
     return render_template('detail_kelas.html', kelas=kelas_row, pengajar_list=pengajar_list,
                            siswa_list=siswa_list, user=user, tab='presensi',
-                           presensi_list=siapkan_presensi_list(kelas_id))
+                           presensi_list=siapkan_presensi_list(kelas_id),
+                           tanggal_boleh=tanggal_boleh)
 
 
 # --- ROUTE JADWAL ---
@@ -589,6 +636,7 @@ def siapkan_jadwal_list(rows):
             'jam_mulai': jam_mulai,
             'jam_selesai': jam_selesai,
             'materi': r['materi'] or '-',
+            'pengganti': bool(r['pengganti']) if 'pengganti' in r.keys() else False,  # BARU
             'minggu': minggu,
             '_urut': (minggu, r['tanggal'] or '', HARI_VALID.index(r['hari']) if r['hari'] in HARI_VALID else 9, jam_mulai),
         })
@@ -613,11 +661,16 @@ def lihat_jadwal():
         rows = user.lihat_jadwal(pilih) if pilih else [
             j for k in kelas_list for j in database.ambil_jadwal_by_kelas(k['id'])]
     else:
+        # DIUBAH: kelas yang cuma dia gantikan ikut masuk daftar filter, kalau tidak
+        # baris jadwalnya muncul tapi kelasnya tidak ada di pilihan (membingungkan).
         kelas_list = user.lihat_kelas_diajar()
+        ada = {k['id'] for k in kelas_list}
+        for kelas_id in sorted(user.kelas_pengganti() - ada):
+            kelas = database.ambil_kelas_by_id(kelas_id)
+            if kelas:
+                kelas_list.append(kelas)
         pilih = kelas_terpilih(kelas_list)
         rows = user.lihat_jadwal_mengajar()
-        if pilih:
-            rows = [j for j in rows if j['kelas_id'] == pilih]
 
     return render_template('kelola_jadwal.html', jadwal_list=siapkan_jadwal_list(rows),
                            kelas_list=kelas_list, pengajar_list=[], bisa_kelola=False,
@@ -638,11 +691,12 @@ def kelola_jadwal():
         pengajar_id = request.form.get('pengajar_id', '')
         tanggal = request.form.get('tanggal', '')
         materi = request.form.get('materi', '')
+        pengganti = bool(request.form.get('pengganti'))  # BARU: centang "guru pengganti"
 
         try:
             user.kelola_jadwal('tambah', hari=hari, jam_mulai=jam_mulai, jam_selesai=jam_selesai,
                                kelas_id=kelas_id, pengajar_id=pengajar_id,
-                               tanggal=tanggal, materi=materi)
+                               tanggal=tanggal, materi=materi, pengganti=pengganti)
             flash('Jadwal berhasil ditambahkan!', 'success')
         except ValueError as e:
             flash(str(e), 'danger')
@@ -673,7 +727,8 @@ def edit_jadwal(jadwal_id):
                            kelas_id=request.form.get('kelas_id', ''),
                            pengajar_id=request.form.get('pengajar_id', ''),
                            tanggal=request.form.get('tanggal', ''),
-                           materi=request.form.get('materi', ''))
+                           materi=request.form.get('materi', ''),
+                           pengganti=bool(request.form.get('pengganti')))  # BARU
         flash('Jadwal berhasil diperbarui!', 'success')
     except ValueError as e:
         flash(str(e), 'danger')
@@ -930,7 +985,7 @@ def kumpul_tugas(tugas_id):
     except ValueError as e:
         hapus_file(filename)
         flash(str(e), 'danger')
-    return redirect(url_for('detail_tugas', tugas_id=tugas_id))
+    return redirect(url_for('detail_tugas', tugas_id=tugas_id, pane='siswa'))
 
 
 @app.route('/tugas/<int:tugas_id>/komentar', methods=['POST'])
@@ -952,7 +1007,7 @@ def tambah_komentar_tugas(tugas_id):
         flash('Komentar berhasil dikirim.', 'success')
     except ValueError as e:
         flash(str(e), 'danger')
-    return redirect(url_for('detail_tugas', tugas_id=tugas_id))
+    return redirect(url_for('detail_tugas', tugas_id=tugas_id, pane='siswa'))
 
 
 @app.route('/pengumpulan/<int:pengumpulan_id>/nilai', methods=['POST'])
@@ -971,7 +1026,7 @@ def beri_nilai_tugas(pengumpulan_id):
         flash('Nilai berhasil disimpan!', 'success')
     except ValueError as e:
         flash(str(e), 'danger')
-    return redirect(url_for('detail_tugas', tugas_id=data['tugas_id']))
+    return redirect(url_for('detail_tugas', tugas_id=data['tugas_id'], pane='siswa'))
 
 
 # --- ROUTE CATATAN AKHIR (dari profil siswa, oleh pengajar) ---
@@ -989,6 +1044,21 @@ def simpan_catatan_akhir(kelas_id, siswa_id):
     except ValueError as e:
         flash(str(e), 'danger')
     return redirect(url_for('monitoring_siswa', siswa_id=siswa_id))  # DIUBAH: balik ke Monitoring
+
+
+
+@app.route('/catatan/<int:catatan_id>/hapus')  # BARU: pengajar menghapus catatan akhirnya
+def hapus_catatan_akhir(catatan_id):
+    user = get_current_user()
+    if not user or user.role != 'pengajar':
+        return redirect(url_for('login'))
+    try:
+        siswa_id = user.hapus_catatan_akhir(catatan_id)
+        flash('Catatan akhir berhasil dihapus.', 'success')
+        return redirect(url_for('monitoring_siswa', siswa_id=siswa_id))
+    except ValueError as e:
+        flash(str(e), 'danger')
+        return redirect(url_for('monitoring'))
 
 
 # --- ROUTE MONITORING (Anggota 3) ---
@@ -1101,7 +1171,10 @@ def simpan_presensi(kelas_id):
         flash(f'Presensi {jumlah} siswa berhasil disimpan!', 'success')
     except ValueError as e:
         flash(str(e), 'danger')
-    return redirect(url_for('detail_kelas', kelas_id=kelas_id))
+    # DIUBAH: tanggal pertemuan yang barusan diisi ikut dibawa, biar pilihan tanggalnya
+    # tidak balik sendiri ke pertemuan paling baru.
+    return redirect(url_for('detail_kelas', kelas_id=kelas_id,
+                            tanggal=request.form.get('tanggal', '') or None))
 
 
 if __name__ == '__main__':

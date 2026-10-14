@@ -44,6 +44,10 @@ CREATE TABLE IF NOT EXISTS jadwal (
     pengajar_id INTEGER NOT NULL,
     tanggal TEXT,
     materi TEXT,
+        tanggal TEXT,
+    materi TEXT,
+    -- BARU: 1 kalau pengajarnya guru pengganti (bukan guru tetap kelas tsb)
+    pengganti INTEGER DEFAULT 0,
     FOREIGN KEY(kelas_id) REFERENCES kelas(id),
     FOREIGN KEY(pengajar_id) REFERENCES users(id)
 );

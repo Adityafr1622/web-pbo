@@ -69,6 +69,7 @@ def migrasi():
             ('kelas', 'pengajar_id2', 'INTEGER'),
             ('jadwal', 'tanggal', 'TEXT'),
             ('jadwal', 'materi', 'TEXT'),
+            ('jadwal', 'pengganti', 'INTEGER'),
             ('users', 'alamat', 'TEXT'),
             ('users', 'nik', 'TEXT'),
             ('users', 'email', 'TEXT'),
@@ -411,24 +412,40 @@ def ambil_jadwal_by_pengajar(pengajar_id):
     conn.close()
     return rows
 
-def tambah_jadwal(hari, jam, kelas_id, pengajar_id, tanggal=None, materi=None):
+# DIUBAH: + pengganti (0/1), penanda pengajar yang mengisi pertemuan ini bukan guru tetap kelasnya
+def tambah_jadwal(hari, jam, kelas_id, pengajar_id, tanggal=None, materi=None, pengganti=0):
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute('INSERT INTO jadwal (hari, jam, kelas_id, pengajar_id, tanggal, materi) VALUES (?, ?, ?, ?, ?, ?)',
-                   (hari, jam, kelas_id, pengajar_id, tanggal, materi))
+    cursor.execute('INSERT INTO jadwal (hari, jam, kelas_id, pengajar_id, tanggal, materi, pengganti) '
+                   'VALUES (?, ?, ?, ?, ?, ?, ?)',
+                   (hari, jam, kelas_id, pengajar_id, tanggal, materi, 1 if pengganti else 0))
     conn.commit()
     last_id = cursor.lastrowid
     conn.close()
     return last_id
 
-def edit_jadwal(jadwal_id, hari, jam, kelas_id, pengajar_id, tanggal=None, materi=None):
+def edit_jadwal(jadwal_id, hari, jam, kelas_id, pengajar_id, tanggal=None, materi=None, pengganti=0):
     conn = get_connection()
     conn.execute('''
-        UPDATE jadwal SET hari = ?, jam = ?, kelas_id = ?, pengajar_id = ?, tanggal = ?, materi = ?
+        UPDATE jadwal SET hari = ?, jam = ?, kelas_id = ?, pengajar_id = ?, tanggal = ?,
+                          materi = ?, pengganti = ?
         WHERE id = ?
-    ''', (hari, jam, kelas_id, pengajar_id, tanggal, materi, jadwal_id))
+    ''', (hari, jam, kelas_id, pengajar_id, tanggal, materi, 1 if pengganti else 0, jadwal_id))
     conn.commit()
     conn.close()
+
+def ambil_jadwal_pengganti(pengajar_id):
+    """BARU: pertemuan di mana pengajar ini bertugas sebagai GURU PENGGANTI.
+    Dipakai menentukan kelas apa yang boleh dia buka dan tanggal mana yang boleh dia
+    isi presensinya — di luar itu dia tetap tidak punya akses."""
+    conn = get_connection()
+    try:
+        return conn.execute('''
+            SELECT kelas_id, tanggal FROM jadwal
+            WHERE pengajar_id = ? AND pengganti = 1
+        ''', (pengajar_id,)).fetchall()
+    finally:
+        conn.close()
 
 def hapus_jadwal(jadwal_id):
     conn = get_connection()
@@ -1165,6 +1182,17 @@ def ambil_catatan_akhir_by_siswa(siswa_id):
             WHERE c.siswa_id = ?
             ORDER BY c.tanggal_dibuat DESC
         """, (siswa_id,)).fetchall()
+    finally:
+        conn.close()
+
+def ambil_catatan_akhir_by_id(catatan_id):
+    """BARU: satu baris catatan akhir. Dipakai sebelum menghapus, buat tahu catatan ini
+    milik kelas & siswa yang mana (hak aksesnya dicek dari situ)."""
+    conn = get_connection()
+    try:
+        return conn.execute(
+            "SELECT * FROM catatan_akhir WHERE id = ?", (catatan_id,)
+        ).fetchone()
     finally:
         conn.close()
 

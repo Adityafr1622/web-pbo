@@ -286,7 +286,10 @@
       <tr>
         <td class="td-left td-strong">{{ t.judul_tugas }}</td>
         <td class="td-nowrap">{{ t.deadline|tgl_jam }}</td>
-        <td class="td-nowrap">{% if t.waktu_kumpul %}{{ t.waktu_kumpul|tgl_jam }}{% else %}<span class="muted">Belum dikumpulkan</span>{% endif %}</td>
+        {# BARU: kolom Dikumpulkan ikut menandai pengumpulan yang lewat tenggat #}
+        <td class="td-nowrap">{% if t.waktu_kumpul %}{{ t.waktu_kumpul|tgl_jam }}{% if t.waktu_kumpul|telat(t.deadline) %}
+          <span class="badge badge-telat" title="Masuk setelah tenggat">{{ ic('clock', 12) }} Terlambat</span>{% endif %}
+        {% else %}<span class="muted">Belum dikumpulkan</span>{% endif %}</td>
         <td>
           {% if t.nilai is not none %}
           <span class="nilai-pill {{ 'n-baik' if t.nilai >= 85 else ('n-cukup' if t.nilai >= 70 else 'n-kurang') }}">{{ t.nilai|round|int }}</span>
@@ -304,7 +307,7 @@
     <div class="card-head">
       <div><h2>Catatan Akhir</h2><p class="muted">Ditulis pengajar setelah seluruh pertemuan selesai.</p></div>
     </div>
-    {% for c in data.catatan_akhir %}
+        {% for c in data.catatan_akhir %}
     <div class="mon-catatan">
       {{ avatar(none, c.nama_pengajar, 'avatar-sm2') }}
       <div>
@@ -314,6 +317,14 @@
         <div class="catatan-waktu">{{ c.nama_kelas }} · {{ c.tanggal_dibuat|tgl_jam }}</div>
         <p class="pre-line">{{ c.catatan }}</p>
       </div>
+      {# BARU: tombol hapus, cuma muncul buat pengajar kelas catatan tsb — bukan pengajar
+         kelas lain, apalagi siswa atau admin. Catatan bertanda Lulus dapat peringatan
+         tambahan karena menghapusnya ikut membatalkan kelulusan siswa. #}
+      {% if bisa_beri_catatan and user.mengajar_kelas(c.kelas_id) %}
+      <button type="button" class="icon-btn icon-del catatan-hapus" title="Hapus catatan akhir"
+        data-confirm="{{ url_for('hapus_catatan_akhir', catatan_id=c.id) }}"
+        data-text="Hapus catatan akhir {{ c.nama_kelas }} untuk {{ siswa.nama }}?{% if c.lulus %} Tanda LULUS-nya ikut terhapus, jadi {{ siswa.nama.split()[0] }} akan dihitung belum menamatkan kelas ini.{% endif %} Tindakan ini tidak dapat dibatalkan.">{{ ic('trash', 16) }}</button>
+      {% endif %}
     </div>
     {% else %}
     <p class="empty-text">Belum ada catatan akhir untuk siswa ini.</p>

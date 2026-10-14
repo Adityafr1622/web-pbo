@@ -42,7 +42,7 @@
       <div class="read white {{ 'is-empty' if not data.alamat }}">{{ data.alamat or 'Belum diisi' }}</div></div>
     {% if lengkap %}
     {# NIK hanya dikirim ke admin dan pengajar yang bersangkutan, tidak pernah ke siswa #}
-    <div class="field"><span class="field-label">NIK <span class="label-note">(hanya admin &amp; pengajar ybs)</span></span>
+    <div class="field"><span class="field-label">NIK</span>
       <div class="read">{{ data.nik or '-' }}</div></div>
     {% endif %}
 
@@ -67,9 +67,6 @@
       <input type="text" name="alamat" value="{{ data.alamat or '' }}" placeholder="Masukkan alamat" required></div>
     <div class="field span-2"><label>Photo Profil <span class="label-note">(kosong = tetap)</span></label>
       <input type="file" name="foto" accept="image/*"></div>
-  </div>
-  <p class="form-note">NIK hanya bisa diubah oleh admin lewat menu Kelola Akun.</p>
-  </div>
   <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Simpan</button></div>
 </form>
 {% endcall %}
@@ -80,7 +77,6 @@
     {{ pwfield('Password Lama', 'password_lama', true, 'Masukkan password lama') }}
     {{ pwfield('Password Baru', 'password_baru', true, 'Min. 8 karakter, huruf + angka') }}
     {{ pwfield('Konfirmasi Password Baru', 'konfirmasi_password', true, 'Ulangi password baru') }}
-    <p class="form-note">Waktu penggantian password dicatat sistem, tetapi isi passwordnya tidak pernah disimpan maupun ditampilkan.</p>
   </div>
   <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Simpan</button></div>
 </form>

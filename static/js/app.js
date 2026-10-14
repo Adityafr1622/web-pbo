@@ -12,6 +12,96 @@
     $('.multi-btn', w).classList.toggle('has-value', on.length > 0);
   };
 
+  // BARU: mengisi form sebuah modal lalu membukanya. Dipakai dua kali: waktu tombol Edit
+  // ditekan, dan waktu server menolak isian (modalnya dibuka lagi dengan isi yang sama).
+  const isiForm = (m, data, aksi) => {
+    const f = $('form', m);
+    if (!f) return openM(m);
+    f.reset();
+    if (aksi) f.action = aksi;
+    Object.entries(data || {}).forEach(([k, v]) => {
+      const i = f.elements[k];
+      if (!i || i.type === 'file') return;
+      // DIUBAH: checkbox diisi lewat .checked, bukan .value (mis. centang "guru pengganti")
+      if (i.type === 'checkbox') i.checked = !!v && v !== '0';
+      else i.value = v ?? '';
+    });
+    $$('[data-multi]', f).forEach(w => {
+      $$('input[type=checkbox]', w).forEach(c => c.checked = (data.pengajar_ids || []).includes(+c.value));
+      syncMulti(w);
+    });
+    saringGuru(f);                       // BARU: dropdown pengajar ikut disesuaikan kelasnya
+    if (data && data.pengajar_id) {      // nilainya dipasang lagi, karena penyaringan bisa mengosongkannya
+      const g = f.elements['pengajar_id'];
+      if (g) g.value = data.pengajar_id;
+    }
+    openM(m);
+  };
+
+  // ---------- BARU: pesan kesalahan di dalam modal ----------
+  // Dulu isian yang salah format baru ketahuan setelah form terkirim, dan modalnya
+  // terlanjur tertutup sehingga semua ketikan hilang. Sekarang dicek dulu di browser:
+  // modal tetap terbuka, isian utuh, pesannya muncul di dalam modal. Validasi di
+  // server tetap jalan sebagai pengaman — ini cuma supaya tidak perlu mengetik ulang.
+  const pesanSalah = i => {
+    if (i.validity.valueMissing) return 'Bagian ini wajib diisi dulu.';
+    return i.dataset.pesan || 'Isian ini belum sesuai format yang diminta.';
+  };
+  const bersihkanPesan = f => {
+    const k = $('.form-error', f); if (k) k.remove();
+    $$('.is-salah', f).forEach(i => i.classList.remove('is-salah'));
+  };
+  const tampilkanPesan = (f, inp) => {
+    bersihkanPesan(f);
+    const kotak = document.createElement('p');
+    kotak.className = 'form-error';
+    kotak.textContent = pesanSalah(inp);
+    ($('.modal-body', f) || f).prepend(kotak);
+    inp.classList.add('is-salah');
+    inp.focus({ preventScroll: true });
+    if (inp.scrollIntoView) inp.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  };
+
+  // ---------- BARU: dropdown Pengajar mengikuti kelas yang dipilih ----------
+  // Dulu semua pengajar muncul walau tidak mengajar kelas itu, padahal hak akses kelas
+  // dibaca dari tabel kelas — hasilnya pengajar bisa dijadwalkan tapi diblokir waktu mau
+  // mengisi presensi. Sekarang disaring, kecuali centang "Guru pengganti" dinyalakan.
+  const saringGuru = form => {
+    const kelas = $('[data-kelas-pick]', form), guru = $('[data-guru-pick]', form);
+    const ganti = $('[data-guru-ganti]', form);
+    if (!kelas || !guru) return;
+    const bebas = ganti && ganti.checked;
+    $$('option', guru).forEach(o => {
+      if (!o.value) return;                                   // "Pilih pengajar" selalu ada
+      const miliknya = (o.dataset.kelas || '').split(' ').includes(kelas.value);
+      const boleh = bebas || (kelas.value && miliknya);
+      o.hidden = !boleh;
+      o.disabled = !boleh;
+    });
+    const dipilih = guru.selectedOptions[0];
+    if (dipilih && dipilih.disabled) guru.value = '';         // pilihan lama jadi tidak sah
+  };
+
+  // ---------- BARU: tab yang terbuka diingat lewat URL ----------
+  // Sehabis menyimpan sesuatu, halaman dimuat ulang dari server dan tab-nya balik ke
+  // yang paling kiri. Sekarang tab tujuannya dititipkan di URL (?tab= / ?pane= dari
+  // server, atau #tab= waktu penggunanya sendiri yang mengeklik).
+  const simpanTab = (kunci, nilai) => {
+    try { history.replaceState(null, '', location.pathname + location.search + '#' + kunci + '=' + nilai); }
+    catch (_) { /* browser lama: tidak apa-apa, cuma tidak diingat */ }
+  };
+  const bukaTabDariUrl = () => {
+    const par = new URLSearchParams(location.search);
+    ['tab', 'pane'].forEach(kunci => {
+      const dariHash = location.hash.startsWith('#' + kunci + '=')
+        ? decodeURIComponent(location.hash.slice(kunci.length + 2)) : '';
+      const nilai = dariHash || par.get(kunci) || '';          // hash menang: itu klik terakhir pengguna
+      if (!nilai) return;
+      const tombol = $$('[data-' + kunci + ']').find(b => b.dataset[kunci] === nilai);
+      if (tombol) tombol.click();
+    });
+  };
+
   document.addEventListener('click', e => {
     const t = e.target, up = s => t.closest(s);
     let el;
@@ -24,20 +114,22 @@
     if (t.classList.contains('modal')) return closeM(t);
 
     if ((el = up('[data-edit]'))) {            // isi form edit dari data-fill (JSON)
-      const m = $('#' + el.dataset.edit), f = $('form', m), d = JSON.parse(el.dataset.fill || '{}');
-      f.reset(); f.action = el.dataset.action;
-      Object.entries(d).forEach(([k, v]) => { const i = f.elements[k]; if (i && i.type !== 'file') i.value = v ?? ''; });
-      $$('[data-multi]', f).forEach(w => {
-        $$('input[type=checkbox]', w).forEach(c => c.checked = (d.pengajar_ids || []).includes(+c.value));
-        syncMulti(w);
-      });
+      const m = $('#' + el.dataset.edit);
+      bersihkanPesan(m);                      // DIUBAH: sisa pesan kesalahan dibuang dulu
       $$('[data-del-btn]', m).forEach(b => { b.dataset.confirm = el.dataset.del || ''; b.dataset.text = el.dataset.delText || ''; });
-      return openM(m);
+      return isiForm(m, JSON.parse(el.dataset.fill || '{}'), el.dataset.action);
     }
-    if ((el = up('[data-confirm]'))) {         // konfirmasi hapus
+    if ((el = up('[data-confirm]'))) {         // konfirmasi hapus / keluar akun
       $$('.modal:not([hidden])').forEach(m => closeM(m));
+      const dd = $('.user-dropdown'); if (dd) dd.hidden = true;   // BARU: tutup dropdown dulu
       $('#confirm-text').textContent = el.dataset.text || 'Yakin ingin menghapus data ini?';
-      $('#confirm-ok').href = el.dataset.confirm;
+      // DIUBAH: judul & tombolnya bisa diganti tombol pemanggil (dipakai konfirmasi Logout).
+      // Tanpa data-judul/data-ok/data-warna, bunyinya tetap seperti dulu.
+      $('#confirm-judul').textContent = el.dataset.judul || 'Hapus Data';
+      const ok = $('#confirm-ok');
+      ok.textContent = el.dataset.ok || 'Ya, Hapus';
+      ok.className = 'btn ' + (el.dataset.warna || 'btn-red');
+      ok.href = el.dataset.confirm;
       return openM($('#modal-confirm'));
     }
     if ((el = up('[data-tab]'))) {             // tab Siswa / Pengajar
@@ -45,11 +137,13 @@
       $$('[data-tab]').forEach(b => b.classList.toggle('is-active', b === el));
       $$('[data-panel]').forEach(p => p.hidden = p.dataset.panel !== v);
       $$('[data-for]').forEach(b => b.hidden = b.dataset.for !== v);
+      simpanTab('tab', v);                     // BARU: diingat, jadi refresh tidak balik ke tab awal
       return;
     }
-    if ((el = up('[data-pane]'))) {            // tab Halaman Login / Tentang Kami
+    if ((el = up('[data-pane]'))) {            // subtab (Petunjuk | Pengumpulan, Login | Tentang Kami)
       $$('[data-pane]').forEach(b => b.classList.toggle('is-active', b === el));
       $$('[data-pane-id]').forEach(p => p.hidden = p.dataset.paneId !== el.dataset.pane);
+      simpanTab('pane', el.dataset.pane);      // BARU
       return;
     }
     if (up('[data-lupa]')) { const h = $('#lupa-hint'); h.hidden = !h.hidden; return; }
@@ -88,6 +182,13 @@
       t.form.elements.hari.value = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][new Date(t.value + 'T00:00').getDay()];
     }
 
+    // BARU: ganti kelas atau centang "guru pengganti" -> dropdown pengajar disaring ulang
+    if (t.matches('[data-kelas-pick], [data-guru-ganti]')) {
+      const form = t.closest('form');
+      if (form) saringGuru(form);
+      return;
+    }
+
     // BARU: pilih tanggal pertemuan -> tampilkan tabel presensi tanggal tersebut
     if (t.matches('[data-presensi-pick]')) {
       $$('.presensi-panel').forEach(f => f.hidden = f.id !== t.value);
@@ -123,8 +224,35 @@
     if (i && i === radioSebelum) { i.checked = false; radioSebelum = null; }
   });
 
+  // BARU: form dicegat dulu sebelum terkirim. Balon bawaan browser dimatikan
+  // (noValidate) supaya pesannya memakai gaya web ini dan muncul di dalam modal.
+  $$('form').forEach(f => f.noValidate = true);
+
+  document.addEventListener('submit', e => {
+    const f = e.target;
+    if (f.checkValidity()) { bersihkanPesan(f); return; }
+    e.preventDefault();
+    const salah = $$('input, select, textarea', f).find(i => i.willValidate && !i.checkValidity());
+    if (salah) tampilkanPesan(f, salah);
+  });
+
+  // pesan hilang sendiri begitu isian yang salah sudah dibetulkan
+  document.addEventListener('input', e => {
+    const t = e.target;
+    if (t.form && t.classList.contains('is-salah') && t.checkValidity()) bersihkanPesan(t.form);
+  });
+
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') $$('.modal:not([hidden])').forEach(closeM);
   });
   setTimeout(() => $$('.flash').forEach(f => f.remove()), 6000);
+
+  // BARU: buka tab sesuai URL, saring dropdown pengajar, lalu buka lagi modal yang ditolak server.
+  bukaTabDariUrl();
+  $$('form').forEach(f => { if ($('[data-guru-pick]', f)) saringGuru(f); });
+  const ulang = $('[data-reopen]');
+  if (ulang) {
+    const m = $('#' + ulang.dataset.reopen);
+    if (m) isiForm(m, JSON.parse(ulang.dataset.fill || '{}'), ulang.dataset.aksi || '');
+  }
 })();

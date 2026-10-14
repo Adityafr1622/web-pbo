@@ -48,9 +48,15 @@
 {%- else -%}-{%- endif %}
 {%- endmacro %}
 
-{% macro field(label, name, ph='', type='text', req=true, cls='') -%}
+{# DIUBAH: + pat / minlen / pesan. Aturan formatnya dititip ke atribut HTML (pattern,
+   minlength) supaya browser bisa mengeceknya SEBELUM form terkirim — jadi kalau salah,
+   modalnya tidak keburu tertutup. `pesan` adalah kalimat yang muncul kalau isiannya
+   belum sesuai. Validasi di server tetap ada, ini cuma lapis pertama. #}
+{% macro field(label, name, ph='', type='text', req=true, cls='', pat='', minlen='', pesan='') -%}
 <div class="field {{ cls }}"><label>{{ label }}</label>
-<input type="{{ type }}" name="{{ name }}" placeholder="{{ ph }}" {{ 'required' if req }} {% if type == 'date' %}data-auto-hari{% endif %}></div>
+<input type="{{ type }}" name="{{ name }}" placeholder="{{ ph }}" {{ 'required' if req }}
+ {% if pat %}pattern="{{ pat }}"{% endif %}{% if minlen %} minlength="{{ minlen }}"{% endif %}
+ {% if pesan %}data-pesan="{{ pesan }}"{% endif %} {% if type == 'date' %}data-auto-hari{% endif %}></div>
 {%- endmacro %}
 
 {# BARU: textarea, dipakai deskripsi/petunjuk tugas dan catatan akhir #}
@@ -59,9 +65,12 @@
 <textarea name="{{ name }}" rows="{{ rows }}" placeholder="{{ ph }}" {{ 'required' if req }}></textarea></div>
 {%- endmacro %}
 
-{% macro pwfield(label='Password', name='password', req=true, ph='Masukkan password') -%}
+{# DIUBAH: + pat & pesan, sama alasannya dengan macro field di atas. Dikosongkan secara
+   bawaan supaya form yang tidak butuh aturan khusus (mis. "password lama") tidak ikut dicek. #}
+{% macro pwfield(label='Password', name='password', req=true, ph='Masukkan password', pat='', pesan='') -%}
 <div class="field"><label>{{ label }}</label>
-<div class="input-pass"><input type="password" name="{{ name }}" placeholder="{{ ph }}" {{ 'required' if req }} autocomplete="new-password">
+<div class="input-pass"><input type="password" name="{{ name }}" placeholder="{{ ph }}" {{ 'required' if req }}
+ {% if pat %}pattern="{{ pat }}"{% endif %} {% if pesan %}data-pesan="{{ pesan }}"{% endif %} autocomplete="new-password">
 <button type="button" class="pw-toggle" aria-label="Tampilkan/sembunyikan password">{{ ic('eye-off') }}{{ ic('eye') }}</button></div></div>
 {%- endmacro %}
 

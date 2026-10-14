@@ -3,18 +3,33 @@
 {% block title %}Jadwal · Fluenglo{% endblock %}
 
 {% block content %}
-{# data dari app.py: jadwal_list (dict: id, kelas_id, hari, tanggal, pengajar_id, nama_pengajar, jam_mulai, jam_selesai, materi, minggu),
+{# data dari app.py: jadwal_list (dict: id, kelas_id, hari, tanggal, pengajar_id, nama_pengajar, jam_mulai, jam_selesai, materi, pengganti, minggu),
    kelas_list, pengajar_list, bisa_kelola #}
 {% set BULAN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'] %}
 {% set nama_kelas = {} %}
 {% for k in kelas_list %}{% set _ = nama_kelas.update({k.id: k.nama_kelas}) %}{% endfor %}
 
+{# BARU: {pengajar_id: "1 3"} — kelas apa saja yang diajar tiap pengajar. Dipakai JS
+   untuk menyaring dropdown Pengajar mengikuti kelas yang dipilih. #}
+{% set guru_kelas = {} %}
+{% for k in kelas_list %}{% for g in k.pengajar_list %}
+{% set _ = guru_kelas.update({g.id: (guru_kelas.get(g.id, '') ~ ' ' ~ k.id)}) %}
+{% endfor %}{% endfor %}
+
 {% macro isi_form() %}
 <div class="modal-body"><div class="form-grid">
-  <div class="field"><label>Kelas</label><select name="kelas_id" required><option value="">Pilih kelas</option>
+  <div class="field"><label>Kelas</label><select name="kelas_id" required data-kelas-pick><option value="">Pilih kelas</option>
     {% for k in kelas_list %}<option value="{{ k.id }}">{{ k.nama_kelas }}</option>{% endfor %}</select></div>
-  <div class="field"><label>Pengajar</label><select name="pengajar_id" required><option value="">Pilih pengajar</option>
-    {% for p in pengajar_list %}<option value="{{ p.id }}">{{ p.nama }}</option>{% endfor %}</select></div>
+  {# DIUBAH: tiap pengajar membawa daftar kelasnya, jadi yang bukan guru kelas tsb
+     disembunyikan — kecuali centang "Guru pengganti" di bawah dinyalakan. #}
+  <div class="field"><label>Pengajar</label><select name="pengajar_id" required data-guru-pick><option value="">Pilih pengajar</option>
+    {% for p in pengajar_list %}<option value="{{ p.id }}" data-kelas="{{ guru_kelas.get(p.id, '')|trim }}">{{ p.nama }}</option>{% endfor %}</select></div>
+  <div class="field span-2 field-ganti">
+    <label class="chk-ganti"><input type="checkbox" name="pengganti" value="1" data-guru-ganti>
+      <span>Guru pengganti <span class="label-note">(mengisi pertemuan ini saja, bukan guru tetap kelasnya)</span></span></label>
+    <p class="form-note">Dicentang kalau guru tetapnya berhalangan. Guru pengganti bisa membuka kelas
+      dan mengisi presensi pertemuan ini, tetapi tidak bisa mengubah materi, tugas, maupun nilai.</p>
+  </div>
   {{ field('Tanggal', 'tanggal', '', 'date') }}
   <div class="field"><label>Hari <span class="label-note">(otomatis dari tanggal)</span></label><select name="hari" required>
     {% for h in ['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu'] %}<option>{{ h }}</option>{% endfor %}</select></div>
@@ -51,14 +66,16 @@
     {% for j in items %}
     <tr>
       <td>{{ nama_kelas.get(j.kelas_id, '-') }}</td><td>{{ j.hari }}</td><td>{{ j.tanggal }}</td>
-      <td><a class="link-plain" href="{{ url_for('profil_pengajar', pengajar_id=j.pengajar_id) }}">{{ j.nama_pengajar }}</a></td>
+      {# BARU: penanda guru pengganti, biar jelas kenapa namanya beda dari guru tetap kelas #}
+      <td><a class="link-plain" href="{{ url_for('profil_pengajar', pengajar_id=j.pengajar_id) }}">{{ j.nama_pengajar }}</a>
+        {% if j.pengganti %}<span class="badge badge-ganti" title="Guru pengganti untuk pertemuan ini">Pengganti</span>{% endif %}</td>
       <td>{{ j.jam_mulai }}–{{ j.jam_selesai }}</td><td>{{ j.materi }}</td>
       {% if bisa_kelola %}
       {% set iso = '' %}
       {% if j.tanggal != '-' %}{% set p = j.tanggal.split(' ') %}{% set iso = '%s-%02d-%02d'|format(p[2], BULAN.index(p[1]) + 1, p[0]|int) %}{% endif %}
       <td><div class="aksi">
         <button type="button" class="icon-btn icon-edit" title="Edit" data-edit="modal-edit-jadwal" data-action="/admin/jadwal/edit/{{ j.id }}"
-          data-fill='{{ {"kelas_id": j.kelas_id, "pengajar_id": j.pengajar_id, "tanggal": iso, "hari": j.hari, "jam_mulai": j.jam_mulai, "jam_selesai": j.jam_selesai, "materi": (j.materi if j.materi != "-" else "")}|tojson }}'>{{ ic('pencil', 16) }}</button>
+          data-fill='{{ {"kelas_id": j.kelas_id, "pengajar_id": j.pengajar_id, "tanggal": iso, "hari": j.hari, "jam_mulai": j.jam_mulai, "jam_selesai": j.jam_selesai, "materi": (j.materi if j.materi != "-" else ""), "pengganti": j.pengganti}|tojson }}'>{{ ic('pencil', 16) }}</button>
         <button type="button" class="icon-btn icon-del" title="Hapus" data-confirm="/admin/jadwal/delete/{{ j.id }}"
           data-text="Yakin ingin menghapus jadwal {{ j.materi }} ({{ j.hari }}, {{ j.tanggal }})? Tindakan ini tidak dapat dibatalkan.">{{ ic('trash', 16) }}</button>
       </div></td>

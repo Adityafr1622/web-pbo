@@ -3,7 +3,7 @@
 {% block title %}Presensi {{ kelas.nama_kelas }} · Fluenglo{% endblock %}
 
 {% block content %}
-{# data dari app.py: kelas, pengajar_list, siswa_list, presensi_list, user, tab
+{# data dari app.py: kelas, pengajar_list, siswa_list, presensi_list, user, tab, tanggal_boleh
    presensi_list: [{tanggal, label, status {siswa_id: 'hadir'|...}, materi}] #}
 {{ kelas_head(kelas, pengajar_list, tab, admin=(user.role == 'admin')) }}
 
@@ -35,12 +35,17 @@
 
 {% else %}
 {# ---------- pengajar (bisa mengisi) & admin (lihat saja) ---------- #}
+{# DIUBAH: pertemuan yang terbuka mengikuti ?tanggal= dari URL. Dipakai sehabis menyimpan
+   presensi, supaya halamannya tidak balik sendiri ke pertemuan paling baru. #}
+{% set tgl_pilih = request.args.get('tanggal') %}
+{% set ada_pilihan = tgl_pilih and presensi_list | selectattr('tanggal', 'equalto', tgl_pilih) | list %}
+
 <div class="presensi-pick">
   <label for="pilih-tanggal">Tanggal</label>
   <div class="select-wrap">
     <select id="pilih-tanggal" data-presensi-pick>
       {% for p in presensi_list %}
-      <option value="panel-{{ p.tanggal }}">{{ p.label }}{% if p.materi %} · {{ p.materi }}{% endif %}</option>
+      <option value="panel-{{ p.tanggal }}" {{ 'selected' if (p.tanggal == tgl_pilih) or (not ada_pilihan and loop.first) }}>{{ p.label }}{% if p.materi %} · {{ p.materi }}{% endif %}</option>
       {% endfor %}
     </select>
     {{ ic('chevron', 18) }}
@@ -48,8 +53,11 @@
 </div>
 
 {% for p in presensi_list %}
+{# BARU: tanggal_boleh dikirim app.py. None = guru tetap / admin (tidak dibatasi).
+   Daftar tanggal = guru pengganti, cuma boleh mengisi pertemuan yang dijadwalkan untuk dia. #}
+{% set bisa_isi = user.role == 'pengajar' and (tanggal_boleh is none or p.tanggal in tanggal_boleh) %}
 <form class="presensi-panel" id="panel-{{ p.tanggal }}" method="post"
-      action="{{ url_for('simpan_presensi', kelas_id=kelas.id) }}" {{ 'hidden' if not loop.first }}>
+      action="{{ url_for('simpan_presensi', kelas_id=kelas.id) }}" {{ 'hidden' if not ((p.tanggal == tgl_pilih) or (not ada_pilihan and loop.first)) }}>
   <input type="hidden" name="tanggal" value="{{ p.tanggal }}">
   {# BARU: daftar siswa yang tampil di form. Siswa yang centangnya dilepas akan
      dihapus presensinya saat disimpan, bukan dibiarkan memakai nilai lama. #}
@@ -61,7 +69,7 @@
       {% for kode, nama in STATUS %}
       <th>
         {{ nama }}
-        {% if kode == 'hadir' and user.role == 'pengajar' %}
+        {% if kode == 'hadir' and bisa_isi %}
         <label class="chk-semua"><input type="checkbox" data-semua-hadir><span class="chk"></span> Semua</label>
         {% endif %}
       </th>
@@ -77,7 +85,7 @@
         <label class="chk-wrap">
           <input type="radio" name="st_{{ s.id }}" value="{{ kode }}"
                  {{ 'checked' if p.status.get(s.id) == kode }}
-                 {{ 'disabled' if user.role != 'pengajar' }}>
+                 {{ 'disabled' if not bisa_isi }}>
           <span class="chk">{{ ic('check', 13) }}</span>
           <span class="sr-only">{{ nama }} {{ s.nama }}</span>
         </label>
@@ -89,8 +97,12 @@
     {% endfor %}
     </tbody>
   </table></div></div>
-  {% if user.role == 'pengajar' and siswa_list %}
+  {% if bisa_isi and siswa_list %}
   <div class="presensi-foot"><button class="btn btn-navy">Simpan Presensi</button></div>
+  {% elif user.role == 'pengajar' and tanggal_boleh is not none %}
+  {# guru pengganti sedang melihat pertemuan yang bukan jatahnya #}
+  <p class="form-note note-telat">{{ ic('lock', 14) }} Kamu guru pengganti di kelas ini, jadi hanya bisa
+    mengisi presensi pertemuan yang dijadwalkan untukmu. Pertemuan ini bisa dilihat saja.</p>
   {% endif %}
 </form>
 {% endfor %}

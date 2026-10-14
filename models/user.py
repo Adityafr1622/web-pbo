@@ -590,9 +590,23 @@ class Pengajar(User):
         row = database.ambil_kelas_by_id(kelas_id)
         return row is not None and self.id in (row["pengajar_id"], row["pengajar_id2"])
 
+    # BARU: pertemuan di mana dia jadi GURU PENGGANTI. Dua method, dua pertanyaan berbeda:
+    # "kelas apa saja yang boleh dia buka" dan "tanggal mana saja yang boleh dia isi".
+    # ENCAPSULATION: pembacaan tabel jadwal dibungkus di sini, route cukup bertanya.
+    def kelas_pengganti(self):
+        return {j["kelas_id"] for j in database.ambil_jadwal_pengganti(self.id)}
+
+    def tanggal_pengganti(self, kelas_id):
+        return {j["tanggal"] for j in database.ambil_jadwal_pengganti(self.id)
+                if j["kelas_id"] == kelas_id and j["tanggal"]}
+
     # POLYMORPHISM: pengajar boleh akses kelas yang dia ajar
+    # DIUBAH: guru pengganti ikut boleh MEMBUKA kelasnya. Perhatikan ini cuma izin LIHAT —
+    # izin MENGUBAH (upload materi, bikin tugas, beri nilai, catatan akhir) tetap lewat
+    # mengajar_kelas() yang tidak diubah, jadi guru pengganti tidak bisa menghapus atau
+    # mengubah materi dan tugas milik guru tetapnya.
     def boleh_akses_kelas(self, kelas_id):
-        return self.mengajar_kelas(kelas_id)
+        return self.mengajar_kelas(kelas_id) or kelas_id in self.kelas_pengganti()
 
     def boleh_lihat_siswa(self, siswa_row):
         return siswa_row["kelas_id"] is not None and self.mengajar_kelas(siswa_row["kelas_id"])
@@ -622,8 +636,11 @@ class Pengajar(User):
             kelas_id = int(kelas_id)
         except (TypeError, ValueError):
             raise ValueError("Kelas tidak valid.")
+        # DIUBAH: guru pengganti boleh mengisi presensi, TAPI cuma pada tanggal pertemuan
+        # yang memang dijadwalkan untuk dia. Di luar tanggal itu tetap ditolak.
         if not self.mengajar_kelas(kelas_id):
-            raise ValueError("Kamu bukan pengajar di kelas ini.")
+            if str(tanggal or "").strip() not in self.tanggal_pengganti(kelas_id):
+                raise ValueError("Kamu bukan pengajar di kelas ini.")
 
         kosongkan = list(kosongkan or [])
         if not data_status and not kosongkan:
@@ -663,6 +680,21 @@ class Pengajar(User):
             catatan=isi,
             lulus=lulus
         )
+
+    def hapus_catatan_akhir(self, catatan):
+        """BARU: pengajar menghapus catatan akhir di kelas yang dia ajar.
+        Balikin siswa_id-nya, buat redirect balik ke halaman monitoring anak itu."""
+        # ENCAPSULATION: hak aksesnya dicek dua lapis — di sini (mengajar_kelas) dan sekali
+        # lagi di query database.hapus_catatan_akhir() yang ikut menyaring kelas miliknya.
+        catatan_id = Pengajar._ke_int(catatan, "Catatan akhir")
+        data = database.ambil_catatan_akhir_by_id(catatan_id)
+        if not data:
+            raise ValueError("Catatan akhir tidak ditemukan.")
+        if not self.mengajar_kelas(data["kelas_id"]):
+            raise ValueError("Kamu bukan pengajar di kelas ini.")
+        if not database.hapus_catatan_akhir(catatan_id, self.id):
+            raise ValueError("Catatan akhir gagal dihapus.")
+        return data["siswa_id"]
 
     def lihat_monitoring_siswa(self, siswa_id):
         """Buka monitoring seorang siswa dari profil siswa (cuma siswa di kelas yang diajar)."""
@@ -846,12 +878,15 @@ class Admin(User):
         # bentrok kelas/pengajar) ada di Jadwal.cek_input(), bukan di sini maupun di route.
         from models.akademik import Jadwal
         if aksi == "tambah":
-            kelas_id, pengajar_id, jam, tanggal, materi = Jadwal.cek_input(
+            # DIUBAH: + pengganti, ikut dicek di Jadwal.cek_input dan ikut disimpan
+            kelas_id, pengajar_id, jam, tanggal, materi, pengganti = Jadwal.cek_input(
                 data["hari"], data["jam_mulai"], data["jam_selesai"],
                 data["kelas_id"], data["pengajar_id"],
                 tanggal=data.get("tanggal"), materi=data.get("materi"),
+                pengganti=data.get("pengganti"),
             )
-            return database.tambah_jadwal(data["hari"], jam, kelas_id, pengajar_id, tanggal, materi)
+            return database.tambah_jadwal(data["hari"], jam, kelas_id, pengajar_id, tanggal,
+                                          materi, pengganti)
 
         try:
             jadwal_id = int(data["jadwal_id"])
@@ -862,12 +897,14 @@ class Admin(User):
             raise ValueError("Jadwal tidak ditemukan.")
 
         if aksi == "edit":
-            kelas_id, pengajar_id, jam, tanggal, materi = Jadwal.cek_input(
+            kelas_id, pengajar_id, jam, tanggal, materi, pengganti = Jadwal.cek_input(
                 data["hari"], data["jam_mulai"], data["jam_selesai"],
                 data["kelas_id"], data["pengajar_id"], exclude_id=jadwal_id,
                 tanggal=data.get("tanggal"), materi=data.get("materi"),
+                pengganti=data.get("pengganti"),
             )
-            return database.edit_jadwal(jadwal_id, data["hari"], jam, kelas_id, pengajar_id, tanggal, materi)
+            return database.edit_jadwal(jadwal_id, data["hari"], jam, kelas_id, pengajar_id,
+                                        tanggal, materi, pengganti)
 
         elif aksi == "hapus":
             return database.hapus_jadwal(jadwal_id)

@@ -7,6 +7,16 @@
 {# data dari app.py: users, kelas_list, riwayat_password (list), terakhir_ubah ({user_id: waktu}) #}
 {% set siswa = users|selectattr('role', 'equalto', 'siswa')|list %}
 {% set pengajar = users|selectattr('role', 'equalto', 'pengajar')|list %}
+{# BARU: aturan format yang dulu cuma dicek di server. Sekarang ikut ditempel ke input,
+   jadi browser menahan form yang salah dan modalnya tidak keburu tertutup.
+   Isinya dibuat sama persis dengan validasi di models/user.py. #}
+{% set pat_pw = '(?=.*[A-Za-z])(?=.*[0-9]).{8,}' %}
+{% set pesan_pw = 'Password minimal 8 karakter dan wajib ada huruf sekaligus angka.' %}
+{% set pat_wa = '(\\+62|62|0)8[1-9][0-9]{6,10}' %}
+{% set pesan_wa = 'Nomor WhatsApp belum sesuai. Contoh: 08123456789 (tanpa spasi atau tanda hubung).' %}
+{% set pat_nik = '[0-9]{16}' %}
+{% set pesan_nik = 'NIK harus tepat 16 digit angka.' %}
+{% set pesan_user = 'Username minimal 5 karakter.' %}
 
 {# Password tampil titik-titik; tombol mata membukanya. Yang ditampilkan selalu
    password TERBARU: kalau penggunanya pernah menggantinya sendiri, yang muncul
@@ -130,9 +140,9 @@
         <select name="kelas_id" required><option value="">Pilih kelas</option>
           {% for k in kelas_list %}<option value="{{ k.id }}">{{ k.nama_kelas }}</option>{% endfor %}
         </select></div>
-      {{ field('Username', 'username', 'Minimal 5 karakter') }}
-      {{ field('Nomor WhatsApp', 'whatsapp', 'Contoh: 08123456789') }}
-      {{ pwfield(ph='Min. 8 karakter, huruf + angka') }}
+      {{ field('Username', 'username', 'Minimal 5 karakter', minlen=5, pesan=pesan_user) }}
+      {{ field('Nomor WhatsApp', 'whatsapp', 'Contoh: 08123456789', pat=pat_wa, pesan=pesan_wa) }}
+      {{ pwfield(ph='Min. 8 karakter, huruf + angka', pat=pat_pw, pesan=pesan_pw) }}
       {{ field('Alamat', 'alamat', 'Masukkan alamat') }}
     </div>
     <p class="form-note">Email bersifat opsional dan diisi siswa sendiri lewat menu Profil.</p>
@@ -148,12 +158,12 @@
     {{ field('Nama Lengkap', 'nama', '') }}
     <div class="field"><label>Kelas</label>
       <select name="kelas_id" required>{% for k in kelas_list %}<option value="{{ k.id }}">{{ k.nama_kelas }}</option>{% endfor %}</select></div>
-    {{ field('Username', 'username', '') }}
-    {{ field('Nomor WhatsApp', 'whatsapp', '') }}
-    {{ pwfield(req=false, ph='Kosongkan jika tidak diubah') }}
+    {{ field('Username', 'username', '', minlen=5, pesan=pesan_user) }}
+    {{ field('Nomor WhatsApp', 'whatsapp', '', pat=pat_wa, pesan=pesan_wa) }}
+    {{ pwfield(req=false, ph='Kosongkan jika tidak diubah', pat=pat_pw, pesan=pesan_pw) }}
     {{ field('Alamat', 'alamat', '') }}
   </div>
-  <p class="form-note">Password lama tidak pernah ditampilkan. Isi kolom password hanya kalau ingin menggantinya.</p>
+  <p class="form-note">Kosongkan kolom password kalau tidak ingin menggantinya.</p>
   </div>
   <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Simpan</button></div>
 </form>
@@ -165,10 +175,10 @@
   <input type="hidden" name="role" value="pengajar">
   <div class="modal-body"><div class="form-grid">
     {{ field('Nama Lengkap', 'nama', 'Masukkan nama lengkap') }}
-    {{ field('NIK', 'nik', '16 digit angka') }}
-    {{ field('Username', 'username', 'Minimal 5 karakter') }}
-    {{ field('Nomor WhatsApp', 'whatsapp', 'Contoh: 08123456789') }}
-    {{ pwfield(ph='Min. 8 karakter, huruf + angka') }}
+    {{ field('NIK', 'nik', '16 digit angka', pat=pat_nik, pesan=pesan_nik) }}
+    {{ field('Username', 'username', 'Minimal 5 karakter', minlen=5, pesan=pesan_user) }}
+    {{ field('Nomor WhatsApp', 'whatsapp', 'Contoh: 08123456789', pat=pat_wa, pesan=pesan_wa) }}
+    {{ pwfield(ph='Min. 8 karakter, huruf + angka', pat=pat_pw, pesan=pesan_pw) }}
     {{ field('Alamat', 'alamat', 'Masukkan alamat') }}
     <div class="field"><label>Photo Profil <span class="label-note">(opsional)</span></label><input type="file" name="foto" accept="image/*"></div>
   </div></div>
@@ -181,16 +191,22 @@
 <form method="post" enctype="multipart/form-data">
   <div class="modal-body"><div class="form-grid">
     {{ field('Nama Lengkap', 'nama', '') }}
-    {{ field('NIK', 'nik', '') }}
-    {{ field('Username', 'username', '') }}
-    {{ field('Nomor WhatsApp', 'whatsapp', '') }}
-    {{ pwfield(req=false, ph='Kosongkan jika tidak diubah') }}
+    {{ field('NIK', 'nik', '', pat=pat_nik, pesan=pesan_nik) }}
+    {{ field('Username', 'username', '', minlen=5, pesan=pesan_user) }}
+    {{ field('Nomor WhatsApp', 'whatsapp', '', pat=pat_wa, pesan=pesan_wa) }}
+    {{ pwfield(req=false, ph='Kosongkan jika tidak diubah', pat=pat_pw, pesan=pesan_pw) }}
     {{ field('Alamat', 'alamat', '') }}
     <div class="field"><label>Photo Profil <span class="label-note">(kosong = tetap)</span></label><input type="file" name="foto" accept="image/*"></div>
   </div>
-  <p class="form-note">Password lama tidak pernah ditampilkan. Isi kolom password hanya kalau ingin menggantinya.</p>
+  <p class="form-note">Kosongkan kolom password kalau tidak ingin menggantinya.</p>
   </div>
   <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Simpan</button></div>
 </form>
 {% endcall %}
+{# BARU: kalau server menolak isian (mis. username sudah dipakai), modalnya dibuka lagi
+   lewat kait ini — isinya sama seperti terakhir diketik, tinggal betulkan yang salah. #}
+{% if isian_ulang %}
+<div hidden data-reopen="{{ isian_ulang.modal }}" data-fill='{{ isian_ulang.data|tojson }}'
+     {% if isian_ulang.aksi %}data-aksi="{{ isian_ulang.aksi }}"{% endif %}></div>
+{% endif %}
 {% endblock %}

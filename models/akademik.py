@@ -183,7 +183,7 @@ class Jadwal:
     # dan pengecekan bentrok (kelas atau pengajar sama + jam numpuk) disembunyiin di sini.
     @staticmethod
     def cek_input(hari, jam_mulai, jam_selesai, kelas_id, pengajar_id, exclude_id=None,
-                  tanggal=None, materi=None):
+                  tanggal=None, materi=None, pengganti=False):  # DIUBAH: + pengganti
         if hari not in HARI_VALID:
             raise ValueError("Hari tidak valid.")
 
@@ -213,6 +213,20 @@ class Jadwal:
         if pengajar is None or pengajar["role"] != "pengajar":
             raise ValueError("Pengajar tidak valid.")
 
+        # BARU: pengajarnya harus memang guru kelas ini. Dulu siapa pun boleh dijadwalkan di
+        # kelas mana pun, padahal hak akses kelas dibaca dari tabel `kelas` — akibatnya ada
+        # pengajar yang dijadwalkan mengajar tapi diblokir waktu mau mengisi presensi.
+        # Kalau memang menggantikan, admin wajib mencentang "guru pengganti" supaya
+        # niatnya tercatat, bukan tertukar karena salah pilih di dropdown.
+        kelas = database.ambil_kelas_by_id(kelas_id)
+        guru_tetap = (kelas["pengajar_id"], kelas["pengajar_id2"])
+        pengganti = bool(pengganti) and pengajar_id not in guru_tetap
+        if pengajar_id not in guru_tetap and not pengganti:
+            raise ValueError(
+                f"{pengajar['nama']} bukan pengajar kelas {kelas['nama_kelas']}. "
+                f"Centang \"Guru pengganti\" kalau memang menggantikan pada pertemuan ini."
+            )
+
         # bentrok dicek pada tanggal yang sama (kalau nggak ada tanggal: sesama jadwal mingguan di hari itu)
         if tanggal:
             kandidat = database.ambil_jadwal_by_tanggal(tanggal)
@@ -234,7 +248,9 @@ class Jadwal:
                     raise ValueError(
                         f"Bentrok: {j['pengajar_nama']} sudah mengajar kelas {j['kelas_nama']} pada {j['hari']} {j['jam']}."
                     )
-        return kelas_id, pengajar_id, Jadwal.format_jam(mulai, selesai), (tanggal or None), materi
+        # DIUBAH: + pengganti di urutan terakhir
+        return (kelas_id, pengajar_id, Jadwal.format_jam(mulai, selesai),
+                (tanggal or None), materi, 1 if pengganti else 0)
 
 
 class Materi:
@@ -297,8 +313,10 @@ class Materi:
 
 
 class Tugas:
-    # ENCAPSULATION: aturan deadline (format + cek kedaluwarsa) ada di class Tugas.
-    FORMAT_DEADLINE = ("%Y-%m-%d", "%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M")
+    # ENCAPSULATION: aturan deadline (format + cek kedaluwarsa + cek terlambat) ada di class Tugas.
+    # DIUBAH: + format berjam-menit-detik, karena waktu_kumpul dari database bentuknya begitu
+    # dan sekarang ikut diparse di sini (buat menentukan pengumpulan terlambat atau tidak).
+    FORMAT_DEADLINE = ("%Y-%m-%d", "%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S")
 
     def __init__(self, id, judul, deskripsi, deadline, kelas_id, pengajar_id,
                  tanggal_dibuat=None, tanggal_edit=None):  # DIUBAH: + tanggal dibuat & edit
@@ -353,6 +371,26 @@ class Tugas:
         except ValueError:
             return False  # deadline kosong/rusak dianggap belum lewat
         return datetime.now() > batas
+
+    # BARU: penanda pengumpulan terlambat. Siswa TETAP boleh mengumpulkan setelah tenggat,
+    # tapi berkasnya ditandai "Terlambat" supaya pengajar tahu waktu menilai.
+    # Catatan: dihitung dari waktu_kumpul vs deadline, bukan disimpan di database. Jadi kalau
+    # pengajar memperpanjang tenggat, status terlambatnya otomatis ikut hilang.
+    @staticmethod
+    def kumpul_terlambat(deadline, waktu_kumpul):
+        if not waktu_kumpul:
+            return False  # belum mengumpulkan itu bukan "terlambat", statusnya "belum kumpul"
+        try:
+            # parse_deadline dipakai dua-duanya karena sama-sama teks waktu dari database
+            batas = Tugas.parse_deadline(deadline)
+            masuk = Tugas.parse_deadline(waktu_kumpul)
+        except ValueError:
+            return False  # salah satunya rusak -> jangan menuduh siswa terlambat
+        return masuk > batas
+
+    # ABSTRACTION: versi method biasa, buat kode yang sudah punya objek Tugas.
+    def telat(self, waktu_kumpul):
+        return Tugas.kumpul_terlambat(self.deadline, waktu_kumpul)
 
 
 class Pengumpulan:
