@@ -854,3 +854,291 @@ a.seg-btn {
 /* .mon-catatan sudah flex; tombolnya didorong ke kanan dan tetap sejajar baris pertama. */
 .mon-catatan > div:not([class]) { flex: 1; min-width: 0; }
 .catatan-hapus { flex: none; align-self: flex-start; }
+/* ============================================================
+   11. REVISI 15/10/2026
+       1) menu depan: visi & misi, peta, lokasi
+       2) background kelas pilihan admin
+       3) pendidikan terakhir pengajar
+       4) tombol panah buka kelas + pensil edit
+       5) "Segera hadir" di kartu kelas
+       6) tombol edit/hapus materi berlatar putih
+       7) semua sudut membulat jadi 30px
+       8) tata letak tidak bergeser pindah menu
+   ============================================================ */
+
+/* ---------- 8. tata letak tidak bergeser waktu pindah menu ---------- */
+/* Penyebab utamanya: halaman yang isinya pendek tidak punya batang gulir, yang
+   panjang punya. Lebar isi jadi beda ~15px dan seluruh halaman terlihat "lompat"
+   waktu ganti menu. scrollbar-gutter menyediakan ruang batang gulir terus-menerus,
+   jadi lebarnya sama di semua halaman. */
+html { scrollbar-gutter: stable; overflow-y: scroll; }
+/* tinggi kepala halaman dikunci, biar judul & tombolnya tidak naik-turun antar menu */
+.page-head { min-height: 74px; align-items: center; }
+.page-head > div { min-width: 0; }
+
+/* ---------- 1. MENU DEPAN: visi, misi, peta, lokasi ---------- */
+.login-tabs { row-gap: 10px; }
+
+/* Visi: kotak kuning dengan ikon peta di kiri, persis desain Canva */
+.visi-box {
+    display: flex; align-items: center; gap: 18px; margin-top: 26px;
+    padding: 18px 22px; background: var(--yellow-soft); border-radius: 30px;
+}
+.visi-ic { flex: none; color: var(--red); }
+.visi-isi { border-left: 2px solid rgba(46, 58, 102, .35); padding-left: 18px; }
+.visi-isi h2 { font-size: 16px; font-weight: 700; color: var(--navy); }
+.visi-isi p { margin-top: 4px; font-size: 12.5px; line-height: 1.65; color: var(--navy); text-align: justify; }
+
+/* Misi: ikon orang berlari di kiri, daftar bernomor di kanan */
+.misi-box { display: flex; align-items: center; gap: 18px; margin-top: 26px; }
+.misi-ic { flex: none; color: var(--navy); }
+.misi-isi { border-left: 2px solid rgba(46, 58, 102, .35); padding-left: 18px; }
+.misi-isi h2 { font-size: 16px; font-weight: 700; color: var(--navy); }
+.misi-list { margin: 10px 0 0; padding: 0; list-style: none; counter-reset: misi; display: grid; gap: 12px; }
+.misi-list li {
+    position: relative; counter-increment: misi; padding-left: 34px;
+    font-size: 12.5px; line-height: 1.6; color: var(--navy); text-align: justify;
+}
+/* nomor bulat biru tua, bukan angka biasa — biar sama dengan desain */
+.misi-list li::before {
+    content: counter(misi); position: absolute; left: 0; top: 1px;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--navy); color: #fff; font-size: 12px; font-weight: 700;
+    display: grid; place-items: center;
+}
+
+/* Peta lokasi. Berkasnya: static/images/map_fluenglo.png */
+.map-box {
+    display: block; margin: 0 auto 26px; max-width: 420px;
+    border-radius: 30px; overflow: hidden; background: #eef1f8;
+    box-shadow: 6px 7px 0 var(--yellow); transition: transform .15s;
+}
+.map-box img { display: block; width: 100%; height: auto; }
+.map-box:hover { transform: translateY(-2px); }
+
+/* Baris Lokasi: ikon + label di kiri, alamat di kanan. Seluruh barisnya bisa dipencet. */
+.lokasi-row {
+    display: flex; align-items: flex-start; gap: 20px; text-decoration: none;
+    color: var(--navy); padding: 10px 14px; border-radius: 30px; transition: background .15s;
+}
+.lokasi-row:hover { background: #f3f5fb; }
+.lokasi-kiri { display: grid; justify-items: center; gap: 6px; flex: none; }
+.lokasi-ic { color: var(--red); }
+.lokasi-label { font-size: 13px; font-weight: 600; }
+.lokasi-alamat { text-align: justify; line-height: 1.7; padding-top: 10px; }
+.lokasi-row:hover .lokasi-alamat { text-decoration: underline; }
+.about-card .contact-row { margin-top: 26px; }
+
+/* ---------- 2 & 4 & 5. KARTU KELAS ---------- */
+/* Kartu dibuat kolom, supaya "Segera hadir" bisa didorong mentok ke bawah */
+.kelas-card { display: flex; flex-direction: column; }
+
+/* Background pilihan admin: gambarnya terang, jadi TIDAK diberi lapisan gelap
+   seperti .kelas-bg — tulisannya yang dibuat gelap biar tetap terbaca. */
+.kelas-foto {
+    background: var(--kelas-img) center / cover no-repeat, #eef1f8;
+    color: var(--navy-dark);
+}
+.kelas-foto .kelas-title { color: var(--navy-dark); }
+.kelas-foto .kelas-guru a { color: #4a5073; }
+
+/* 4. tombol panah (buka kelas) + pensil (edit, khusus admin) di kanan atas */
+.kartu-aksi { position: absolute; z-index: 3; top: 16px; right: 18px; display: flex; gap: 2px; }
+.card-ic {
+    width: 42px; height: 42px; border-radius: 50%; border: 0; background: transparent;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: #fff; text-decoration: none; transition: background .15s, transform .1s;
+}
+.kelas-foto .card-ic { color: var(--navy-dark); }
+.card-ic:hover { background: rgba(255, 255, 255, .35); }
+.kelas-foto .card-ic:hover { background: rgba(255, 255, 255, .8); }
+.card-ic:active { transform: translateY(1px); }
+/* kalau kartunya bertanda "Selesai", tombolnya turun supaya tidak bertumpuk */
+.kelas-selesai .kartu-aksi { top: 58px; }
+
+/* 5. "Segera hadir": jadwal terdekat, mentok di bawah kartu */
+.kelas-segera {
+    margin-top: auto; align-self: flex-start;
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 7px 16px 7px 13px; border-radius: 30px;
+    background: rgba(255, 255, 255, .25); color: inherit;
+    font-size: 13.5px; font-weight: 600; text-decoration: none;
+    transition: background .15s;
+}
+.kelas-foto .kelas-segera { background: rgba(255, 255, 255, .7); }
+.kelas-segera:hover { background: rgba(255, 255, 255, .45); }
+.kelas-foto .kelas-segera:hover { background: #fff; }
+.kelas-segera:hover span { text-decoration: underline; }
+.kelas-segera .ic { flex: none; }
+
+/* 2. pemilih background di modal Tambah/Edit Kelas */
+.header-pick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.header-opt { position: relative; cursor: pointer; display: block; }
+.header-opt input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.header-kotak {
+    display: flex; align-items: flex-end; height: 88px; padding: 8px;
+    border: 2px solid #d7dcec; border-radius: 30px; background: #eef1f8;
+    /* gambarnya datang dari --header-img yang dipasang pilih_header() di _macros.html */
+    background-image: var(--header-img, none);
+    background-size: cover; background-position: center;
+    transition: border-color .15s, box-shadow .15s;
+}
+.header-nama {
+    background: rgba(255, 255, 255, .88); color: var(--navy-dark);
+    font-size: 11.5px; font-weight: 700; padding: 3px 11px; border-radius: 999px;
+}
+.header-opt:hover .header-kotak { border-color: #b6bfd9; }
+.header-opt input:checked + .header-kotak { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(46, 58, 102, .18); }
+.header-opt input:focus-visible + .header-kotak { outline: 3px solid rgba(46, 58, 102, .35); outline-offset: 2px; }
+.header-opt input.is-salah + .header-kotak { border-color: #e5453d; }
+
+/* ---------- 3. PENDIDIKAN TERAKHIR ---------- */
+/* di modal Kelola Akun */
+.blok-didik { border-top: 1px solid var(--line); padding-top: 16px; margin-top: 4px; }
+.didik-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 24px; margin-top: 8px; }
+.didik-grid .field + .field { margin-top: 0 !important; }
+.didik-grid .span-2 { grid-column: 1 / -1; }
+
+/* di halaman Profil Pengajar */
+.didik-read { gap: 12px; }
+.didik-ic { flex: none; color: var(--navy); display: inline-flex; }
+.didik-teks { display: grid; min-width: 0; }
+.didik-teks strong { font-weight: 600; line-height: 1.3; }
+.didik-teks small { color: var(--muted); font-size: 12px; }
+
+/* kotak Password di Profil Pengajar (titik-titik + tombol mata) */
+.pw-read { justify-content: space-between; gap: 10px; }
+.pw-read .pw-mask { letter-spacing: 3px; color: var(--muted); }
+.pw-read .pw-asli { background: #fff; }
+
+/* ---------- 6. TOMBOL EDIT & HAPUS MATERI/TUGAS BERLATAR PUTIH ---------- */
+/* Supaya sebaris dengan kartu materinya yang juga putih, bukan menempel di latar abu. */
+.feed-aksi { gap: 8px; }
+.feed-aksi .icon-btn {
+    width: 44px; height: 44px; background: #fff;
+    box-shadow: 0 4px 18px rgba(31, 42, 77, .06);
+}
+.feed-aksi .icon-btn:hover { background: #f3f5fb; }
+
+/* ---------- 7. SEMUA SUDUT MEMBULAT JADI 30px ---------- */
+/* Tombol pill, avatar, badge, dan chip SENGAJA tidak ikut: bentuknya memang sudah
+   bulat penuh (999px), kalau dipaksa 30px malah jadi kotak. */
+:root { --radius: 30px; }
+.card, .empty-card, .table-card, .riwayat, .modal-box, .modal-sm, .modal-form,
+.kelas-card, .feed-item, .file-row, .profile-card, .about-card, .login-card,
+.read, .hint-box, .flash, .user-dropdown, .multi-btn, .multi-list,
+.stat, .kpi, .mon-tabel, .mon-catatan, .catatan-item, .riwayat-item,
+.form-error, .note-telat, .cek-lulus, .field-ganti, .kom, .tip-box,
+.pw-asli, .icon-btn, .modal-x, .kpi-ic, .legend-dot, .nilai-form input,
+.kom-form textarea, .select-wrap select, .pick, .pw-cell-btn,
+.field input:not([type=checkbox]):not([type=radio]):not([type=file]),
+.field select, .field textarea {
+    border-radius: 30px;
+}
+/* kotak isian yang tinggi (alamat panjang, biodata, deskripsi tugas) dibuat sedikit
+   lebih kecil radiusnya supaya sudutnya tidak memakan baris pertama teks */
+.field textarea, .kom-form textarea, .read.pre-line { border-radius: 24px; }
+.user-dropdown a, .user-dropdown button { border-radius: 22px; }
+.user-dropdown a + button { border-radius: 0 0 22px 22px; }
+.mon-tabel .data-table th:first-child { border-radius: 30px 0 0 0; }
+.mon-tabel .data-table th:last-child { border-radius: 0 30px 0 0; }
+.modal-head { border-radius: 30px 30px 0 0; }
+/* .modal-box overflow-nya visible (supaya dropdown pengajar bisa keluar kotak),
+   jadi kepala & kakinya perlu dibulatkan sendiri, tidak bisa ikut terpotong kotaknya. */
+.modal-foot { border-radius: 0 0 30px 30px; }
+.table-card { overflow: hidden; }
+.legend-dot { border-radius: 4px; }
+
+/* ---------- responsif bagian baru ---------- */
+@media (max-width: 860px) {
+    .visi-box, .misi-box { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .visi-isi, .misi-isi { border-left: 0; padding-left: 0; }
+    .didik-grid { grid-template-columns: 1fr; }
+    .lokasi-row { flex-direction: column; align-items: center; text-align: center; }
+    .lokasi-alamat { padding-top: 0; text-align: center; }
+}
+@media (max-width: 600px) {
+    .header-pick { grid-template-columns: 1fr; }
+    .header-kotak { height: 72px; }
+    .kartu-aksi { top: 12px; right: 12px; }
+    .kelas-segera { font-size: 12.5px; }
+}
+
+/* catatan kecil yang berdiri sendiri di dalam form-grid (mis. "kosongkan password") */
+.form-grid > .form-note { grid-column: 1 / -1; margin: 0; }
+
+
+/* ============================================================
+   12. REVISI 16/10/2026
+       a) 3 tab halaman depan jadi satu batang kuning (sesuai desain Canva)
+       b) tabel jadwal dibuat kotak, tidak membulat
+       c) ikon WhatsApp tidak lagi gelap sendiri, gelapnya waktu disentuh kursor
+       d) gambar peta tidak bisa dipencet (lihat juga login.html)
+       e) "Segera hadir" jadi tulisan biasa menempel di kiri bawah kartu kelas
+   ============================================================ */
+
+/* ---------- a) 3 tab menu depan menyambung ---------- */
+/* Dulu 3 pil abu-abu terpisah. Sekarang satu batang kuning yang membungkus
+   ketiganya, dan yang sedang aktif jadi pil biru tua di dalamnya. */
+.login-tabs {
+    display: inline-flex; gap: 0; row-gap: 0; flex-wrap: nowrap;
+    align-self: flex-start; max-width: 100%;
+    padding: 5px; background: var(--yellow-soft); border-radius: 999px;
+}
+.login-tabs .pill {
+    background: transparent; color: var(--navy); font-weight: 500;
+    padding: 9px 28px; white-space: nowrap;
+}
+.login-tabs .pill:hover { background: rgba(255, 255, 255, .6); }
+.login-tabs .pill.is-active { background: var(--login-btn); color: #fff; }
+.login-tabs .pill.is-active:hover { background: var(--login-btn); }
+
+/* ---------- b) tabel jadwal kotak ---------- */
+/* Khusus tabel di halaman Jadwal. Tabel lain (Kelola Akun, Monitoring) tetap membulat. */
+.jadwal-group .table-card { border-radius: 0; }
+.jadwal-group .table-card .data-table th:first-child,
+.jadwal-group .table-card .data-table th:last-child { border-radius: 0; }
+
+/* ---------- c) ikon WhatsApp ---------- */
+/* Lingkarannya sekarang sama dengan Email & Instagram. Yang berubah jadi lebih
+   gelap hanya waktu kursor mendekat, sama seperti dua ikon lainnya. */
+.contact-wa .contact-ic { background: #e3e6f2; color: #25d366; }
+.contact-wa:hover .contact-ic { background: #d4d9ec; }
+
+/* ---------- d) peta bukan tautan lagi ---------- */
+.map-box { cursor: default; }
+.map-box:hover { transform: none; }
+
+/* ---------- e) "Segera hadir" jadi tulisan biasa ---------- */
+/* Tidak berkotak putih lagi: menempel di kiri bawah kartu, sejajar dengan judul
+   kelas dan nama pengajar di atasnya. Garis bawah tetap muncul waktu disentuh kursor. */
+.kelas-segera {
+    margin-top: auto; align-self: flex-start;
+    display: inline-block; padding: 0; border-radius: 0;
+    background: none; color: inherit;
+    font-size: 14px; font-weight: 500; text-decoration: none;
+}
+.kelas-foto .kelas-segera { background: none; color: #3c4668; }
+.kelas-segera:hover,
+.kelas-foto .kelas-segera:hover { background: none; }
+.kelas-segera:hover span { text-decoration: underline; }
+
+@media (max-width: 600px) {
+    .login-tabs { flex-wrap: wrap; border-radius: 26px; }
+    .login-tabs .pill { padding: 9px 18px; font-size: 13px; }
+}
+
+/* ---------- REVISI 16/10 (lanjutan): lebar batang 3 tab ---------- */
+/* Dulu lebarnya cuma sepanjang tulisannya, jadi kependekan dibanding desain.
+   Sekarang selebar kolom isi (sama dengan kartu login di bawahnya), dan ketiga
+   tab berbagi lebar sama rata — seperti di Canva. */
+.login-tabs {
+    display: flex; width: 100%; max-width: 560px;
+    align-self: auto; padding: 6px;
+}
+.login-tabs .pill { flex: 1 1 0; padding: 10px 12px; text-align: center; }
+
+@media (max-width: 600px) {
+    .login-tabs { padding: 5px; }
+    .login-tabs .pill { padding: 9px 6px; font-size: 12.5px; }
+}

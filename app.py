@@ -6,8 +6,10 @@ from flask import (Flask, render_template, request, redirect, url_for, session, 
                    send_from_directory)
 from werkzeug.utils import secure_filename
 import database
-from models.akademik import Jadwal, Materi, Tugas, HARI_VALID  # DIUBAH: + Materi & Tugas
-from models.user import buat_objek_user
+# DIUBAH: + HEADER_KELAS (pilihan background kelas, revisi 2)
+from models.akademik import Jadwal, Materi, Tugas, HARI_VALID, HEADER_KELAS
+# DIUBAH: + Pendidikan (pilihan gelar & jurusan di form Kelola Akun, revisi 3)
+from models.user import buat_objek_user, Pendidikan
 from models.presensi import Presensi
 
 
@@ -346,6 +348,11 @@ def kelola_akun():
         alamat = request.form.get('alamat', '')
         nik = request.form.get('nik', '')
         kelas_id = request.form.get('kelas_id', '')
+        # BARU (revisi 3): pendidikan terakhir pengajar, diisi admin
+        gelar = request.form.get('gelar', '')
+        jurusan = request.form.get('jurusan', '')
+        jurusan_lain = request.form.get('jurusan_lain', '')
+        institusi = request.form.get('institusi', '')
 
         foto_filename = 'default_avatar.png'
         # DIUBAH: tab yang sedang dibuka ikut dibawa pulang lewat ?tab=, biar admin yang
@@ -356,7 +363,9 @@ def kelola_akun():
                 foto_filename = simpan_foto() or foto_filename
             user.kelola_akun('tambah', nama=nama, username=username, password=password,
                              role=role, whatsapp=whatsapp, alamat=alamat, nik=nik,
-                             foto=foto_filename, kelas_id=kelas_id)
+                             foto=foto_filename, kelas_id=kelas_id,
+                             gelar=gelar, jurusan=jurusan, jurusan_lain=jurusan_lain,
+                             institusi=institusi)  # BARU (revisi 3)
             flash('Akun berhasil dibuat!', 'success')
         except ValueError as e:
             if foto_filename != 'default_avatar.png':
@@ -365,16 +374,25 @@ def kelola_akun():
             # BARU: isian yang ditolak disimpan sebentar, supaya modalnya kebuka lagi
             # dengan isi yang sama dan admin tinggal membetulkan bagian yang salah.
             ingat_isian('modal-tambah-' + tab, nama=nama, username=username, password=password,
-                        whatsapp=whatsapp, alamat=alamat, nik=nik, kelas_id=kelas_id)
+                        whatsapp=whatsapp, alamat=alamat, nik=nik, kelas_id=kelas_id,
+                        gelar=gelar, jurusan=jurusan, jurusan_lain=jurusan_lain,
+                        institusi=institusi)  # BARU (revisi 3)
 
         return redirect(url_for('kelola_akun', tab=tab))
 
     users = database.ambil_semua_user()
     # DIUBAH: + riwayat_password (kartu Riwayat Perubahan Password) dan terakhir_ubah (kolom Password Diubah)
     # DIUBAH: + isian_ulang, dipakai membuka kembali modal yang isinya ditolak
+    # DIUBAH: + pendidikan (buat kolom tabel pengajar & isian modal edit) dan daftar
+    # pilihan gelar/jurusan, supaya template tidak menulis ulang daftarnya sendiri.
     return render_template('kelola_akun.html', users=users, kelas_list=database.ambil_semua_kelas(),
                            riwayat_password=database.ambil_riwayat_password(),
                            terakhir_ubah=database.ambil_terakhir_ubah_password(),
+                           pendidikan={u['id']: database.ambil_pendidikan(u['id'])
+                                       for u in users if u['role'] == 'pengajar'},
+                           gelar_list=Pendidikan.GELAR_VALID,
+                           jurusan_list=Pendidikan.JURUSAN_VALID,
+                           jurusan_lain=Pendidikan.JURUSAN_LAIN,
                            isian_ulang=session.pop('isian_ulang', None))
 
 
@@ -401,6 +419,11 @@ def edit_akun(user_id):
                          alamat=request.form.get('alamat', ''),
                          nik=request.form.get('nik', ''),
                          kelas_id=request.form.get('kelas_id', ''),  # BARU: admin bisa pindah kelas siswa
+                         # BARU (revisi 3): pendidikan terakhir pengajar
+                         gelar=request.form.get('gelar', ''),
+                         jurusan=request.form.get('jurusan', ''),
+                         jurusan_lain=request.form.get('jurusan_lain', ''),
+                         institusi=request.form.get('institusi', ''),
                          foto=foto)
         flash('Akun berhasil diperbarui!', 'success')
     except ValueError as e:
@@ -415,7 +438,11 @@ def edit_akun(user_id):
                     whatsapp=request.form.get('whatsapp', ''),
                     alamat=request.form.get('alamat', ''),
                     nik=request.form.get('nik', ''),
-                    kelas_id=request.form.get('kelas_id', ''))
+                    kelas_id=request.form.get('kelas_id', ''),
+                    gelar=request.form.get('gelar', ''),            # BARU (revisi 3)
+                    jurusan=request.form.get('jurusan', ''),
+                    jurusan_lain=request.form.get('jurusan_lain', ''),
+                    institusi=request.form.get('institusi', ''))
     return redirect(url_for('kelola_akun', tab=tab))
 
 
@@ -456,6 +483,39 @@ def biodata_akun(user_id):
 
 
 # --- ROUTE KELAS ---
+# BARU (revisi 5): "Segera hadir" di kartu kelas.
+def jadwal_segera(kelas_list, user):
+    """{kelas_id: {'teks': 'Senin, 19 Oktober 2026, 08.00'}} berisi SATU pertemuan terdekat
+    yang belum lewat untuk tiap kelas. Kelas yang semua jadwalnya sudah lewat tidak masuk
+    ke dict ini sama sekali, jadi kartunya memang tidak menampilkan apa-apa.
+    Pengajar hanya diberi tahu pertemuan yang DIA ajar; siswa & admin semua pertemuan kelas itu."""
+    sekarang = datetime.now()
+    ids = {k['id'] for k in kelas_list}
+    hasil = {}
+    # mundur sehari supaya pertemuan hari ini ikut terbaca, lalu disaring lagi pakai jam selesai
+    mulai = (sekarang.date() - timedelta(days=1)).isoformat()
+    for r in database.ambil_jadwal_mendatang(mulai):
+        kelas_id = r['kelas_id']
+        if kelas_id not in ids or kelas_id in hasil:
+            continue
+        if user.role == 'pengajar' and r['pengajar_id'] != user.id:
+            continue
+        try:
+            d = datetime.strptime(r['tanggal'], '%Y-%m-%d')
+            jam_mulai, jam_selesai = Jadwal.pecah_jam(r['jam'])
+            jam, menit = (int(x) for x in jam_selesai.split(':'))
+        except ValueError:
+            continue
+        # pertemuan yang jamnya sudah lewat hari ini tidak dihitung "segera hadir"
+        if d.replace(hour=jam, minute=menit) < sekarang:
+            continue
+        hasil[kelas_id] = {
+            'teks': f"{r['hari']}, {d.day} {BULAN[d.month - 1]} {d.year}, "
+                    f"{jam_mulai.replace(':', '.')}",
+        }
+    return hasil
+
+
 def kelas_terpilih(kelas_list, bawaan=None):
     """BARU: baca ?kelas=<id> dari URL untuk memilih kelas mana yang jadwalnya ditampilkan.
     Balikin None kalau pengguna memilih "Semua Kelas". `bawaan` dipakai kalau URL belum
@@ -482,8 +542,10 @@ def lihat_kelas():
     # DIUBAH: siswa melihat kelas aktif + kelas lama yang sudah dia tamatkan (bertanda Selesai)
     kelas_list = user.lihat_semua_kelas() if user.role == 'siswa' else user.lihat_kelas_diajar()
     # bisa_kelola=False: template sembunyikan tombol tambah & edit kalau False
+    # DIUBAH: + segera (revisi 5) dan header_list (revisi 2)
     return render_template('kelola_kelas.html', kelas_list=kelas_list, pengajar_list=[],
-                           bisa_kelola=False)
+                           bisa_kelola=False, segera=jadwal_segera(kelas_list, user),
+                           header_list=HEADER_KELAS)
 
 
 @app.route('/admin/kelas', methods=['GET', 'POST'])
@@ -497,9 +559,10 @@ def kelola_kelas():
         pengajar_id = request.form.get('pengajar_id', '')
         pengajar_id2 = request.form.get('pengajar_id2', '')
 
-        try:  # DIUBAH: kelas tidak lagi punya deskripsi
+        try:  # DIUBAH: kelas tidak lagi punya deskripsi, tapi sekarang punya header (revisi 2)
             user.kelola_kelas('tambah', nama_kelas=nama_kelas, pengajar_id=pengajar_id,
-                              pengajar_id2=pengajar_id2)
+                              pengajar_id2=pengajar_id2,
+                              header=request.form.get('header', ''))
             flash('Kelas berhasil dibuat!', 'success')
         except ValueError as e:
             flash(str(e), 'danger')
@@ -508,8 +571,10 @@ def kelola_kelas():
 
     kelas_list = database.ambil_semua_kelas()
     pengajar_list = database.ambil_semua_pengajar()
+    # DIUBAH: + segera (revisi 5) dan header_list (revisi 2)
     return render_template('kelola_kelas.html', kelas_list=kelas_list, pengajar_list=pengajar_list,
-                           bisa_kelola=True)
+                           bisa_kelola=True, segera=jadwal_segera(kelas_list, user),
+                           header_list=HEADER_KELAS)
 
 
 @app.route('/admin/kelas/edit/<int:kelas_id>', methods=['POST'])  # BARU: route edit kelas (tombol pensil)
@@ -521,7 +586,8 @@ def edit_kelas(kelas_id):
         user.kelola_kelas('edit', kelas_id=kelas_id,
                           nama_kelas=request.form.get('nama_kelas', ''),
                           pengajar_id=request.form.get('pengajar_id', ''),
-                          pengajar_id2=request.form.get('pengajar_id2', ''))
+                          pengajar_id2=request.form.get('pengajar_id2', ''),
+                          header=request.form.get('header', ''))  # BARU (revisi 2)
         flash('Kelas berhasil diperbarui!', 'success')
     except ValueError as e:
         flash(str(e), 'danger')

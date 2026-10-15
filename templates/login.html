@@ -3,6 +3,17 @@
 {% block title %}Masuk · Fluenglo{% endblock %}
 {% block body_class %}login-page{% endblock %}
 
+{# DIUBAH (revisi 1): menu depan dipecah jadi 3 tab seperti desain Canva —
+   Halaman Login | Tentang Kami | Hubungi Kami.
+   - Tentang Kami  : penjelasan + Visi & Misi
+   - Hubungi Kami  : gambar peta (map_fluenglo.png), alamat yang bisa dipencet ke
+                     Google Maps, lalu WhatsApp / Email / Instagram
+   CATATAN BERKAS: taruh map_fluenglo.png di folder static/images. Isinya tangkapan
+   layar Google Maps lokasi Fluenglo (pin "KURSUS BAHASA INGGRIS FLUENGLO" di tengah),
+   seperti di halaman 3 PDF desain. #}
+{% set MAPS = 'https://maps.app.goo.gl/Ssgm3bk1swWqUMoA9' %}
+{% set ALAMAT = 'Jl Bukit Erliza No 8A RT 022, Air Hitam, Kec. Samarinda Ulu, Kota Samarinda, Kalimantan Timur 75124' %}
+
 {% block shell %}
 <div class="login">
   <aside class="login-hero" style="--hero-img: url('{{ url_for('static', filename='images/bg-login.png') }}')">
@@ -13,8 +24,10 @@
     <div class="login-tabs">
       <button type="button" class="pill is-active" data-pane="login">Halaman Login</button>
       <button type="button" class="pill" data-pane="about">Tentang Kami</button>
+      <button type="button" class="pill" data-pane="kontak">Hubungi Kami</button>
     </div>
 
+    {# ===== tab 1: login ===== #}
     <section class="login-panel" data-pane-id="login">
       <h1>Selamat Datang!</h1>
       <p class="sub">Silahkan masuk untuk melanjutkan pembelajaran</p>
@@ -29,16 +42,62 @@
           <button type="button" class="pw-toggle" aria-label="Tampilkan/sembunyikan kata sandi">{{ ic('eye-off') }}{{ ic('eye') }}</button>
         </div>
         <div class="lupa-row"><button type="button" class="link-btn" data-lupa>Lupa Kata Sandi?</button></div>
-        <div class="hint-box" id="lupa-hint" hidden>Hubungi admin Fluenglo lewat WhatsApp atau email di tab Tentang Kami untuk mengatur ulang kata sandi.</div>
+        <div class="hint-box" id="lupa-hint" hidden>Hubungi admin Fluenglo lewat WhatsApp atau email di tab Hubungi Kami untuk mengatur ulang kata sandi.</div>
         <div class="login-actions"><button class="btn btn-login">Masuk</button></div>
       </form>
     </section>
 
+    {# ===== tab 2: tentang kami (penjelasan + visi & misi) ===== #}
     <section class="login-panel" data-pane-id="about" hidden>
       <h1>Tentang Fluenglo</h1>
       <div class="card about-card">
         <p class="about-text">Fluenglo adalah kursus Bahasa Inggris yang dirancang khusus untuk siswa SMA. Kami membantu siswa belajar grammar, vocabulary, reading, writing, hingga listening secara terstruktur, dengan jadwal, materi, dan tugas yang bisa dipantau langsung oleh siswa, pengajar, maupun orang tua. Tujuan kami sederhana: membuat belajar Bahasa Inggris terasa lebih mudah, teratur, dan menyenangkan.</p>
-        <h2 class="about-sub">Hubungi Kami</h2>
+
+        <div class="visi-box">
+          <span class="visi-ic">{{ ic('map-pin', 34) }}</span>
+          <div class="visi-isi">
+            <h2>Visi Kami</h2>
+            <p>Menjadi lembaga kursus Bahasa Inggris terpercaya bagi siswa SMA dalam mengembangkan kemampuan berbahasa Inggris yang percaya diri, kompeten, dan siap menghadapi kebutuhan akademik maupun tantangan global.</p>
+          </div>
+        </div>
+
+        <div class="misi-box">
+          {# DIUBAH (revisi 16/10): ikon orang berlari diganti sasaran panah —
+             lebih jelas terbaca di ukuran besar dan nyambung dengan ikon Visi. #}
+          <span class="misi-ic">{{ ic('target', 58) }}</span>
+          <div class="misi-isi">
+            <h2>Misi Kami</h2>
+            <ol class="misi-list">
+              <li>Menyelenggarakan pembelajaran Bahasa Inggris yang terstruktur berdasarkan level Basic, Intermediate, dan Advanced dengan standar CEFR.</li>
+              <li>Mengembangkan kemampuan Reading, Writing, Listening, dan Speaking melalui pembelajaran tatap muka yang interaktif dan sesuai dengan kebutuhan siswa SMA.</li>
+              <li>Memanfaatkan sistem informasi berbasis web untuk mendukung pengelolaan kelas, jadwal, materi pembelajaran, dan tugas secara efektif.</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    {# ===== tab 3: hubungi kami (peta + lokasi + kontak) ===== #}
+    <section class="login-panel" data-pane-id="kontak" hidden>
+      <h1>Hubungi Fluenglo</h1>
+      <div class="card about-card">
+        {# DIUBAH (revisi 16/10): gambar petanya TIDAK bisa dipencet lagi, cuma gambar
+           biasa. Yang membuka Google Maps hanya ikon Lokasi dan tulisan alamat di bawah. #}
+        <div class="map-box">
+          <img src="{{ url_for('static', filename='images/map_fluenglo.png') }}"
+               alt="Peta lokasi Kursus Bahasa Inggris Fluenglo di Samarinda">
+        </div>
+
+        {# DIUBAH (revisi 1): logo lokasi + alamatnya bisa dipencet, langsung membuka
+           Google Maps di tab baru. #}
+        <a class="lokasi-row" href="{{ MAPS }}" target="_blank" rel="noopener">
+          <span class="lokasi-kiri">
+            <span class="contact-ic lokasi-ic">{{ ic('map-pin', 28) }}</span>
+            <span class="lokasi-label">Lokasi</span>
+          </span>
+          <span class="lokasi-alamat">{{ ALAMAT }}</span>
+        </a>
+
         <div class="contact-row">
           {# TODO: ganti nomor, email, dan akun Instagram yang asli #}
           <a class="contact contact-wa" href="https://wa.me/6285191990064" target="_blank" rel="noopener"><span class="contact-ic">{{ ic('whatsapp', 26) }}</span>WhatsApp</a>

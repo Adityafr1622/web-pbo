@@ -10,6 +10,15 @@ from datetime import date, datetime, time
 import database
 
 HARI_VALID = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
+# BARU (revisi 2): 3 gambar latar kartu kelas yang boleh dipilih admin.
+# Berkasnya ada di static/images. Daftar ini satu-satunya sumber pilihan — dipakai
+# template untuk menggambar pilihannya DAN dipakai Kelas.cek_input untuk menolak
+# nama berkas lain, jadi tidak mungkin ada kelas dengan gambar yang tidak ada.
+HEADER_KELAS = {
+    "header_winter.png": "Winter",
+    "header_autum.png": "Autumn",
+    "header_spring.png": "Spring",
+}
 BULAN = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli",
          "Agustus", "September", "Oktober", "November", "Desember"]
 
@@ -40,11 +49,12 @@ def _punya(row, kolom):
 class Kelas:
     # data kelas (nama, 1-2 pengajar, daftar siswa) + aturan tambah/hapus
 
-    def __init__(self, id, nama_kelas, pengajar_id, pengajar_id2=None):
+    def __init__(self, id, nama_kelas, pengajar_id, pengajar_id2=None, header=None):
         self.id = id
         self.nama_kelas = nama_kelas
         self.pengajar_id = pengajar_id
         self.pengajar_id2 = pengajar_id2  # guru ke-2 (opsional)
+        self.header = header              # BARU: gambar latar kartu kelas
         self.daftar_siswa = []
 
     # ABSTRACTION: dari_row / muat nyembunyiin proses baca database.
@@ -52,7 +62,8 @@ class Kelas:
     def dari_row(cls, row):
         nama = row["nama"] if _punya(row, "nama") else row["nama_kelas"]
         pengajar_id2 = row["pengajar_id2"] if _punya(row, "pengajar_id2") else None
-        kelas = cls(row["id"], nama, row["pengajar_id"], pengajar_id2)
+        header = row["header"] if _punya(row, "header") else None
+        kelas = cls(row["id"], nama, row["pengajar_id"], pengajar_id2, header)
         kelas.daftar_siswa = [s["id"] for s in database.ambil_siswa_by_kelas(row["id"])]
         return kelas
 
@@ -64,11 +75,21 @@ class Kelas:
         return cls.dari_row(row)
 
     # validasi input kelas dikunci di sini, Admin.kelola_kelas() tinggal manggil.
+    # DIUBAH (revisi 2): + header. Balikannya sekarang 4 nilai, yang terakhir nama berkas gambar.
     @staticmethod
-    def cek_input(nama_kelas, pengajar_id, pengajar_id2=None, exclude_id=None):
+    def cek_input(nama_kelas, pengajar_id, pengajar_id2=None, exclude_id=None, header=None):
         nama = (nama_kelas or "").strip()
         if not nama:
             raise ValueError("Nama kelas tidak boleh kosong.")
+
+        # BARU: background wajib dipilih, dan hanya boleh salah satu dari 3 berkas yang
+        # memang ada. Dicek di sini (bukan di route) supaya route tambah maupun edit
+        # sama-sama kena aturan yang sama tanpa ditulis dua kali.
+        header = (header or "").strip()
+        if not header:
+            raise ValueError("Background kelas wajib dipilih.")
+        if header not in HEADER_KELAS:
+            raise ValueError("Background kelas yang dipilih tidak dikenal.")
 
         pengajar_id = _ke_int(pengajar_id, "Pengajar")
         pengajar = database.ambil_user_by_id(pengajar_id)
@@ -89,7 +110,7 @@ class Kelas:
         kembar = database.ambil_kelas_by_nama(nama)
         if kembar is not None and kembar["id"] != exclude_id:
             raise ValueError(f"Kelas dengan nama '{nama}' sudah ada.")
-        return nama, pengajar_id, pengajar_id2
+        return nama, pengajar_id, pengajar_id2, header  # DIUBAH: + header
 
     def tambah_siswa(self, siswa):
         """siswa boleh objek Siswa atau id-nya."""

@@ -62,6 +62,8 @@ def migrasi():
             ('users', 'nik', 'TEXT'),
             ('users', 'email', 'TEXT'),
             ('kelas', 'deskripsi', 'TEXT'),
+            # BARU (revisi 2): gambar latar kartu kelas yang dipilih admin
+            ('kelas', 'header', 'TEXT'),
             # BARU: tanggal posting & tanggal edit materi/tugas (dipakai di feed kelas)
             ('materi', 'tanggal_upload', 'TEXT'),
             ('materi', 'tanggal_edit', 'TEXT'),
@@ -181,6 +183,8 @@ def hapus_user(user_id):
         conn.execute('DELETE FROM catatan_akhir WHERE siswa_id = ?', (user_id,))
         conn.execute('DELETE FROM komentar WHERE user_id = ?', (user_id,))
         conn.execute('DELETE FROM riwayat_password WHERE user_id = ?', (user_id,))
+        # BARU (revisi 3): data pendidikan ikut dibuang biar nggak jadi data yatim
+        conn.execute('DELETE FROM pendidikan WHERE pengajar_id = ?', (user_id,))
         conn.execute('DELETE FROM users WHERE id = ?', (user_id,))
         conn.commit()
     finally:
@@ -228,6 +232,38 @@ def ambil_riwayat_password(limit=50):
         ''', (limit,)).fetchall()
     finally:
         conn.close()
+
+# --- PENDIDIKAN PENGAJAR (BARU, revisi 3) ---
+# Satu pengajar satu baris. Diisi admin lewat Kelola Akun; pengajar sendiri tidak punya
+# route untuk mengubahnya, jadi datanya memang cuma bisa masuk dari sisi admin.
+def ambil_pendidikan(pengajar_id):
+    conn = get_connection()
+    try:
+        return conn.execute('SELECT * FROM pendidikan WHERE pengajar_id = ?',
+                            (pengajar_id,)).fetchone()
+    finally:
+        conn.close()
+
+
+def simpan_pendidikan(pengajar_id, gelar, jurusan, institusi):
+    """Simpan atau perbarui pendidikan terakhir seorang pengajar."""
+    conn = get_connection()
+    try:
+        lama = conn.execute('SELECT id FROM pendidikan WHERE pengajar_id = ?',
+                            (pengajar_id,)).fetchone()
+        if lama:
+            conn.execute('UPDATE pendidikan SET gelar = ?, jurusan = ?, institusi = ? WHERE id = ?',
+                         (gelar, jurusan, institusi, lama['id']))
+            hasil = lama['id']
+        else:
+            cur = conn.execute('INSERT INTO pendidikan (pengajar_id, gelar, jurusan, institusi) '
+                               'VALUES (?, ?, ?, ?)', (pengajar_id, gelar, jurusan, institusi))
+            hasil = cur.lastrowid
+        conn.commit()
+        return hasil
+    finally:
+        conn.close()
+
 
 def ambil_terakhir_ubah_password():
     """{user_id: waktu perubahan terakhir}, buat kolom 'Password Diubah'."""
@@ -289,20 +325,23 @@ def ambil_kelas_by_pengajar(pengajar_id):
     conn.close()
     return [kelas_jadi_dict(r) for r in rows]
 
-def tambah_kelas(nama, pengajar_id, pengajar_id2=None, deskripsi=None):
+# DIUBAH (revisi 2): + header, nama berkas gambar latar kartu kelas
+def tambah_kelas(nama, pengajar_id, pengajar_id2=None, deskripsi=None, header=None):
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute('INSERT INTO kelas (nama, pengajar_id, pengajar_id2, deskripsi) VALUES (?, ?, ?, ?)',
-                   (nama, pengajar_id, pengajar_id2, deskripsi))
+    cursor.execute('INSERT INTO kelas (nama, pengajar_id, pengajar_id2, deskripsi, header) '
+                   'VALUES (?, ?, ?, ?, ?)',
+                   (nama, pengajar_id, pengajar_id2, deskripsi, header))
     conn.commit()
     last_id = cursor.lastrowid
     conn.close()
     return last_id
 
-def edit_kelas(kelas_id, nama, pengajar_id, pengajar_id2=None, deskripsi=None):
+def edit_kelas(kelas_id, nama, pengajar_id, pengajar_id2=None, deskripsi=None, header=None):
     conn = get_connection()
-    conn.execute('UPDATE kelas SET nama = ?, pengajar_id = ?, pengajar_id2 = ?, deskripsi = ? WHERE id = ?',
-                 (nama, pengajar_id, pengajar_id2, deskripsi, kelas_id))
+    conn.execute('UPDATE kelas SET nama = ?, pengajar_id = ?, pengajar_id2 = ?, deskripsi = ?, '
+                 'header = ? WHERE id = ?',
+                 (nama, pengajar_id, pengajar_id2, deskripsi, header, kelas_id))
     conn.commit()
     conn.close()
 
@@ -419,6 +458,18 @@ def edit_jadwal(jadwal_id, hari, jam, kelas_id, pengajar_id, tanggal=None, mater
     ''', (hari, jam, kelas_id, pengajar_id, tanggal, materi, 1 if pengganti else 0, jadwal_id))
     conn.commit()
     conn.close()
+
+def ambil_jadwal_mendatang(sejak):
+    """BARU (revisi 5): semua pertemuan yang tanggalnya mulai `sejak` (YYYY-MM-DD) ke depan,
+    yang paling dekat lebih dulu. Dipakai kartu kelas untuk menulis "Segera hadir".
+    Jadwal tanpa tanggal tidak ikut, karena yang mau ditampilkan tanggal pastinya."""
+    conn = get_connection()
+    try:
+        return conn.execute(
+            _SELECT_JADWAL + " WHERE j.tanggal IS NOT NULL AND j.tanggal != '' AND j.tanggal >= ? "
+                             "ORDER BY j.tanggal ASC, j.jam ASC", (sejak,)).fetchall()
+    finally:
+        conn.close()
 
 def ambil_jadwal_pengganti(pengajar_id):
     """BARU: pertemuan di mana pengajar ini bertugas sebagai GURU PENGGANTI.

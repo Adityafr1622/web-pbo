@@ -4,11 +4,11 @@
 {% block title %}Profil Pengajar · Fluenglo{% endblock %}
 
 {% block content %}
-{# data dari app.py: data (dict profil pengajar), lengkap (NIK ikut ditampilkan?), bisa_ubah
-   CATATAN: field Password sengaja TIDAK ditampilkan di sini — beda dari desain Canva.
-   Halaman ini bisa dibuka admin maupun pengajar lain, jadi passwordnya tidak ditaruh di sini.
-   Admin melihat password lewat menu Kelola Akun, pemiliknya menggantinya lewat tombol
-   "Ganti Password" di bawah. #}
+{# data dari app.py: data (dict profil pengajar), lengkap (NIK & password ikut ditampilkan?), bisa_ubah
+   DIUBAH (revisi 3): field Password sekarang ADA di sini, tapi cuma untuk admin dan
+   pengajar yang bersangkutan (lengkap=True). Kalau siswa yang membuka halaman ini,
+   app.py mengirim profil_publik() yang memang tidak pernah berisi password maupun NIK,
+   jadi datanya bukan sekadar disembunyikan di template — memang tidak dikirim. #}
 <div class="page-head">
   <div>
     <h1>Profil Pengajar</h1>
@@ -24,6 +24,40 @@
       <div class="profile-fields">
         <div class="field"><span class="field-label">Nama Lengkap</span><div class="read strong">{{ data.nama }}</div></div>
         <div class="field"><span class="field-label">Username</span><div class="read">{{ data.username }}</div></div>
+
+        {# BARU (revisi 3): Password, titik-titik dengan tombol mata — sama seperti di
+           menu Kelola Akun. Hanya muncul untuk admin & pengajar ybs. #}
+        {% if lengkap %}
+        <div class="field"><span class="field-label">Password</span>
+          {% if data.password|pw_hash %}
+          <div class="read is-empty">Belum terbaca &mdash; password lama masih tersimpan terenkripsi.</div>
+          {% else %}
+          <div class="read pw-read">
+            <span class="pw-mask">••••••••••</span>
+            <code class="pw-asli" hidden>{{ data.password }}</code>
+            <button type="button" class="pw-cell-btn" data-pw-cell aria-label="Tampilkan password">{{ ic('eye-off', 18) }}{{ ic('eye', 18) }}</button>
+          </div>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        {# BARU (revisi 3): pendidikan terakhir. Letaknya di bawah Password untuk admin &
+           pengajar, dan otomatis jatuh tepat di bawah Username untuk siswa — karena buat
+           siswa blok Password di atas memang tidak digambar sama sekali. #}
+        <div class="field"><span class="field-label">Pendidikan Terakhir <span class="label-note">(diisi admin)</span></span>
+          {% if data.pendidikan %}
+          <div class="read didik-read">
+            <span class="didik-ic">{{ ic('cap', 22) }}</span>
+            <span class="didik-teks">
+              <strong>{{ data.pendidikan.ringkas }}</strong>
+              <small>{{ data.pendidikan.institusi }}</small>
+            </span>
+          </div>
+          {% else %}
+          <div class="read is-empty">Belum diisi admin.</div>
+          {% endif %}
+        </div>
+
         {% if data.biodata %}
         <div class="field"><span class="field-label">Biodata</span><div class="read pre-line">{{ data.biodata }}</div></div>
         {% endif %}
@@ -42,7 +76,7 @@
       <div class="read white {{ 'is-empty' if not data.alamat }}">{{ data.alamat or 'Belum diisi' }}</div></div>
     {% if lengkap %}
     {# NIK hanya dikirim ke admin dan pengajar yang bersangkutan, tidak pernah ke siswa #}
-    <div class="field"><span class="field-label">NIK</span>
+    <div class="field"><span class="field-label">NIK <span class="label-note">(hanya admin &amp; pengajar ybs)</span></span>
       <div class="read">{{ data.nik or '-' }}</div></div>
     {% endif %}
 
@@ -67,6 +101,10 @@
       <input type="text" name="alamat" value="{{ data.alamat or '' }}" placeholder="Masukkan alamat" required></div>
     <div class="field span-2"><label>Photo Profil <span class="label-note">(kosong = tetap)</span></label>
       <input type="file" name="foto" accept="image/*"></div>
+  </div>
+  {# DIUBAH (revisi 3): pendidikan ikut disebut, karena sekarang juga cuma admin yang bisa mengubahnya #}
+  <p class="form-note">NIK dan Pendidikan Terakhir hanya bisa diubah oleh admin lewat menu Kelola Akun.</p>
+  </div>
   <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Simpan</button></div>
 </form>
 {% endcall %}
@@ -77,6 +115,7 @@
     {{ pwfield('Password Lama', 'password_lama', true, 'Masukkan password lama') }}
     {{ pwfield('Password Baru', 'password_baru', true, 'Min. 8 karakter, huruf + angka') }}
     {{ pwfield('Konfirmasi Password Baru', 'konfirmasi_password', true, 'Ulangi password baru') }}
+    <p class="form-note">Waktu penggantian password dicatat sistem, lengkap dengan password lama dan barunya, supaya admin bisa membantu kalau kamu lupa.</p>
   </div>
   <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Simpan</button></div>
 </form>

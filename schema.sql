@@ -20,8 +20,23 @@ CREATE TABLE IF NOT EXISTS kelas (
     pengajar_id INTEGER NOT NULL,
     pengajar_id2 INTEGER,
     deskripsi TEXT,
+    -- BARU (revisi 2): gambar latar kartu kelas, dipilih admin dari 3 pilihan yang ada
+    -- di static/images (header_winter.png / header_autum.png / header_spring.png).
+    header TEXT,
     FOREIGN KEY(pengajar_id) REFERENCES users(id),
     FOREIGN KEY(pengajar_id2) REFERENCES users(id)
+);
+
+-- BARU (revisi 3): pendidikan TERAKHIR pengajar, diisi admin waktu membuat/mengedit akun.
+-- Satu pengajar cuma punya satu baris di sini (UNIQUE), jadi memang "pendidikan terakhir",
+-- bukan daftar riwayat pendidikan.
+CREATE TABLE IF NOT EXISTS pendidikan (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pengajar_id INTEGER NOT NULL UNIQUE,
+    gelar TEXT NOT NULL,
+    jurusan TEXT NOT NULL,
+    institusi TEXT NOT NULL,
+    FOREIGN KEY (pengajar_id) REFERENCES users(id)
 );
 
 -- Log penggantian password yang dilakukan siswa/pengajar sendiri.
@@ -43,8 +58,6 @@ CREATE TABLE IF NOT EXISTS jadwal (
     kelas_id INTEGER NOT NULL,
     pengajar_id INTEGER NOT NULL,
     tanggal TEXT,
-    materi TEXT,
-        tanggal TEXT,
     materi TEXT,
     -- BARU: 1 kalau pengajarnya guru pengganti (bukan guru tetap kelas tsb)
     pengganti INTEGER DEFAULT 0,

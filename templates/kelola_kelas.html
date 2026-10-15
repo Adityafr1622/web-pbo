@@ -1,9 +1,11 @@
 {% extends 'base.html' %}
-{% from '_macros.html' import ic, field, modal, multi %}
+{# DIUBAH: + pilih_header (revisi 2) #}
+{% from '_macros.html' import ic, field, modal, multi, pilih_header %}
 {% block title %}Kelola Kelas · Fluenglo{% endblock %}
 
 {% block content %}
-{# data dari app.py: kelas_list (id, nama_kelas, pengajar_list[], selesai), pengajar_list, bisa_kelola #}
+{# data dari app.py: kelas_list (id, nama_kelas, header, pengajar_list[], selesai),
+   pengajar_list, bisa_kelola, header_list (pilihan background), segera (jadwal terdekat) #}
 <div class="page-head">
   <div>
     <h1>{{ 'Kelola Kelas' if bisa_kelola else 'Kelas' }}</h1>
@@ -14,20 +16,43 @@
 
 <div class="kelas-grid">
   {% for k in kelas_list %}
-  <article class="kelas-card kelas-bg {{ 'kelas-selesai' if k.selesai }}">
-    {# DIUBAH: kartu kelas membuka tab Materi (halaman pertama kelas), sesuai desain #}
+  {# DIUBAH (revisi 2): background kartu mengikuti pilihan admin. Kelas lama yang
+     belum punya pilihan tetap memakai gambar bawaan (class kelas-bg). #}
+  <article class="kelas-card {{ 'kelas-foto' if k.header else 'kelas-bg' }} {{ 'kelas-selesai' if k.selesai }}"
+    {% if k.header %}style="--kelas-img: url('{{ url_for('static', filename='images/' ~ k.header) }}')"{% endif %}>
+
+    {# BARU (revisi 4): kartu kelas TIDAK lagi bisa dipencet seluruhnya. Satu-satunya
+       jalan masuk ke kelas adalah tombol panah di kanan atas, jadi tidak ada lagi
+       salah pencet waktu mau mengeklik nama pengajar. #}
+    <div class="kartu-aksi">
+      {% if bisa_kelola %}
+      <button type="button" class="card-ic" aria-label="Edit {{ k.nama_kelas }}" title="Edit kelas"
+        data-edit="modal-edit-kelas"
+        data-action="/admin/kelas/edit/{{ k.id }}"
+        data-del="{{ url_for('hapus_kelas', kelas_id=k.id) }}"
+        data-del-text="Yakin ingin menghapus kelas {{ k.nama_kelas }}? Kelas yang masih punya materi, tugas, atau presensi tidak bisa dihapus."
+        data-fill='{{ {"nama_kelas": k.nama_kelas, "header": k.header, "pengajar_ids": k.pengajar_list|map(attribute="id")|list}|tojson }}'>{{ ic('pencil', 20) }}</button>
+      {% endif %}
+      <a class="card-ic" href="{{ url_for('kelola_materi', kelas_id=k.id) }}"
+         aria-label="Buka kelas {{ k.nama_kelas }}" title="Buka kelas">{{ ic('arrow-ne', 20) }}</a>
+    </div>
+
     {# BARU: kelas yang sudah ditamatkan siswa diberi tanda Selesai #}
     {% if k.selesai %}<span class="tanda-selesai">{{ ic('check', 14) }} Selesai</span>{% endif %}
-    <h2 class="kelas-title"><a class="stretched" href="{{ url_for('kelola_materi', kelas_id=k.id) }}">{{ k.nama_kelas }}</a></h2>
+
+    <h2 class="kelas-title">{{ k.nama_kelas }}</h2>
     <div class="kelas-guru">
       {% for p in k.pengajar_list %}<a href="{{ url_for('profil_pengajar', pengajar_id=p.id) }}">{{ p.nama }}</a>{% endfor %}
     </div>
-    {% if bisa_kelola %}
-    <button type="button" class="card-edit" aria-label="Edit {{ k.nama_kelas }}" data-edit="modal-edit-kelas"
-      data-action="/admin/kelas/edit/{{ k.id }}"
-      data-del="{{ url_for('hapus_kelas', kelas_id=k.id) }}"
-      data-del-text="Yakin ingin menghapus kelas {{ k.nama_kelas }}? Kelas yang masih punya materi, tugas, atau presensi tidak bisa dihapus."
-      data-fill='{{ {"nama_kelas": k.nama_kelas, "pengajar_ids": k.pengajar_list|map(attribute="id")|list}|tojson }}'>{{ ic('pencil', 22) }}</button>
+
+    {# BARU (revisi 5): pertemuan terdekat yang belum lewat, menempel di bawah kartu.
+       Kalau semua jadwalnya sudah lewat, bagian ini memang tidak muncul sama sekali.
+       Pengajar hanya diberi tahu pertemuan yang dia ajar (disaring di app.py). #}
+    {# DIUBAH (revisi 16/10): tulisan biasa menempel di kiri bawah kartu, bukan lagi
+       kotak putih. Kata "Segera hadir:" boleh diganti sesuka hati di baris bawah ini. #}
+    {% if segera and segera.get(k.id) %}
+    <a class="kelas-segera" href="{{ url_for('kelola_jadwal' if bisa_kelola else 'lihat_jadwal', kelas=k.id) }}"
+       title="Lihat jadwal {{ k.nama_kelas }}"><span>Segera hadir: {{ segera[k.id].teks }}</span></a>
     {% endif %}
   </article>
   {% else %}
@@ -41,6 +66,7 @@
   <div class="modal-body">
     {{ field('Nama Kelas', 'nama_kelas', 'Masukkan nama kelas') }}
     {{ multi(pengajar_list) }}
+    {{ pilih_header(header_list) }}
   </div>
   <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Tambahkan</button></div>
 </form>
@@ -51,6 +77,7 @@
   <div class="modal-body">
     {{ field('Nama Kelas', 'nama_kelas', '') }}
     {{ multi(pengajar_list) }}
+    {{ pilih_header(header_list) }}
   </div>
   <div class="modal-foot split">
     <button type="button" class="btn btn-danger-ghost" data-del-btn data-confirm="" data-text="">{{ ic('trash', 16) }} Hapus Kelas</button>

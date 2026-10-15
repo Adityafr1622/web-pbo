@@ -35,6 +35,11 @@
       const g = f.elements['pengajar_id'];
       if (g) g.value = data.pengajar_id;
     }
+    // BARU (revisi 3): kolom "Jurusan Lainnya" ikut dibuka kalau jurusannya di luar daftar.
+    // Dipanggil SETELAH isian terpasang, supaya yang dibaca nilai yang baru, bukan yang lama.
+    const jl = data && data.jurusan_lain;
+    saringJurusan(f);
+    if (jl) { const i = f.elements['jurusan_lain']; if (i) i.value = jl; }
     openM(m);
   };
 
@@ -44,7 +49,9 @@
   // modal tetap terbuka, isian utuh, pesannya muncul di dalam modal. Validasi di
   // server tetap jalan sebagai pengaman — ini cuma supaya tidak perlu mengetik ulang.
   const pesanSalah = i => {
-    if (i.validity.valueMissing) return 'Bagian ini wajib diisi dulu.';
+    // DIUBAH: isian tertentu (mis. pilihan background kelas) punya kalimatnya sendiri
+    // waktu dibiarkan kosong, lewat data-pesan-kosong.
+    if (i.validity.valueMissing) return i.dataset.pesanKosong || 'Bagian ini wajib diisi dulu.';
     return i.dataset.pesan || 'Isian ini belum sesuai format yang diminta.';
   };
   const bersihkanPesan = f => {
@@ -80,6 +87,22 @@
     });
     const dipilih = guru.selectedOptions[0];
     if (dipilih && dipilih.disabled) guru.value = '';         // pilihan lama jadi tidak sah
+  };
+
+  // ---------- BARU (revisi 3): jurusan "Lainnya" di form akun pengajar ----------
+  // Dropdown jurusan punya 3 pilihan tetap + "Lainnya". Waktu "Lainnya" dipilih,
+  // kolom ketik manual di sebelahnya dibuka DAN dijadikan wajib; selain itu kolomnya
+  // disembunyikan sekaligus dilepas kewajibannya — kalau tidak, form jadi tidak bisa
+  // dikirim gara-gara menunggu kolom yang tidak kelihatan.
+  const saringJurusan = form => {
+    const pilih = $('[data-jurusan-pick]', form), kotak = $('[data-jurusan-lain]', form);
+    if (!pilih || !kotak) return;
+    const lain = pilih.value && pilih.value === pilih.dataset.lain;
+    kotak.hidden = !lain;
+    const isi = $('input', kotak);
+    if (!isi) return;
+    isi.required = !!lain;
+    if (!lain) isi.value = '';
   };
 
   // ---------- BARU: tab yang terbuka diingat lewat URL ----------
@@ -189,6 +212,13 @@
       return;
     }
 
+    // BARU (revisi 3): ganti pilihan jurusan -> kolom "Jurusan Lainnya" dibuka/ditutup
+    if (t.matches('[data-jurusan-pick]')) {
+      const form = t.closest('form');
+      if (form) saringJurusan(form);
+      return;
+    }
+
     // BARU: pilih tanggal pertemuan -> tampilkan tabel presensi tanggal tersebut
     if (t.matches('[data-presensi-pick]')) {
       $$('.presensi-panel').forEach(f => f.hidden = f.id !== t.value);
@@ -250,6 +280,7 @@
   // BARU: buka tab sesuai URL, saring dropdown pengajar, lalu buka lagi modal yang ditolak server.
   bukaTabDariUrl();
   $$('form').forEach(f => { if ($('[data-guru-pick]', f)) saringGuru(f); });
+  $$('form').forEach(f => saringJurusan(f));   // BARU (revisi 3)
   const ulang = $('[data-reopen]');
   if (ulang) {
     const m = $('#' + ulang.dataset.reopen);

@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {# DIUBAH: tambah import wa_link biar nomor WA di tabel bisa dipencet #}
-{% from '_macros.html' import ic, field, pwfield, modal, wa_link %}
+{# DIUBAH: + field_pendidikan (revisi 3) #}
+{% from '_macros.html' import ic, field, pwfield, modal, wa_link, field_pendidikan %}
 {% block title %}Kelola Akun · Fluenglo{% endblock %}
 
 {% block content %}
@@ -79,11 +80,19 @@
 {# ===== tabel pengajar ===== #}
 <div class="table-card" data-panel="pengajar" hidden><div class="table-scroll">
 <table class="data-table table-akun">
-  <thead><tr><th>Nama</th><th>Username</th><th>Email</th><th>No. WhatsApp</th><th>Alamat</th><th>NIK</th><th>Password</th><th>Diubah</th><th>Profil Lengkap</th><th>Aksi</th></tr></thead>
+  {# DIUBAH (revisi 3): + kolom Pendidikan #}
+  <thead><tr><th>Nama</th><th>Username</th><th>Pendidikan</th><th>Email</th><th>No. WhatsApp</th><th>Alamat</th><th>NIK</th><th>Password</th><th>Diubah</th><th>Profil Lengkap</th><th>Aksi</th></tr></thead>
   <tbody>
   {% for u in pengajar %}
+  {# BARU (revisi 3): jurusan di luar 3 pilihan tetap dianggap "Lainnya", jadi waktu modal
+     edit dibuka dropdown-nya tetap cocok dan isiannya muncul di kolom ketik manual. #}
+  {% set p = pendidikan.get(u.id) %}
+  {% set p_baku = p and p.jurusan in jurusan_list %}
   <tr>
-    <td class="td-strong td-nama" title="{{ u.nama }}">{{ u.nama }}</td><td>{{ u.username }}</td><td class="td-clip">{{ u.email or '-' }}</td>
+    <td class="td-strong td-nama" title="{{ u.nama }}">{{ u.nama }}</td><td>{{ u.username }}</td>
+    <td class="td-clip" title="{{ (p.gelar ~ ' ' ~ p.jurusan ~ ' — ' ~ p.institusi) if p else '' }}">
+      {{ (p.gelar ~ ' ' ~ p.jurusan) if p else '-' }}</td>
+    <td class="td-clip">{{ u.email or '-' }}</td>
     {# DIUBAH: nomor WA jadi tautan wa.me, bukan teks biasa #}
     <td class="td-nowrap">{{ wa_link(u.no_whatsapp) }}</td><td class="td-clip">{{ u.alamat or '-' }}</td>
     {# DIUBAH: NIK cuma 4 digit awal di tabel, lengkapnya di halaman Profil Lengkap #}
@@ -94,12 +103,16 @@
     <td><div class="aksi">
       <button type="button" class="icon-btn icon-edit" title="Edit" data-edit="modal-edit-pengajar"
         data-action="{{ url_for('edit_akun', user_id=u.id) }}"
-        data-fill='{{ {"nama": u.nama, "username": u.username, "whatsapp": u.no_whatsapp, "alamat": u.alamat, "nik": u.nik}|tojson }}'>{{ ic('pencil', 16) }}</button>
+        data-fill='{{ {"nama": u.nama, "username": u.username, "whatsapp": u.no_whatsapp, "alamat": u.alamat, "nik": u.nik,
+                       "gelar": (p.gelar if p else ""),
+                       "jurusan": (p.jurusan if p_baku else (jurusan_lain if p else "")),
+                       "jurusan_lain": ("" if (p_baku or not p) else p.jurusan),
+                       "institusi": (p.institusi if p else "")}|tojson }}'>{{ ic('pencil', 16) }}</button>
       <button type="button" class="icon-btn icon-del" title="Hapus" data-confirm="{{ url_for('hapus_akun', user_id=u.id) }}"
         data-text="Yakin ingin menghapus akun {{ u.nama }}? Tindakan ini tidak dapat dibatalkan.">{{ ic('trash', 16) }}</button>
     </div></td>
   </tr>
-  {% else %}<tr class="row-empty"><td colspan="10">Belum ada akun pengajar. Klik "Tambah Pengajar" untuk membuat akun pertama.</td></tr>
+  {% else %}<tr class="row-empty"><td colspan="11">Belum ada akun pengajar. Klik "Tambah Pengajar" untuk membuat akun pertama.</td></tr>
   {% endfor %}
   </tbody>
 </table></div></div>
@@ -181,6 +194,7 @@
     {{ pwfield(ph='Min. 8 karakter, huruf + angka', pat=pat_pw, pesan=pesan_pw) }}
     {{ field('Alamat', 'alamat', 'Masukkan alamat') }}
     <div class="field"><label>Photo Profil <span class="label-note">(opsional)</span></label><input type="file" name="foto" accept="image/*"></div>
+    {{ field_pendidikan(gelar_list, jurusan_list, jurusan_lain) }}
   </div></div>
   <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Tambahkan</button></div>
 </form>
@@ -197,8 +211,11 @@
     {{ pwfield(req=false, ph='Kosongkan jika tidak diubah', pat=pat_pw, pesan=pesan_pw) }}
     {{ field('Alamat', 'alamat', '') }}
     <div class="field"><label>Photo Profil <span class="label-note">(kosong = tetap)</span></label><input type="file" name="foto" accept="image/*"></div>
+    {# DIUBAH: catatan password dipindah ke sini, sebelum blok Pendidikan — kalau ditaruh
+       di bawah seperti dulu, bunyinya seolah-olah menjelaskan kolom Institusi. #}
+    <p class="form-note span-2">Kosongkan kolom password kalau tidak ingin menggantinya.</p>
+    {{ field_pendidikan(gelar_list, jurusan_list, jurusan_lain) }}
   </div>
-  <p class="form-note">Kosongkan kolom password kalau tidak ingin menggantinya.</p>
   </div>
   <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Simpan</button></div>
 </form>
