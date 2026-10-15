@@ -1142,3 +1142,36 @@ html { scrollbar-gutter: stable; overflow-y: scroll; }
     .login-tabs { padding: 5px; }
     .login-tabs .pill { padding: 9px 6px; font-size: 12.5px; }
 }
+
+/* ---------- REVISI 16/10 (lanjutan): tombol edit & hapus MASUK ke kartu putih ---------- */
+/* Sebelumnya tombol pensil & sampah berdiri sendiri di luar kartu, masing-masing
+   berlatar putih — jadi kelihatan seperti dua kartu kecil terpisah.
+   Sekarang kartu putihnya dipindah ke .feed-row (pembungkus barisnya), lalu
+   .feed-item di dalamnya dibuat bening. Hasilnya satu kartu putih utuh dengan
+   tombol pensil & sampah berada DI DALAMNYA, rata kanan.
+   Tidak ada perubahan di file HTML — strukturnya memang sudah mendukung ini. */
+.feed-row {
+    align-items: center; gap: 0; padding-right: 16px;
+    background: #fff; border-radius: 30px;
+    box-shadow: 0 4px 18px rgba(31, 42, 77, .06);
+    transition: background .15s;
+}
+.feed-row:hover { background: #eef0f8; }
+/* kartu bagian teks jadi bening, supaya tidak ada kotak putih di dalam kotak putih */
+.feed-row .feed-item { background: transparent; box-shadow: none; }
+.feed-row .feed-item:hover { background: transparent; }
+
+/* tombolnya kembali tanpa latar; yang menyala hanya waktu disentuh kursor */
+.feed-aksi .icon-btn {
+    width: 38px; height: 38px; background: transparent; box-shadow: none;
+}
+.feed-aksi .icon-btn:hover { background: rgba(46, 58, 102, .09); }
+
+/* .feed-item yang BUKAN di dalam .feed-row (kartu berkas di halaman detail materi)
+   tetap punya latar sendiri seperti semula. */
+
+@media (max-width: 860px) {
+    /* di layar sempit tombolnya turun ke bawah, tapi tetap di dalam kartu putih yang sama */
+    .feed-row { flex-direction: column; align-items: stretch; padding: 0 16px 10px; }
+    .feed-row .feed-item { padding-left: 6px; padding-right: 6px; }
+}
