@@ -68,7 +68,7 @@
     <div class="field span-2"><label>Photo Profil <span class="label-note">(kosong = tetap)</span></label>
       <input type="file" name="foto" accept="image/*"></div>
   </div></div>
-  <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Simpan</button></div>
+  <div class="modal-foot"><button type="button" class="btn btn-light" data-reset-form>Batal</button><button class="btn btn-yellow">Simpan</button></div>
 </form>
 {% endcall %}
 
@@ -80,7 +80,7 @@
     {{ pwfield('Password Baru', 'password_baru', true, 'Min. 8 karakter, huruf + angka') }}
     {{ pwfield('Konfirmasi Password Baru', 'konfirmasi_password', true, 'Ulangi password baru') }}
   </div>
-  <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Simpan</button></div>
+  <div class="modal-foot"><button type="button" class="btn btn-light" data-reset-form>Batal</button><button class="btn btn-yellow">Simpan</button></div>
 </form>
 {% endcall %}
 {% endif %}

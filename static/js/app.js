@@ -5,6 +5,41 @@
   const openM = m => { if (m) { m.hidden = false; document.body.classList.add('no-scroll'); } };
   const closeM = m => { m.hidden = true; if (!$('.modal:not([hidden])')) document.body.classList.remove('no-scroll'); };
 
+  // Simpan kondisi awal form saat popup dibuka. Tombol Batal mengembalikan kondisi ini
+  // tanpa menutup popup, sehingga perubahan yang belum disimpan benar-benar dibatalkan.
+  const ambilStateForm = f => [...f.elements].map(i => ({
+    name: i.name,
+    type: i.type,
+    value: i.type === 'checkbox' || i.type === 'radio' ? '' : i.value,
+    checked: i.checked
+  }));
+  const simpanStateAwal = m => {
+    const f = $('form', m);
+    if (f) m._stateAwal = ambilStateForm(f);
+  };
+  const pulihkanStateForm = m => {
+    const f = $('form', m);
+    if (!f || !m._stateAwal) return;
+    const daftar = m._stateAwal;
+    for (const state of daftar) {
+      const fields = [...f.elements].filter(i => i.name === state.name && i.type === state.type);
+      if (!fields.length) continue;
+      if (state.type === 'checkbox' || state.type === 'radio') {
+        // Radio/checkbox perlu dipulihkan per elemen, bukan hanya berdasarkan name.
+        const idx = daftar.filter(x => x.name === state.name && x.type === state.type).indexOf(state);
+        if (fields[idx]) fields[idx].checked = state.checked;
+      } else {
+        fields[0].value = state.value ?? '';
+      }
+    }
+    // File input tidak bisa diisi ulang oleh browser; Batal selalu mengosongkannya.
+    $$('input[type="file"]', f).forEach(i => { i.value = ''; });
+    bersihkanPesan(f);
+    $$('[data-multi]', f).forEach(w => syncMulti(w));
+    saringGuru(f);
+    saringJurusan(f);
+  };
+
   const syncMulti = w => {
     const on = $$('input[type=checkbox]:checked', w), lab = $('[data-label]', w);
     $$('input[type=hidden]', w).forEach((h, i) => h.value = on[i] ? on[i].value : '');
@@ -40,6 +75,7 @@
     const jl = data && data.jurusan_lain;
     saringJurusan(f);
     if (jl) { const i = f.elements['jurusan_lain']; if (i) i.value = jl; }
+    simpanStateAwal(m);
     openM(m);
   };
 
@@ -132,9 +168,31 @@
     if (!up('.usermenu')) { const dd = $('.user-dropdown'); if (dd) dd.hidden = true; }
     if (!up('.multi')) $$('.multi-list').forEach(l => l.hidden = true);
 
-    if ((el = up('[data-open]'))) return openM($('#' + el.dataset.open));
+    if ((el = up('[data-open]'))) {
+      const m = $('#' + el.dataset.open);
+      if (m) {
+        const f = $('form', m);
+        // Modal Tambah selalu dimulai dari kondisi kosong. Modal edit/profil tetap
+        // memakai nilai yang sudah dirender halaman sebagai kondisi awal.
+        if (m.id.startsWith('modal-tambah-') && f) {
+          f.reset();
+          $$('[data-multi]', f).forEach(w => syncMulti(w));
+          saringGuru(f);
+          saringJurusan(f);
+        }
+        simpanStateAwal(m);
+        openM(m);
+      }
+      return;
+    }
+    if ((el = up('[data-reset-form]'))) { pulihkanStateForm(up('.modal')); return; }
     if (up('[data-close]')) return closeM(up('.modal'));
-    if (t.classList.contains('modal')) return closeM(t);
+    if (t.classList.contains('modal')) {
+      // Popup formulir hanya boleh ditutup lewat tombol X. Klik area gelap di luar
+      // formulir tidak membuang isian yang sedang diedit.
+      if ($('.modal-box.modal-form', t)) return;
+      return closeM(t);
+    }
 
     if ((el = up('[data-edit]'))) {            // isi form edit dari data-fill (JSON)
       const m = $('#' + el.dataset.edit);
@@ -225,16 +283,18 @@
       return;
     }
 
-    // BARU: centang "Semua" di kolom Hadir -> semua siswa ditandai hadir sekaligus
-    if (t.matches('[data-semua-hadir]')) {
+    // Centang "Semua" pada setiap status -> semua siswa langsung diberi status itu.
+    // Diklik lagi -> seluruh status itu dikosongkan kembali.
+    if (t.matches('[data-semua-status]')) {
       const form = t.closest('form');
-      $$('input[type=radio][value=hadir]', form).forEach(r => { if (!r.disabled) r.checked = t.checked; });
+      const kode = t.dataset.semuaStatus;
+      $$('input[type=radio][value="' + kode + '"]', form).forEach(r => { if (!r.disabled) r.checked = t.checked; });
       return;
     }
 
-    // kalau satu baris diubah manual, centang "Semua" dilepas biar nggak menyesatkan
-    if (t.type === 'radio' && t.name.startsWith('st_') && t.value !== 'hadir') {
-      const semua = $('[data-semua-hadir]', t.closest('form') || document);
+    // Kalau satu baris diubah manual, tombol "Semua" untuk status tersebut dilepas.
+    if (t.type === 'radio' && t.name.startsWith('st_')) {
+      const semua = $('[data-semua-status="' + t.value + '"]', t.closest('form') || document);
       if (semua) semua.checked = false;
     }
   });
@@ -273,7 +333,7 @@
   });
 
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') $$('.modal:not([hidden])').forEach(closeM);
+    if (e.key === 'Escape') $$('.modal:not([hidden])').forEach(m => { if (!$('.modal-box.modal-form', m)) closeM(m); });
   });
   setTimeout(() => $$('.flash').forEach(f => f.remove()), 6000);
 

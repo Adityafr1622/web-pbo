@@ -45,7 +45,7 @@
     {{ field('Kategori', 'kategori', 'Contoh: Grammar, Reading, Writing', 'text', false) }}
     <div class="field"><label>Berkas Materi</label><input type="file" name="file_materi" required></div>
   </div>
-  <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Unggah</button></div>
+  <div class="modal-foot"><button type="button" class="btn btn-light" data-reset-form>Batal</button><button class="btn btn-yellow">Unggah</button></div>
 </form>
 {% endcall %}
 
@@ -56,7 +56,7 @@
     {{ field('Kategori', 'kategori', '', 'text', false) }}
     <div class="field"><label>Ganti Berkas <span class="label-note">(kosong = berkas lama tetap dipakai)</span></label><input type="file" name="file_materi"></div>
   </div>
-  <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Simpan</button></div>
+  <div class="modal-foot"><button type="button" class="btn btn-light" data-reset-form>Batal</button><button class="btn btn-yellow">Simpan</button></div>
 </form>
 {% endcall %}
 {% endif %}

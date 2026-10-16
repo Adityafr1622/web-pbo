@@ -45,7 +45,7 @@
     {{ ta('Petunjuk Tugas', 'deskripsi', 'Tulis petunjuk pengerjaan untuk siswa', false, 5) }}
     {{ field('Tenggat', 'deadline', '', 'datetime-local') }}
   </div>
-  <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Tambahkan</button></div>
+  <div class="modal-foot"><button type="button" class="btn btn-light" data-reset-form>Batal</button><button class="btn btn-yellow">Tambahkan</button></div>
 </form>
 {% endcall %}
 
@@ -56,7 +56,7 @@
     {{ ta('Petunjuk Tugas', 'deskripsi', '', false, 5) }}
     {{ field('Tenggat', 'deadline', '', 'datetime-local') }}
   </div>
-  <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Simpan</button></div>
+  <div class="modal-foot"><button type="button" class="btn btn-light" data-reset-form>Batal</button><button class="btn btn-yellow">Simpan</button></div>
 </form>
 {% endcall %}
 {% endif %}

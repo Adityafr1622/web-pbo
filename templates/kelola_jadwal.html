@@ -92,12 +92,12 @@
 {% if bisa_kelola %}
 {% call modal('modal-tambah-jadwal', 'Buat Jadwal') %}
 <form method="post" action="{{ url_for('kelola_jadwal') }}">{{ isi_form() }}
-  <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Tambahkan</button></div>
+  <div class="modal-foot"><button type="button" class="btn btn-light" data-reset-form>Batal</button><button class="btn btn-yellow">Tambahkan</button></div>
 </form>
 {% endcall %}
 {% call modal('modal-edit-jadwal', 'Edit Jadwal') %}
 <form method="post">{{ isi_form() }}
-  <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Simpan</button></div>
+  <div class="modal-foot"><button type="button" class="btn btn-light" data-reset-form>Batal</button><button class="btn btn-yellow">Simpan</button></div>
 </form>
 {% endcall %}
 {% endif %}

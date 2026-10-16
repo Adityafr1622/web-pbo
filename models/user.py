@@ -715,7 +715,7 @@ class Pengajar(User):
         if not data_status and not kosongkan:
             raise ValueError("Belum ada status kehadiran yang dipilih.")
 
-        jumlah = Presensi.simpan_massal(kelas_id, tanggal, data_status) if data_status else 0
+        jumlah = Presensi.simpan_massal(kelas_id, tanggal, data_status, pengajar_id=self.id) if data_status else 0
         if kosongkan:
             Presensi.hapus_banyak(kelas_id, tanggal, kosongkan)
         return jumlah

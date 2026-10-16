@@ -160,7 +160,7 @@
     </div>
     <p class="form-note">Email bersifat opsional dan diisi siswa sendiri lewat menu Profil.</p>
   </div>
-  <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Tambahkan</button></div>
+  <div class="modal-foot"><button type="button" class="btn btn-light" data-reset-form>Batal</button><button class="btn btn-yellow">Tambahkan</button></div>
 </form>
 {% endcall %}
 
@@ -178,7 +178,7 @@
   </div>
   <p class="form-note">Kosongkan kolom password kalau tidak ingin menggantinya.</p>
   </div>
-  <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Simpan</button></div>
+  <div class="modal-foot"><button type="button" class="btn btn-light" data-reset-form>Batal</button><button class="btn btn-yellow">Simpan</button></div>
 </form>
 {% endcall %}
 
@@ -193,10 +193,10 @@
     {{ field('Nomor WhatsApp', 'whatsapp', 'Contoh: 08123456789', pat=pat_wa, pesan=pesan_wa) }}
     {{ pwfield(ph='Min. 8 karakter, huruf + angka', pat=pat_pw, pesan=pesan_pw) }}
     {{ field('Alamat', 'alamat', 'Masukkan alamat') }}
-    <div class="field"><label>Photo Profil <span class="label-note">(opsional)</span></label><input type="file" name="foto" accept="image/*"></div>
+    <div class="field"><label>Photo Profil</label><input type="file" name="foto" accept="image/*" required></div>
     {{ field_pendidikan(gelar_list, jurusan_list, jurusan_lain) }}
   </div></div>
-  <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Tambahkan</button></div>
+  <div class="modal-foot"><button type="button" class="btn btn-light" data-reset-form>Batal</button><button class="btn btn-yellow">Tambahkan</button></div>
 </form>
 {% endcall %}
 
@@ -217,7 +217,7 @@
     {{ field_pendidikan(gelar_list, jurusan_list, jurusan_lain) }}
   </div>
   </div>
-  <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Simpan</button></div>
+  <div class="modal-foot"><button type="button" class="btn btn-light" data-reset-form>Batal</button><button class="btn btn-yellow">Simpan</button></div>
 </form>
 {% endcall %}
 {# BARU: kalau server menolak isian (mis. username sudah dipakai), modalnya dibuka lagi

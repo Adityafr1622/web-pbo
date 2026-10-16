@@ -127,7 +127,9 @@ CREATE TABLE IF NOT EXISTS presensi (
     siswa_id INTEGER NOT NULL,
     kelas_id INTEGER NOT NULL,
     status TEXT DEFAULT 'Belum Hadir',
-    UNIQUE (tanggal, siswa_id, kelas_id)
+    pengajar_id INTEGER,
+    UNIQUE (tanggal, siswa_id, kelas_id),
+    FOREIGN KEY (pengajar_id) REFERENCES users(id)
 );
 
 -- Catatan akhir pengajar: satu siswa satu catatan per kelas (bisa diedit),

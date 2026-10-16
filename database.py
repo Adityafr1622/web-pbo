@@ -76,6 +76,8 @@ def migrasi():
             # BARU: isi password lama & baru di riwayat penggantian password
             ('riwayat_password', 'password_lama', 'TEXT'),
             ('riwayat_password', 'password_baru', 'TEXT'),
+            # Pengajar yang benar-benar menyimpan/mengubah presensi per pertemuan.
+            ('presensi', 'pengajar_id', 'INTEGER'),
         ]
         for tabel, nama, tipe in tambahan:
             ada = kolom(tabel)
@@ -903,32 +905,34 @@ def ambil_tanggal_presensi_kelas(kelas_id):
     conn.close()
     return [r['tanggal'] for r in rows]
 
-def _simpan_presensi(conn, tanggal, siswa_id, kelas_id, status):
+def _simpan_presensi(conn, tanggal, siswa_id, kelas_id, status, pengajar_id=None):
     """Upsert: satu siswa hanya punya satu presensi per kelas per tanggal."""
     row = conn.execute('SELECT id FROM presensi WHERE tanggal = ? AND siswa_id = ? AND kelas_id = ?',
                        (tanggal, siswa_id, kelas_id)).fetchone()
     if row:
-        conn.execute('UPDATE presensi SET status = ? WHERE id = ?', (status, row['id']))
+        conn.execute('UPDATE presensi SET status = ?, pengajar_id = ? WHERE id = ?',
+                     (status, pengajar_id, row['id']))
         return row['id']
-    cur = conn.execute('INSERT INTO presensi (tanggal, siswa_id, kelas_id, status) VALUES (?, ?, ?, ?)',
-                       (tanggal, siswa_id, kelas_id, status))
+    cur = conn.execute(
+        'INSERT INTO presensi (tanggal, siswa_id, kelas_id, status, pengajar_id) VALUES (?, ?, ?, ?, ?)',
+        (tanggal, siswa_id, kelas_id, status, pengajar_id))
     return cur.lastrowid
 
-def simpan_presensi(tanggal, siswa_id, kelas_id, status):
+def simpan_presensi(tanggal, siswa_id, kelas_id, status, pengajar_id=None):
     conn = get_connection()
     try:
-        presensi_id = _simpan_presensi(conn, tanggal, siswa_id, kelas_id, status)
+        presensi_id = _simpan_presensi(conn, tanggal, siswa_id, kelas_id, status, pengajar_id)
         conn.commit()
         return presensi_id
     finally:
         conn.close()
 
-def simpan_presensi_massal(kelas_id, tanggal, data_status):
+def simpan_presensi_massal(kelas_id, tanggal, data_status, pengajar_id=None):
     """data_status: {siswa_id: status}. Semua disimpan dalam satu transaksi."""
     conn = get_connection()
     try:
         for siswa_id, status in data_status.items():
-            _simpan_presensi(conn, tanggal, siswa_id, kelas_id, status)
+            _simpan_presensi(conn, tanggal, siswa_id, kelas_id, status, pengajar_id)
         conn.commit()
     except Exception:
         conn.rollback()

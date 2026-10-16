@@ -111,7 +111,7 @@ class Presensi:
     # Di dalamnya ada validasi, upsert (nggak duplikat), dan transaksi database,
     # tapi pemanggil (Pengajar / route Flask) nggak perlu tau.
     @staticmethod
-    def simpan_massal(kelas_id, tanggal, data_status):
+    def simpan_massal(kelas_id, tanggal, data_status, pengajar_id=None):
         """Simpan presensi banyak siswa sekaligus.
         data_status: {siswa_id: 'hadir' / 'Izin' / ...}. Semua divalidasi dulu,
         kalau ada satu yang salah nggak ada yang tersimpan. Return jumlah siswa."""
@@ -121,7 +121,7 @@ class Presensi:
         for sid, st in data_status.items():
             bersih[_ke_int(sid, "Siswa")] = Presensi.normalisasi_status(st)
         kelas_id, tanggal = Presensi.cek_input(kelas_id, tanggal, bersih.keys())
-        database.simpan_presensi_massal(kelas_id, tanggal, bersih)
+        database.simpan_presensi_massal(kelas_id, tanggal, bersih, pengajar_id)
         return len(bersih)
 
     @staticmethod

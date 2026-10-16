@@ -72,6 +72,7 @@ button { cursor: pointer; }
 .btn-red:hover { background: #c33a33; }
 .btn-navy { background: var(--navy); color: #fff; padding: 12px 26px; border-radius: 12px; }
 .btn-navy:hover:not([disabled]) { background: var(--navy-dark); }
+.modal-foot.center .btn-navy { padding: 10px 24px; border-radius: 999px; }
 .btn-login { background: var(--login-btn); color: #fff; padding: 11px 44px; font-weight: 500; }
 .btn-login:hover { background: var(--navy-dark); }
 .btn-danger-ghost { background: transparent; color: var(--red); padding-left: 4px; }
@@ -257,7 +258,15 @@ button { cursor: pointer; }
 .login-card .hint-box { margin: 14px 0 0; }
 .login-actions { display: flex; justify-content: center; margin-top: 22px; }
 
-.about-card { margin-top: 36px; padding: 32px clamp(24px, 3vw, 36px) 28px; border-radius: 36px; }
+.about-card {
+    margin-top: 36px;
+    padding: 32px clamp(24px, 3vw, 36px) 28px;
+    border-radius: 36px;
+    box-shadow:
+        0 0 70px rgba(255, 214, 90, .28),
+        0 4px 18px rgba(31, 42, 77, .06);
+    border: 1px solid rgba(255, 214, 90, .25);
+}
 .about-text { text-align: justify; color: var(--navy); line-height: 1.7; }
 .about-sub { margin-top: 36px; font-size: 17px; font-weight: 700; color: var(--navy); }
 .contact-row { display: flex; justify-content: center; gap: 28px; margin-top: 16px; flex-wrap: wrap; }
@@ -589,8 +598,54 @@ a.feed-item:hover, button.feed-item:hover { background: #e4e6f1; }
 .kom-form textarea:focus { border-color: var(--navy); outline: 0; box-shadow: 0 0 0 3px rgba(46, 58, 102, .12); }
 .modal-body .kom-list { max-height: 46vh; overflow-y: auto; margin: 14px 0 16px; padding-right: 4px; }
 
-/* ---------- presensi ---------- */
-.presensi-table { min-width: 680px; }
+/* ---------- PRESENSI SISWA ---------- */
+
+.presensi-rekap-table {
+    width: 100%;
+    min-width: 680px;
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: fixed;
+}
+
+/* Semua isi rata kiri */
+.presensi-rekap-table th,
+.presensi-rekap-table td {
+    text-align: left;
+    vertical-align: middle;
+}
+
+/* Pertemuan: cukup untuk tanggal */
+.presensi-rekap-table th:nth-child(1),
+.presensi-rekap-table td:nth-child(1) {
+    width: 24%;
+    padding-left: 32px;
+    padding-right: 12px;
+}
+
+/* Materi: dibuat lebih lebar dan dimulai lebih dekat ke kiri */
+.presensi-rekap-table th:nth-child(2),
+.presensi-rekap-table td:nth-child(2) {
+    width: 30%;
+    padding-left: 12px;
+    padding-right: 20px;
+}
+
+/* Pengajar */
+.presensi-rekap-table th:nth-child(3),
+.presensi-rekap-table td:nth-child(3) {
+    width: 26%;
+    padding-left: 12px;
+    padding-right: 20px;
+}
+
+/* Kehadiran */
+.presensi-rekap-table th:nth-child(4),
+.presensi-rekap-table td:nth-child(4) {
+    width: 20%;
+    padding-left: 12px;
+    padding-right: 20px;
+}
 .presensi-table th { vertical-align: top; }
 .chk-wrap { display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .chk-wrap input { position: absolute; opacity: 0; pointer-events: none; }

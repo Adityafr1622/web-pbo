@@ -16,13 +16,14 @@
 {# ---------- siswa: rekap kehadiran dirinya sendiri, semua pertemuan sekaligus ---------- #}
 <div class="table-card"><div class="table-scroll">
 <table class="data-table">
-  <thead><tr><th class="th-left">Pertemuan</th><th>Materi</th><th>Kehadiran</th></tr></thead>
+  <thead><tr><th class="th-left">Pertemuan</th><th>Materi</th><th>Pengajar</th><th>Kehadiran</th></tr></thead>
   <tbody>
   {% for p in presensi_list %}
   {% set saya = p.status.get(user.id) %}
   <tr>
     <td class="td-left td-strong">{{ p.label }}</td>
     <td>{{ p.materi or '-' }}</td>
+    <td>{{ p.nama_pengajar or '-' }}</td>
     <td>
       {% if saya == 'hadir' %}<span class="badge badge-ok">{{ ic('check', 13) }} Hadir</span>
       {% elif saya %}<span class="badge badge-kuning">{{ saya|capitalize }}</span>
@@ -69,8 +70,8 @@
       {% for kode, nama in STATUS %}
       <th>
         {{ nama }}
-        {% if kode == 'hadir' and bisa_isi %}
-        <label class="chk-semua"><input type="checkbox" data-semua-hadir><span class="chk"></span> Semua</label>
+        {% if bisa_isi %}
+        <label class="chk-semua"><input type="checkbox" data-semua-status="{{ kode }}"><span class="chk"></span> Semua</label>
         {% endif %}
       </th>
       {% endfor %}

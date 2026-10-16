@@ -44,7 +44,7 @@
         {# BARU (revisi 3): pendidikan terakhir. Letaknya di bawah Password untuk admin &
            pengajar, dan otomatis jatuh tepat di bawah Username untuk siswa — karena buat
            siswa blok Password di atas memang tidak digambar sama sekali. #}
-        <div class="field"><span class="field-label">Pendidikan Terakhir <span class="label-note">(diisi admin)</span></span>
+          <div class="field"><span class="field-label">Pendidikan Terakhir</span>
           {% if data.pendidikan %}
           <div class="read didik-read">
             <span class="didik-ic">{{ ic('cap', 22) }}</span>
@@ -105,7 +105,7 @@
   {# DIUBAH (revisi 3): pendidikan ikut disebut, karena sekarang juga cuma admin yang bisa mengubahnya #}
   <p class="form-note">NIK dan Pendidikan Terakhir hanya bisa diubah oleh admin lewat menu Kelola Akun.</p>
   </div>
-  <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Simpan</button></div>
+  <div class="modal-foot"><button type="button" class="btn btn-light" data-reset-form>Batal</button><button class="btn btn-yellow">Simpan</button></div>
 </form>
 {% endcall %}
 
@@ -117,7 +117,7 @@
     {{ pwfield('Konfirmasi Password Baru', 'konfirmasi_password', true, 'Ulangi password baru') }}
     <p class="form-note">Waktu penggantian password dicatat sistem, lengkap dengan password lama dan barunya, supaya admin bisa membantu kalau kamu lupa.</p>
   </div>
-  <div class="modal-foot"><button type="button" class="btn btn-light" data-close>Batal</button><button class="btn btn-yellow">Simpan</button></div>
+  <div class="modal-foot"><button type="button" class="btn btn-light" data-reset-form>Batal</button><button class="btn btn-yellow">Simpan</button></div>
 </form>
 {% endcall %}
 {% endif %}

@@ -359,8 +359,11 @@ def kelola_akun():
         # sedang menambah pengajar nggak terlempar balik ke tab Siswa.
         tab = role if role in ('siswa', 'pengajar') else 'siswa'
         try:
+            # Foto pengajar wajib saat akun dibuat oleh admin.
             if role == 'pengajar':
-                foto_filename = simpan_foto() or foto_filename
+                foto_filename = simpan_foto()
+                if not foto_filename:
+                    raise ValueError('Foto profil pengajar wajib diisi.')
             user.kelola_akun('tambah', nama=nama, username=username, password=password,
                              role=role, whatsapp=whatsapp, alamat=alamat, nik=nik,
                              foto=foto_filename, kelas_id=kelas_id,
@@ -1179,18 +1182,28 @@ def siapkan_presensi_list(kelas_id):
     semua_tanggal = set(database.ambil_tanggal_jadwal_kelas(kelas_id)) | \
                     set(database.ambil_tanggal_presensi_kelas(kelas_id))
     # BARU: materi pertemuan ikut ditampilkan di pilihan tanggal ("Senin, 5 Oktober 2026 · Descriptive Text")
-    materi_per_tanggal = {j['tanggal']: j['materi'] for j in database.ambil_jadwal_by_kelas(kelas_id)
-                          if j['tanggal']}
+    jadwal_kelas = database.ambil_jadwal_by_kelas(kelas_id)
+    materi_per_tanggal = {j['tanggal']: j['materi'] for j in jadwal_kelas if j['tanggal']}
+    pengajar_jadwal = {j['tanggal']: j['pengajar_nama'] for j in jadwal_kelas if j['tanggal']}
     hasil = []
     for tanggal in sorted(semua_tanggal, reverse=True):
         try:
             label = Presensi.format_label(tanggal)
         except ValueError:
             continue
+        rows = database.ambil_presensi_kelas_tanggal(kelas_id, tanggal)
         status = {p.siswa_id: p.status.lower() for p in Presensi.ambil_kelas(kelas_id, tanggal)
                   if p.status in Presensi.STATUS_VALID}
+        # Presensi lama belum punya pengajar_id, jadi tampilkan pengajar pada jadwal sebagai fallback.
+        pengajar_id = next((r['pengajar_id'] for r in rows if 'pengajar_id' in r.keys() and r['pengajar_id']), None)
+        nama_pengajar = None
+        if pengajar_id:
+            pengajar = database.ambil_user_by_id(pengajar_id)
+            nama_pengajar = pengajar['nama'] if pengajar else None
+        nama_pengajar = nama_pengajar or pengajar_jadwal.get(tanggal) or '-'
         hasil.append({'tanggal': tanggal, 'label': label, 'status': status,
-                      'materi': materi_per_tanggal.get(tanggal)})
+                      'materi': materi_per_tanggal.get(tanggal),
+                      'nama_pengajar': nama_pengajar})
     return hasil
 
 
