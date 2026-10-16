@@ -2,10 +2,6 @@
 *.db
 fluenglo.db
 
-# file yang diunggah pengguna
-static/uploads/*
-!static/uploads/.gitkeep
-
 # bawaan Python
 __pycache__/
 *.py[cod]
