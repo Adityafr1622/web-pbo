@@ -599,53 +599,31 @@ a.feed-item:hover, button.feed-item:hover { background: #e4e6f1; }
 .modal-body .kom-list { max-height: 46vh; overflow-y: auto; margin: 14px 0 16px; padding-right: 4px; }
 
 /* ---------- PRESENSI SISWA ---------- */
-
 .presensi-rekap-table {
     width: 100%;
     min-width: 680px;
-    border-collapse: separate;
-    border-spacing: 0;
+    border-collapse: collapse;
     table-layout: fixed;
 }
-
-/* Semua isi rata kiri */
 .presensi-rekap-table th,
 .presensi-rekap-table td {
     text-align: left;
     vertical-align: middle;
-}
-
-/* Pertemuan: cukup untuk tanggal */
-.presensi-rekap-table th:nth-child(1),
-.presensi-rekap-table td:nth-child(1) {
-    width: 24%;
-    padding-left: 32px;
+    padding-left: 28px;
     padding-right: 12px;
 }
-
-/* Materi: dibuat lebih lebar dan dimulai lebih dekat ke kiri */
+.presensi-rekap-table th:nth-child(1),
+.presensi-rekap-table td:nth-child(1) { width: 22%; }  /* Pertemuan */
 .presensi-rekap-table th:nth-child(2),
-.presensi-rekap-table td:nth-child(2) {
-    width: 30%;
-    padding-left: 12px;
-    padding-right: 20px;
-}
-
-/* Pengajar */
+.presensi-rekap-table td:nth-child(2) { width: 26%; }  /* Materi */
 .presensi-rekap-table th:nth-child(3),
-.presensi-rekap-table td:nth-child(3) {
-    width: 26%;
-    padding-left: 12px;
-    padding-right: 20px;
-}
-
-/* Kehadiran */
+.presensi-rekap-table td:nth-child(3) { width: 26%; }  /* Pengajar */
 .presensi-rekap-table th:nth-child(4),
-.presensi-rekap-table td:nth-child(4) {
-    width: 20%;
-    padding-left: 12px;
-    padding-right: 20px;
-}
+.presensi-rekap-table td:nth-child(4) { width: 26%; }  /* Kehadiran */
+
+.table-card--kotak,
+.table-card--kotak .table-scroll { border-radius: 0; }
+
 .presensi-table th { vertical-align: top; }
 .chk-wrap { display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .chk-wrap input { position: absolute; opacity: 0; pointer-events: none; }

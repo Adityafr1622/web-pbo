@@ -1,7 +1,3 @@
-# database lokal: isinya akun asli (NIK, hash password), jangan ikut ke GitHub
-*.db
-fluenglo.db
-
 # bawaan Python
 __pycache__/
 *.py[cod]

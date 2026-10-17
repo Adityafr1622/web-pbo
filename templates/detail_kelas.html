@@ -14,14 +14,16 @@
 
 {% elif user.role == 'siswa' %}
 {# ---------- siswa: rekap kehadiran dirinya sendiri, semua pertemuan sekaligus ---------- #}
-<div class="table-card"><div class="table-scroll">
-<table class="data-table">
-  <thead><tr><th class="th-left">Pertemuan</th><th>Materi</th><th>Pengajar</th><th>Kehadiran</th></tr></thead>
+{# DIUBAH: tabel diberi class presensi-rekap-table (lebar kolom sama rata & rata kiri) dan
+   table-card--kotak (sudut kotak). Sebelumnya class ini tidak terpasang sehingga CSS-nya tidak jalan. #}
+<div class="table-card table-card--kotak"><div class="table-scroll">
+<table class="data-table presensi-rekap-table">
+  <thead><tr><th>Pertemuan</th><th>Materi</th><th>Pengajar</th><th>Kehadiran</th></tr></thead>
   <tbody>
   {% for p in presensi_list %}
   {% set saya = p.status.get(user.id) %}
   <tr>
-    <td class="td-left td-strong">{{ p.label }}</td>
+    <td class="td-strong">{{ p.label }}</td>
     <td>{{ p.materi or '-' }}</td>
     <td>{{ p.nama_pengajar or '-' }}</td>
     <td>
