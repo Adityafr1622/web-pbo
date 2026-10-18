@@ -80,30 +80,115 @@
     {# ===== tab 3: hubungi kami (peta + lokasi + kontak) ===== #}
     <section class="login-panel" data-pane-id="kontak" hidden>
       <h1>Hubungi Fluenglo</h1>
-      <div class="card about-card">
-        {# DIUBAH (revisi 16/10): gambar petanya TIDAK bisa dipencet lagi, cuma gambar
-           biasa. Yang membuka Google Maps hanya ikon Lokasi dan tulisan alamat di bawah. #}
+
+      <div class="card about-card contact-card">
+
+        {# ===== PETA ===== #}
         <div class="map-box">
-          <img src="{{ url_for('static', filename='images/map_fluenglo.png') }}"
-               alt="Peta lokasi Kursus Bahasa Inggris Fluenglo di Samarinda">
+          <img
+            src="{{ url_for('static', filename='images/map_fluenglo.png') }}"
+            alt="Peta lokasi Kursus Bahasa Inggris Fluenglo di Samarinda"
+          >
         </div>
 
-        {# DIUBAH (revisi 1): logo lokasi + alamatnya bisa dipencet, langsung membuka
-           Google Maps di tab baru. #}
-        <a class="lokasi-row" href="{{ MAPS }}" target="_blank" rel="noopener">
-          <span class="lokasi-kiri">
-            <span class="contact-ic lokasi-ic">{{ ic('map-pin', 28) }}</span>
-            <span class="lokasi-label">Lokasi</span>
-          </span>
-          <span class="lokasi-alamat">{{ ALAMAT }}</span>
-        </a>
+        {# ===== LOKASI ===== #}
+        <div class="lokasi-section">
+          <div class="lokasi-info">
 
-        <div class="contact-row">
-          {# TODO: ganti nomor, email, dan akun Instagram yang asli #}
-          <a class="contact contact-wa" href="https://wa.me/6285191990064" target="_blank" rel="noopener"><span class="contact-ic">{{ ic('whatsapp', 26) }}</span>WhatsApp</a>
-          <a class="contact" href="https://mail.google.com/mail/?view=cm&to=fluenglo@gmail.com" target="_blank" rel="noopener"><span class="contact-ic">{{ ic('mail', 26) }}</span>Email</a>
-          <a class="contact" href="https://instagram.com/fluenglo" target="_blank" rel="noopener"><span class="contact-ic">{{ ic('instagram', 26) }}</span>Instagram</a>
+            <span class="lokasi-icon">
+              {{ ic('map-pin', 26) }}
+            </span>
+
+            <div class="lokasi-detail">
+              <h2>Lokasi</h2>
+              <p>{{ ALAMAT }}</p>
+
+              <a
+                class="maps-button"
+                href="{{ MAPS }}"
+                target="_blank"
+                rel="noopener"
+              >
+                <span>{{ ic('map-pin', 18) }}</span>
+                <span>Buka di Google Maps</span>
+              </a>
+            </div>
+
+          </div>
         </div>
+
+        {# ===== PEMISAH ===== #}
+        <div class="contact-divider"></div>
+
+        {# ===== KONTAK ===== #}
+        <div class="kontak-section">
+
+          <div class="kontak-heading">
+            <span class="kontak-heading-icon">
+              {{ ic('mail', 20) }}
+            </span>
+
+            <div>
+              <h2>Kontak</h2>
+              <p>Hubungi kami melalui kanal berikut:</p>
+            </div>
+          </div>
+
+          <div class="contact-row">
+
+            {# WhatsApp #}
+            <a
+              class="contact contact-wa"
+              href="https://wa.me/6285191990064"
+              target="_blank"
+              rel="noopener"
+            >
+              <span class="contact-ic">
+                {{ ic('whatsapp', 24) }}
+              </span>
+
+              <span class="contact-content">
+                <strong>WhatsApp</strong>
+              </span>
+            </a>
+
+            {# Email #}
+            <a
+              class="contact contact-email"
+              href="https://mail.google.com/mail/?view=cm&to=fluenglo@gmail.com"
+              target="_blank"
+              rel="noopener"
+            >
+              <span class="contact-ic">
+                {{ ic('mail', 24) }}
+              </span>
+
+              <span class="contact-content">
+                <strong>Email</strong>
+              </span>
+
+            </a>
+
+            {# Instagram #}
+            <a
+              class="contact contact-instagram"
+              href="https://instagram.com/fluenglo"
+              target="_blank"
+              rel="noopener"
+            >
+              <span class="contact-ic">
+                {{ ic('instagram', 24) }}
+              </span>
+
+              <span class="contact-content">
+                <strong>Instagram</strong>
+              </span>
+
+            </a>
+
+          </div>
+        </div>
+
       </div>
     </section>
   </main>

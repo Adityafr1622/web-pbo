@@ -269,12 +269,6 @@ button { cursor: pointer; }
 }
 .about-text { text-align: justify; color: var(--navy); line-height: 1.7; }
 .about-sub { margin-top: 36px; font-size: 17px; font-weight: 700; color: var(--navy); }
-.contact-row { display: flex; justify-content: center; gap: 28px; margin-top: 16px; flex-wrap: wrap; }
-.contact { display: grid; justify-items: center; gap: 6px; text-decoration: none; font-size: 13px; color: var(--navy); }
-.contact-ic { width: 54px; height: 54px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: #e3e6f2; color: #111; transition: transform .15s, background .15s; }
-.contact:hover .contact-ic { transform: translateY(-2px); background: #d4d9ec; }
-.contact-wa .contact-ic { background: #cdd0de; color: #25d366; }
-
 /* ---------- 4. NAVBAR & LAYOUT ---------- */
 .topbar {
     position: sticky; top: 0; z-index: 100; display: flex; align-items: center; justify-content: space-between; gap: 16px;
@@ -940,28 +934,6 @@ html { scrollbar-gutter: stable; overflow-y: scroll; }
     display: grid; place-items: center;
 }
 
-/* Peta lokasi. Berkasnya: static/images/map_fluenglo.png */
-.map-box {
-    display: block; margin: 0 auto 26px; max-width: 420px;
-    border-radius: 30px; overflow: hidden; background: #eef1f8;
-    box-shadow: 6px 7px 0 var(--yellow); transition: transform .15s;
-}
-.map-box img { display: block; width: 100%; height: auto; }
-.map-box:hover { transform: translateY(-2px); }
-
-/* Baris Lokasi: ikon + label di kiri, alamat di kanan. Seluruh barisnya bisa dipencet. */
-.lokasi-row {
-    display: flex; align-items: flex-start; gap: 20px; text-decoration: none;
-    color: var(--navy); padding: 10px 14px; border-radius: 30px; transition: background .15s;
-}
-.lokasi-row:hover { background: #f3f5fb; }
-.lokasi-kiri { display: grid; justify-items: center; gap: 6px; flex: none; }
-.lokasi-ic { color: var(--red); }
-.lokasi-label { font-size: 13px; font-weight: 600; }
-.lokasi-alamat { text-align: justify; line-height: 1.7; padding-top: 10px; }
-.lokasi-row:hover .lokasi-alamat { text-decoration: underline; }
-.about-card .contact-row { margin-top: 26px; }
-
 /* ---------- 2 & 4 & 5. KARTU KELAS ---------- */
 /* Kartu dibuat kolom, supaya "Segera hadir" bisa didorong mentok ke bawah */
 .kelas-card { display: flex; flex-direction: column; }
@@ -1087,8 +1059,6 @@ html { scrollbar-gutter: stable; overflow-y: scroll; }
     .visi-box, .misi-box { flex-direction: column; align-items: flex-start; gap: 12px; }
     .visi-isi, .misi-isi { border-left: 0; padding-left: 0; }
     .didik-grid { grid-template-columns: 1fr; }
-    .lokasi-row { flex-direction: column; align-items: center; text-align: center; }
-    .lokasi-alamat { padding-top: 0; text-align: center; }
 }
 @media (max-width: 600px) {
     .header-pick { grid-template-columns: 1fr; }
@@ -1208,3 +1178,239 @@ html { scrollbar-gutter: stable; overflow-y: scroll; }
     .feed-row { flex-direction: column; align-items: stretch; padding: 0 16px 10px; }
     .feed-row .feed-item { padding-left: 6px; padding-right: 6px; }
 }
+
+/* =========================================================
+   HUBUNGI KAMI
+   ========================================================= */
+
+/* ---------- peta ---------- */
+.map-box {
+    width: 100%;
+    height: 240px;
+    overflow: hidden;
+    border-radius: 28px;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+}
+
+.map-box img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    object-fit: cover;
+    object-position: center 58%;
+    border-radius: 28px;
+}
+
+.map-box:hover {
+    transform: translateY(-2px);
+}
+
+/* ---------- lokasi ---------- */
+.lokasi-section {
+    padding: 20px 0 22px;
+}
+
+.lokasi-info {
+    display: flex;
+    align-items: flex-start;
+    gap: 18px;
+}
+
+.lokasi-icon {
+    flex: 0 0 58px;
+    width: 58px;
+    height: 58px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff0b8;
+    color: #263b78;
+    border-radius: 50%;
+}
+
+.lokasi-detail {
+    min-width: 0;
+}
+
+.lokasi-detail h2 {
+    margin: 0 0 6px;
+    color: #263b78;
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.lokasi-detail p {
+    margin: 0;
+    max-width: 680px;
+    color: #33477f;
+    font-size: 14px;
+    line-height: 1.7;
+}
+
+/* ---------- tombol Google Maps ---------- */
+.maps-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    margin-top: 14px;
+    padding: 11px 18px;
+    border: 1.5px solid #a9caff;
+    border-radius: 999px;
+    background: #fff;
+    color: #263b78;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+    transition: background .2s ease, transform .2s ease, box-shadow .2s ease;
+}
+
+.maps-button:hover {
+    background: #f3f8ff;
+    transform: translateY(-1px);
+    box-shadow: 0 5px 15px rgba(74, 117, 190, .12);
+}
+
+.maps-button > span:first-child {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #263b78;
+}
+
+/* ---------- judul kontak ---------- */
+.kontak-section {
+    padding-top: 22px;
+    border-top: 1px solid #dfe4ef;
+}
+
+.kontak-heading {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 18px;
+}
+
+.kontak-heading-icon {
+    flex: 0 0 38px;
+    width: 38px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff0b8;
+    color: #263b78;
+    border-radius: 50%;
+}
+
+.kontak-heading h2 {
+    margin: 0;
+    color: #263b78;
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.kontak-heading p {
+    margin: 3px 0 0;
+    color: #6b7ca8;
+    font-size: 13px;
+}
+
+/* ---------- kartu kontak ---------- */
+.contact-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+}
+
+.contact {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 64px;
+    padding: 10px 14px;
+    border-radius: 18px;
+    text-decoration: none;
+    color: #263b78;
+    transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.contact:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(38, 59, 120, .10);
+}
+
+.contact-wa { background: #e5f8ee; }
+.contact-email { background: #eaf2ff; }
+.contact-instagram { background: #fbe8f5; }
+
+.contact .contact-ic {
+    flex: 0 0 38px;
+    width: 38px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+.contact-wa .contact-ic {
+    background: #20c779;
+    color: #fff;
+}
+
+.contact-email .contact-ic {
+    background: #5e9ded;
+    color: #fff;
+}
+
+.contact-instagram .contact-ic {
+    background: linear-gradient(135deg, #f6a1d0, #e6388d);
+    color: #fff;
+}
+
+.contact-content {
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    align-items: center;
+}
+
+.contact-content strong {
+    color: #263b78;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+/* ---------- responsif ---------- */
+@media (max-width: 900px) {
+    .contact-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 860px) {
+    .lokasi-info {
+        align-items: flex-start;
+    }
+}
+
+@media (max-width: 600px) {
+    .lokasi-icon {
+        flex-basis: 48px;
+        width: 48px;
+        height: 48px;
+    }
+
+    .lokasi-detail p {
+        font-size: 13px;
+    }
+
+    .contact {
+        padding: 8px 12px;
+    }
+}
+

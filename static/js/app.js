@@ -347,3 +347,61 @@
     if (m) isiForm(m, JSON.parse(ulang.dataset.fill || '{}'), ulang.dataset.aksi || '');
   }
 })();
+
+document.addEventListener("DOMContentLoaded", () => {
+  // Semua checkbox status per siswa
+  const statusCheckboxes = document.querySelectorAll(
+    '.chk-wrap input[type="checkbox"]'
+  );
+
+  // Checkbox "Semua" di header setiap status
+  const semuaCheckboxes = document.querySelectorAll(
+    '.chk-semua input[type="checkbox"]'
+  );
+
+  // Saat memilih status untuk satu siswa
+  statusCheckboxes.forEach((checkbox) => {
+    checkbox.addEventListener("change", () => {
+      if (!checkbox.checked) return;
+
+      const siswaId = checkbox.dataset.siswa;
+      const status = checkbox.value;
+
+      // Matikan status lain untuk siswa yang sama
+      statusCheckboxes.forEach((item) => {
+        if (
+          item !== checkbox &&
+          item.dataset.siswa === siswaId
+        ) {
+          item.checked = false;
+        }
+      });
+
+      // Kalau ada checkbox "Semua" yang aktif,
+      // matikan karena sekarang ada siswa yang berbeda status
+      semuaCheckboxes.forEach((semua) => {
+        semua.checked = false;
+      });
+    });
+  });
+
+  // Saat klik "Semua" pada suatu status
+  semuaCheckboxes.forEach((semua) => {
+    semua.addEventListener("change", () => {
+      if (!semua.checked) return;
+
+      const status = semua.value;
+
+      statusCheckboxes.forEach((checkbox) => {
+        checkbox.checked = checkbox.value === status;
+      });
+
+      // Pastikan checkbox "Semua" lain mati
+      semuaCheckboxes.forEach((item) => {
+        if (item !== semua) {
+          item.checked = false;
+        }
+      });
+    });
+  });
+});
