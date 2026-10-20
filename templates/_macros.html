@@ -44,7 +44,7 @@
 {%- endif %}
 {%- endmacro %}
 
-{# BARU: nomor WhatsApp yang bisa dipencet, langsung membuka chat di WhatsApp #}
+{# nomor WhatsApp yang bisa dipencet, langsung membuka chat di WhatsApp #}
 {% macro wa_link(nomor) -%}
 {% if nomor -%}
 <a class="link-wa" href="{{ nomor|wa }}" target="_blank" rel="noopener"
@@ -52,7 +52,7 @@
 {%- else -%}-{%- endif %}
 {%- endmacro %}
 
-{# DIUBAH: + pat / minlen / pesan. Aturan formatnya dititip ke atribut HTML (pattern,
+{# + pat / minlen / pesan. Aturan formatnya dititip ke atribut HTML (pattern,
    minlength) supaya browser bisa mengeceknya SEBELUM form terkirim — jadi kalau salah,
    modalnya tidak keburu tertutup. `pesan` adalah kalimat yang muncul kalau isiannya
    belum sesuai. Validasi di server tetap ada, ini cuma lapis pertama. #}
@@ -63,13 +63,13 @@
  {% if pesan %}data-pesan="{{ pesan }}"{% endif %} {% if type == 'date' %}data-auto-hari{% endif %}></div>
 {%- endmacro %}
 
-{# BARU: textarea, dipakai deskripsi/petunjuk tugas dan catatan akhir #}
+{# textarea, dipakai deskripsi/petunjuk tugas dan catatan akhir #}
 {% macro ta(label, name, ph='', req=true, rows=4, cls='') -%}
 <div class="field {{ cls }}"><label>{{ label }}</label>
 <textarea name="{{ name }}" rows="{{ rows }}" placeholder="{{ ph }}" {{ 'required' if req }}></textarea></div>
 {%- endmacro %}
 
-{# DIUBAH: + pat & pesan, sama alasannya dengan macro field di atas. Dikosongkan secara
+{# + pat & pesan, sama alasannya dengan macro field di atas. Dikosongkan secara
    bawaan supaya form yang tidak butuh aturan khusus (mis. "password lama") tidak ikut dicek. #}
 {% macro pwfield(label='Password', name='password', req=true, ph='Masukkan password', pat='', pesan='') -%}
 <div class="field"><label>{{ label }}</label>
@@ -97,7 +97,7 @@
 </div></div></div>
 {%- endmacro %}
 
-{# BARU (revisi 2): pemilih background kelas. Admin wajib memilih salah satu dari 3
+{# pemilih background kelas. Admin wajib memilih salah satu dari 3
    gambar yang ada di static/images. Pilihannya datang dari HEADER_KELAS di
    models/akademik.py, jadi daftar di sini tidak pernah beda dengan yang divalidasi
    server. Dibuat dari radio button (bukan select) supaya gambarnya kelihatan langsung. #}
@@ -123,7 +123,7 @@
 </div>
 {%- endmacro %}
 
-{# BARU (revisi 3): bagian Pendidikan Terakhir di modal Tambah/Edit Akun Pengajar.
+{# bagian Pendidikan Terakhir di modal Tambah/Edit Akun Pengajar.
    Dropdown jurusan punya pilihan "Lainnya"; kalau itu yang dipilih, kolom ketik manual
    di sebelahnya yang dipakai (diatur app.js lewat data-jurusan-pick). #}
 {% macro field_pendidikan(gelar_list, jurusan_list, jurusan_lain) -%}
@@ -147,7 +147,7 @@
 </div>
 {%- endmacro %}
 
-{# BARU: banner kelas + tab Materi | Tugas | Presensi. Dipakai bareng oleh
+{# banner kelas + tab Materi | Tugas | Presensi. Dipakai bareng oleh
    materi.html, detail_materi.html, tugas.html, detail_tugas.html, detail_kelas.html. #}
 {% macro kelas_head(kelas, pengajar_list, tab, admin=false) -%}
 <div class="page-head">
@@ -157,7 +157,7 @@
   </div>
 </div>
 
-{# DIUBAH (revisi 2): banner kelas ikut memakai background yang dipilih admin.
+{# banner kelas ikut memakai background yang dipilih admin.
    Kelas lama yang belum punya pilihan tetap memakai gambar bawaan (class kelas-bg). #}
 {% set gbr = kelas.header if kelas.header is defined else none %}
 <article class="kelas-card kelas-banner {{ 'kelas-foto' if gbr else 'kelas-bg' }}"

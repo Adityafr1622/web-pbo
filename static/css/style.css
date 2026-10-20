@@ -773,7 +773,7 @@ a.feed-item:hover, button.feed-item:hover { background: #e4e6f1; }
 }
 
 /* ============================================================
-   10. REVISI: pemilih kelas di Jadwal, tanda kelas selesai,
+   10. pemilih kelas di Jadwal, tanda kelas selesai,
        dan centang kelulusan di catatan akhir
    ============================================================ */
 
@@ -882,7 +882,7 @@ a.seg-btn {
 .mon-catatan > div:not([class]) { flex: 1; min-width: 0; }
 .catatan-hapus { flex: none; align-self: flex-start; }
 /* ============================================================
-   11. REVISI 15/10/2026
+   11. 
        1) menu depan: visi & misi, peta, lokasi
        2) background kelas pilihan admin
        3) pendidikan terakhir pengajar
@@ -1072,7 +1072,7 @@ html { scrollbar-gutter: stable; overflow-y: scroll; }
 
 
 /* ============================================================
-   12. REVISI 16/10/2026
+   12.
        a) 3 tab halaman depan jadi satu batang kuning (sesuai desain Canva)
        b) tabel jadwal dibuat kotak, tidak membulat
        c) ikon WhatsApp tidak lagi gelap sendiri, gelapnya waktu disentuh kursor
@@ -1131,7 +1131,6 @@ html { scrollbar-gutter: stable; overflow-y: scroll; }
     .login-tabs .pill { padding: 9px 18px; font-size: 13px; }
 }
 
-/* ---------- REVISI 16/10 (lanjutan): lebar batang 3 tab ---------- */
 /* Dulu lebarnya cuma sepanjang tulisannya, jadi kependekan dibanding desain.
    Sekarang selebar kolom isi (sama dengan kartu login di bawahnya), dan ketiga
    tab berbagi lebar sama rata — seperti di Canva. */
@@ -1413,4 +1412,3 @@ html { scrollbar-gutter: stable; overflow-y: scroll; }
         padding: 8px 12px;
     }
 }
-

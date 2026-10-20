@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
-{# DIUBAH: tambah import wa_link biar nomor WA di tabel bisa dipencet #}
-{# DIUBAH: + field_pendidikan (revisi 3) #}
+{# tambah import wa_link biar nomor WA di tabel bisa dipencet #}
+{# + field_pendidikan (revisi 3) #}
 {% from '_macros.html' import ic, field, pwfield, modal, wa_link, field_pendidikan %}
 {% block title %}Kelola Akun · Fluenglo{% endblock %}
 
@@ -8,7 +8,7 @@
 {# data dari app.py: users, kelas_list, riwayat_password (list), terakhir_ubah ({user_id: waktu}) #}
 {% set siswa = users|selectattr('role', 'equalto', 'siswa')|list %}
 {% set pengajar = users|selectattr('role', 'equalto', 'pengajar')|list %}
-{# BARU: aturan format yang dulu cuma dicek di server. Sekarang ikut ditempel ke input,
+{# aturan format yang dulu cuma dicek di server. Sekarang ikut ditempel ke input,
    jadi browser menahan form yang salah dan modalnya tidak keburu tertutup.
    Isinya dibuat sama persis dengan validasi di models/user.py. #}
 {% set pat_pw = '(?=.*[A-Za-z])(?=.*[0-9]).{8,}' %}
@@ -59,7 +59,7 @@
   {% for u in siswa %}
   <tr>
     <td class="td-strong td-nama" title="{{ u.nama }}">{{ u.nama }}</td><td>{{ u.kelas_nama or '-' }}</td><td>{{ u.username }}</td>
-    {# DIUBAH: nomor WA jadi tautan wa.me, bukan teks biasa #}
+    {# nomor WA jadi tautan wa.me, bukan teks biasa #}
     <td class="td-clip">{{ u.email or '-' }}</td><td class="td-nowrap">{{ wa_link(u.no_whatsapp) }}</td><td class="td-clip">{{ u.alamat or '-' }}</td>
     {{ sel_password(u) }}
     <td class="td-nowrap">{{ terakhir_ubah[u.id]|tgl_singkat if u.id in terakhir_ubah else 'Belum pernah' }}</td>
@@ -80,11 +80,11 @@
 {# ===== tabel pengajar ===== #}
 <div class="table-card" data-panel="pengajar" hidden><div class="table-scroll">
 <table class="data-table table-akun">
-  {# DIUBAH (revisi 3): + kolom Pendidikan #}
+  {# + kolom Pendidikan #}
   <thead><tr><th>Nama</th><th>Username</th><th>Pendidikan</th><th>Email</th><th>No. WhatsApp</th><th>Alamat</th><th>NIK</th><th>Password</th><th>Diubah</th><th>Profil Lengkap</th><th>Aksi</th></tr></thead>
   <tbody>
   {% for u in pengajar %}
-  {# BARU (revisi 3): jurusan di luar 3 pilihan tetap dianggap "Lainnya", jadi waktu modal
+  {# jurusan di luar 3 pilihan tetap dianggap "Lainnya", jadi waktu modal
      edit dibuka dropdown-nya tetap cocok dan isiannya muncul di kolom ketik manual. #}
   {% set p = pendidikan.get(u.id) %}
   {% set p_baku = p and p.jurusan in jurusan_list %}
@@ -93,9 +93,9 @@
     <td class="td-clip" title="{{ (p.gelar ~ ' ' ~ p.jurusan ~ ' — ' ~ p.institusi) if p else '' }}">
       {{ (p.gelar ~ ' ' ~ p.jurusan) if p else '-' }}</td>
     <td class="td-clip">{{ u.email or '-' }}</td>
-    {# DIUBAH: nomor WA jadi tautan wa.me, bukan teks biasa #}
+    {# nomor WA jadi tautan wa.me, bukan teks biasa #}
     <td class="td-nowrap">{{ wa_link(u.no_whatsapp) }}</td><td class="td-clip">{{ u.alamat or '-' }}</td>
-    {# DIUBAH: NIK cuma 4 digit awal di tabel, lengkapnya di halaman Profil Lengkap #}
+    {# NIK cuma 4 digit awal di tabel, lengkapnya di halaman Profil Lengkap #}
     <td class="td-nowrap">{{ u.nik|samar }}</td>
     {{ sel_password(u) }}
     <td class="td-nowrap">{{ terakhir_ubah[u.id]|tgl_singkat if u.id in terakhir_ubah else 'Belum pernah' }}</td>

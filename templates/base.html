@@ -13,7 +13,7 @@
 <body class="{% block body_class %}{% endblock %}">
 {% block shell %}
 {# label menu (dari tampilkan_menu) -> endpoint, ikon, endpoint lain yang ikut menyalakan menu #}
-{# DIUBAH: + entri Monitoring (admin) & Monitoring Anak (siswa), + endpoint detail_materi #}
+{# + entri Monitoring (admin) & Monitoring Anak (siswa), + endpoint detail_materi #}
 {% set HAL_KELAS = ['detail_kelas','kelola_materi','detail_materi','daftar_tugas','detail_tugas'] %}
 {% set NAV = [
  ('Kelola Akun','kelola_akun','users',['biodata_akun','profil_siswa','profil_pengajar']),
@@ -38,7 +38,7 @@
     </button>
     <div class="user-dropdown" hidden>
       {% if session.get('role') != 'admin' %}<a href="{{ url_for('profil') }}">{{ ic('user', 20) }} Lihat Profil</a>{% endif %}
-      {# DIUBAH: logout lewat konfirmasi dulu, biar nggak kelepasan pencet waktu lagi
+      {# logout lewat konfirmasi dulu, biar nggak kelepasan pencet waktu lagi
          mengisi presensi atau menulis komentar. Modalnya modal yang sama dengan tombol
          hapus, cuma judul & tombolnya diganti lewat data-judul / data-ok / data-warna. #}
       <button type="button" class="dd-logout" data-confirm="{{ url_for('logout') }}"
@@ -56,7 +56,7 @@
 {% endfor %}</div>{% endif %}{% endwith %}
 
 {# modal konfirmasi, dipakai semua tombol [data-confirm].
-   DIUBAH: judul & tombolnya tidak lagi terkunci "Hapus Data". Tombol pemanggil boleh
+   judul & tombolnya tidak lagi terkunci "Hapus Data". Tombol pemanggil boleh
    mengganti lewat data-judul / data-ok / data-warna; kalau tidak diisi, tetap memakai
    bunyi lama, jadi semua tombol hapus yang sudah ada tidak perlu diubah. #}
 <div class="modal" id="modal-confirm" hidden><div class="modal-box modal-sm">

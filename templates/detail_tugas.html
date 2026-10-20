@@ -42,7 +42,7 @@
         <strong>{{ pengumpulan.file_jawaban|nama_berkas }}</strong>
         <small>Dikumpulkan {{ pengumpulan.waktu_kumpul|tgl_jam }}</small>
       </div>
-      {# BARU: penanda terlambat, dihitung dari waktu kumpul vs tenggat #}
+      {# penanda terlambat, dihitung dari waktu kumpul vs tenggat #}
       {% if pengumpulan.waktu_kumpul|telat(tugas.deadline) %}
       <span class="badge badge-telat" title="Berkas ini masuk setelah tenggat. Pengajar tetap bisa menilainya.">{{ ic('clock', 13) }} Terlambat</span>
       {% endif %}
@@ -66,7 +66,7 @@
       <div class="field"><label>{{ 'Ganti berkas jawaban' if pengumpulan else 'Berkas jawaban' }}</label>
         <input type="file" name="file_jawaban" required></div>
       <button class="btn btn-navy">{{ ic('upload', 16) }} {{ 'Kumpulkan Ulang' if pengumpulan else 'Kumpulkan' }}</button>
-      {# BARU: pemberitahuan kalau tenggatnya sudah lewat — tetap boleh kumpul, tapi ditandai #}
+      {# pemberitahuan kalau tenggatnya sudah lewat — tetap boleh kumpul, tapi ditandai #}
       {% if sudah_lewat %}<p class="form-note note-telat">{{ ic('clock', 14) }} Tenggat sudah lewat. Pengumpulan masih dibuka, tetapi berkasnya akan ditandai <strong>Terlambat</strong> dan pengajar bisa melihat penanda itu.</p>{% endif %}
       {% if pengumpulan %}<p class="form-note">Mengumpulkan ulang akan menghapus nilai lama, jadi pengajar perlu menilai lagi.</p>{% endif %}
     </form>
@@ -78,7 +78,7 @@
     <p class="muted">Percakapan privat antara kamu dan pengajar. Siswa lain tidak bisa membacanya.</p>
     <div class="kom-list">
       {% for k in komentar.get(user.id, []) %}
-      {# DIUBAH: yang di kanan sekarang komentar milik akun yang sedang login, bukan selalu
+      {# yang di kanan sekarang komentar milik akun yang sedang login, bukan selalu
          pengajar. Jadi siswa melihat komentarnya sendiri di kanan, pengajar juga begitu —
          persis kebiasaan aplikasi chat. #}
       <div class="kom {{ 'kom-saya' if k.user_id == user.id }}">
@@ -107,7 +107,7 @@
       <td>
         {% if b.file_jawaban %}
         <a class="link-profil" href="{{ url_for('static', filename='uploads/' ~ b.file_jawaban) }}" target="_blank" rel="noopener">{{ b.file_jawaban|nama_berkas }}</a>
-        {# BARU: waktu kumpulnya ikut ditampilkan, biar pengajar bisa menilai sendiri seberapa telat #}
+        {# waktu kumpulnya ikut ditampilkan, biar pengajar bisa menilai sendiri seberapa telat #}
         <small class="muted blok">{{ b.waktu_kumpul|tgl_jam }}</small>
         {% else %}<span class="muted">Belum mengumpulkan</span>{% endif %}
       </td>
@@ -127,7 +127,7 @@
       </td>
       <td><a class="link-profil" href="{{ url_for('profil_siswa', siswa_id=b.siswa_id) }}">Buka Profil</a></td>
       <td>
-        {# BARU: badge Terlambat berdiri sendiri, jadi bisa muncul bareng "Dinilai"/"Belum dinilai" #}
+        {# badge Terlambat berdiri sendiri, jadi bisa muncul bareng "Dinilai"/"Belum dinilai" #}
         <div class="badge-tumpuk">
           {% if b.nilai is not none %}<span class="badge badge-ok">{{ ic('check', 13) }} Dinilai</span>
           {% elif b.file_jawaban %}<span class="badge badge-no">Belum dinilai</span>
@@ -150,7 +150,7 @@
     <p class="muted">{{ tugas.judul }} · Percakapan privat antara {{ b.siswa_nama.split()[0] }} dan pengajar.</p>
     <div class="kom-list">
       {% for k in komentar.get(b.siswa_id, []) %}
-      {# DIUBAH: yang di kanan sekarang komentar milik akun yang sedang login, bukan selalu
+      {# yang di kanan sekarang komentar milik akun yang sedang login, bukan selalu
          pengajar. Jadi siswa melihat komentarnya sendiri di kanan, pengajar juga begitu —
          persis kebiasaan aplikasi chat. #}
       <div class="kom {{ 'kom-saya' if k.user_id == user.id }}">

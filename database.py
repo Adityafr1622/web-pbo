@@ -1,11 +1,7 @@
-# PEMBAGIAN TUGAS DI database.py
-# Penanggung jawab utama: JULPA (koneksi + query users), modul lain menambah query-nya sendiri.
-#
-
 import os
 import sqlite3
 from datetime import datetime
-# DIUBAH: password disimpan apa adanya supaya admin bisa membacanya lewat tombol mata
+# password disimpan apa adanya supaya admin bisa membacanya lewat tombol mata
 # di Kelola Akun. check_password_hash cuma dipakai untuk membaca akun lama yang
 # terlanjur tersimpan ter-hash (lihat User.cek_password di models/user.py).
 from werkzeug.security import check_password_hash
@@ -19,8 +15,7 @@ def get_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-
-# BARU: waktu lokal (WITA/WIB sesuai komputer), bukan UTC-nya CURRENT_TIMESTAMP,
+# waktu lokal (WITA/WIB sesuai komputer), bukan UTC-nya CURRENT_TIMESTAMP,
 # biar jam yang tampil di komentar & materi sama dengan jam di jam dinding.
 def sekarang():
     return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -62,18 +57,18 @@ def migrasi():
             ('users', 'nik', 'TEXT'),
             ('users', 'email', 'TEXT'),
             ('kelas', 'deskripsi', 'TEXT'),
-            # BARU (revisi 2): gambar latar kartu kelas yang dipilih admin
+            # gambar latar kartu kelas yang dipilih admin
             ('kelas', 'header', 'TEXT'),
-            # BARU: tanggal posting & tanggal edit materi/tugas (dipakai di feed kelas)
+            # tanggal posting & tanggal edit materi/tugas (dipakai di feed kelas)
             ('materi', 'tanggal_upload', 'TEXT'),
             ('materi', 'tanggal_edit', 'TEXT'),
             ('tugas', 'tanggal_dibuat', 'TEXT'),
             ('tugas', 'tanggal_edit', 'TEXT'),
-            # BARU: komentar jadi percakapan privat per siswa, bukan satu kelas ramai-ramai
+            # komentar jadi percakapan privat per siswa, bukan satu kelas ramai-ramai
             ('komentar', 'siswa_id', 'INTEGER'),
-            # BARU: penanda siswa sudah lulus kelas tsb (dicentang pengajar di catatan akhir)
+            # penanda siswa sudah lulus kelas tsb (dicentang pengajar di catatan akhir)
             ('catatan_akhir', 'lulus', 'INTEGER'),
-            # BARU: isi password lama & baru di riwayat penggantian password
+            # isi password lama & baru di riwayat penggantian password
             ('riwayat_password', 'password_lama', 'TEXT'),
             ('riwayat_password', 'password_baru', 'TEXT'),
             # Pengajar yang benar-benar menyimpan/mengubah presensi per pertemuan.
@@ -125,7 +120,7 @@ def tambah_user(nama, username, password, role, foto=None, no_whatsapp=None, bio
             INSERT INTO users (nama, username, password, role, foto, no_whatsapp, biodata,
                                kelas_id, alamat, nik, email)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (nama, username, password, role,  # DIUBAH: password disimpan apa adanya
+        ''', (nama, username, password, role,  # password disimpan apa adanya
               foto or 'default_avatar.png', no_whatsapp,
               biodata, kelas_id, alamat, nik, email))
         conn.commit()
@@ -235,7 +230,7 @@ def ambil_riwayat_password(limit=50):
     finally:
         conn.close()
 
-# --- PENDIDIKAN PENGAJAR (BARU, revisi 3) ---
+# --- PENDIDIKAN PENGAJAR ---
 # Satu pengajar satu baris. Diisi admin lewat Kelola Akun; pengajar sendiri tidak punya
 # route untuk mengubahnya, jadi datanya memang cuma bisa masuk dari sisi admin.
 def ambil_pendidikan(pengajar_id):
@@ -327,7 +322,7 @@ def ambil_kelas_by_pengajar(pengajar_id):
     conn.close()
     return [kelas_jadi_dict(r) for r in rows]
 
-# DIUBAH (revisi 2): + header, nama berkas gambar latar kartu kelas
+# + header, nama berkas gambar latar kartu kelas
 def tambah_kelas(nama, pengajar_id, pengajar_id2=None, deskripsi=None, header=None):
     conn = get_connection()
     cursor = conn.cursor()
@@ -360,7 +355,7 @@ def hapus_kelas(kelas_id):
 def ambil_siswa_by_kelas(kelas_id):
     conn = get_connection()
     rows = conn.execute('SELECT * FROM users WHERE role = "siswa" AND kelas_id = ? ORDER BY nama',
-                        (kelas_id,)).fetchall()  # DIUBAH: urut nama biar presensi stabil urutannya
+                        (kelas_id,)).fetchall()  # urut nama biar presensi stabil urutannya
     conn.close()
     return rows
 
@@ -370,7 +365,7 @@ def ambil_kelas_siswa(siswa_id):
         SELECT k.*, k.nama AS nama_kelas FROM kelas k
         JOIN users u ON u.kelas_id = k.id
         WHERE u.id = ?
-    ''', (siswa_id,)).fetchone()  # DIUBAH: + alias nama_kelas, dipakai kartu kelas & pemilih jadwal
+    ''', (siswa_id,)).fetchone()  # + alias nama_kelas, dipakai kartu kelas & pemilih jadwal
     conn.close()
     return row
 
@@ -439,7 +434,7 @@ def ambil_jadwal_by_pengajar(pengajar_id):
     conn.close()
     return rows
 
-# DIUBAH: + pengganti (0/1), penanda pengajar yang mengisi pertemuan ini bukan guru tetap kelasnya
+# + pengganti (0/1), penanda pengajar yang mengisi pertemuan ini bukan guru tetap kelasnya
 def tambah_jadwal(hari, jam, kelas_id, pengajar_id, tanggal=None, materi=None, pengganti=0):
     conn = get_connection()
     cursor = conn.cursor()
@@ -519,7 +514,7 @@ def tambah_materi(kelas_id, pengajar_id, judul, kategori, file_path):
             INSERT INTO materi
                 (kelas_id, pengajar_id, judul, kategori, file_path, tanggal_upload)
             VALUES (?, ?, ?, ?, ?, ?)
-        """, (kelas_id, pengajar_id, judul, kategori, file_path, sekarang()))  # DIUBAH: + tanggal upload
+        """, (kelas_id, pengajar_id, judul, kategori, file_path, sekarang()))  # + tanggal upload
 
         conn.commit()
         return cursor.lastrowid
@@ -556,7 +551,7 @@ def edit_materi(materi_id, judul, kategori, file_path=None):
     """Ubah judul/kategori materi. file_path diisi kalau pengajar upload file pengganti."""
     conn = get_connection()
     try:
-        # DIUBAH: tiap edit mencatat tanggal_edit, dipakai label "(Diedit 03 Oktober)" di feed
+        # tiap edit mencatat tanggal_edit, dipakai label "(Diedit 03 Oktober)" di feed
         if file_path:
             cursor = conn.execute(
                 "UPDATE materi SET judul = ?, kategori = ?, file_path = ?, tanggal_edit = ? WHERE id = ?",
@@ -682,7 +677,7 @@ def simpan_pengumpulan(tugas_id, siswa_id, file_jawaban):
             WHERE tugas_id = ? AND siswa_id = ?
         """, (tugas_id, siswa_id)).fetchone()
 
-        # DIUBAH: pakai waktu lokal, bukan CURRENT_TIMESTAMP yang UTC (beda 8 jam di WITA)
+        # pakai waktu lokal, bukan CURRENT_TIMESTAMP yang UTC (beda 8 jam di WITA)
         if existing:
             # jawaban diganti = nilai lama nggak berlaku lagi, pengajar perlu menilai ulang
             conn.execute("""
@@ -735,7 +730,7 @@ def ambil_pengumpulan_by_tugas(tugas_id):
 
 
 def ambil_pengumpulan_lengkap(tugas_id, kelas_id):
-    """BARU: SEMUA siswa kelas tsb + pengumpulannya (kalau ada), buat tabel 'Tugas Siswa'.
+    """SEMUA siswa kelas tsb + pengumpulannya (kalau ada), buat tabel 'Tugas Siswa'.
     Siswa yang belum mengumpulkan tetap muncul dengan file_jawaban/nilai NULL,
     jadi pengajar langsung kelihatan siapa yang belum setor."""
     conn = get_connection()
@@ -793,7 +788,7 @@ def update_nilai_pengumpulan(pengumpulan_id, nilai):
 
 
 def tambah_komentar(tugas_id, user_id, isi, siswa_id):
-    """DIUBAH: komentar sekarang selalu menempel ke satu siswa (percakapan privat),
+    """komentar sekarang selalu menempel ke satu siswa (percakapan privat),
     jadi siswa_id wajib diisi. Siswa harus anggota kelas tugas tersebut."""
     isi = (isi or "").strip()
     if not isi:
@@ -840,7 +835,7 @@ def tambah_komentar(tugas_id, user_id, isi, siswa_id):
 
 
 def ambil_komentar_tugas(tugas_id, siswa_id):
-    """DIUBAH: cuma percakapan milik siswa tsb yang keluar, bukan komentar sekelas."""
+    """cuma percakapan milik siswa tsb yang keluar, bukan komentar sekelas."""
     conn = get_connection()
     try:
         return conn.execute("""
@@ -855,7 +850,7 @@ def ambil_komentar_tugas(tugas_id, siswa_id):
 
 
 def hitung_komentar_tugas(tugas_id):
-    """BARU: {siswa_id: jumlah komentar}, buat kolom 'Komentar (n)' di tabel pengumpulan."""
+    """{siswa_id: jumlah komentar}, buat kolom 'Komentar (n)' di tabel pengumpulan."""
     conn = get_connection()
     try:
         rows = conn.execute("""
@@ -941,7 +936,7 @@ def simpan_presensi_massal(kelas_id, tanggal, data_status, pengajar_id=None):
         conn.close()
 
 def hapus_presensi(kelas_id, tanggal, siswa_id):
-    """BARU: hapus catatan presensi seorang siswa pada satu pertemuan.
+    """hapus catatan presensi seorang siswa pada satu pertemuan.
     Dipakai waktu pengajar melepas centang yang terlanjur salah pencet."""
     conn = get_connection()
     try:
@@ -975,10 +970,9 @@ def rekap_presensi_kelas(kelas_id):
     conn.close()
     return rows
 
-# ============================================================
+
 # Penilaian tugas, Rekap nilai, dan Catatan akhir Pengajar
 # Nilai disimpan di pengumpulan.nilai (satu-satunya sumber nilai).
-# ============================================================
 
 def beri_nilai(tugas_id, siswa_id, pengajar_id, nilai, komentar=None):
     """Memberi / memperbarui nilai pengumpulan siswa pada sebuah tugas.
@@ -1226,7 +1220,7 @@ def ambil_catatan_akhir_by_siswa(siswa_id):
         conn.close()
 
 def ambil_catatan_akhir_by_id(catatan_id):
-    """BARU: satu baris catatan akhir. Dipakai sebelum menghapus, buat tahu catatan ini
+    """satu baris catatan akhir. Dipakai sebelum menghapus, buat tahu catatan ini
     milik kelas & siswa yang mana (hak aksesnya dicek dari situ)."""
     conn = get_connection()
     try:

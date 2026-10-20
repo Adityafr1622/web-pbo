@@ -1,7 +1,3 @@
-# PEMBAGIAN TUGAS DI models/presensi.py
-# Presensi                      -> ANGGOTA 4 (Backend Presensi)
-# CatatanPengajar (Catatan Akhir) -> ANGGOTA 3 (Monitoring)
-
 from datetime import datetime
 import database
 
@@ -9,22 +5,17 @@ HARI = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
 BULAN = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli",
          "Agustus", "September", "Oktober", "November", "Desember"]
 
-
 def _ke_int(nilai, nama):
     try:
         return int(nilai)
     except (TypeError, ValueError):
         raise ValueError(f"{nama} tidak valid.")
 
-
 class Presensi:
     # data kehadiran (id, tanggal, siswa_id, kelas_id, status) dan
-    # perilakunya (simpan, update_status, rekap) ada dalam SATU class.
-    # Aturan status (STATUS_VALID/_ALIAS) disimpan di sini, bukan nyebar di route.
     STATUS_DEFAULT = "Belum Hadir"
     STATUS_VALID = ["Hadir", "Izin", "Sakit", "Alfa"]
     # ENCAPSULATION: awalan underscore (_ALIAS) = detail internal, jangan dipakai dari luar.
-    # nilai dari form (huruf kecil) -> nilai yang disimpan di database
     _ALIAS = {"hadir": "Hadir", "izin": "Izin", "sakit": "Sakit",
               "alfa": "Alfa", "alpha": "Alfa", "alpa": "Alfa"}
 
@@ -207,9 +198,7 @@ class Presensi:
 
 
 class CatatanPengajar:
-    # Catatan akhir: 1 catatan per siswa per kelas, ditulis pengajar setelah seluruh pertemuan
-    # selesai, tampil di Monitoring Anak.
-    # isi catatan + aturan simpan/ubah dibungkus di class ini.
+    # Catatan akhir: 1 catatan per siswa per kelas, ditulis pengajar setelah seluruh pertemuan selesai, tampil di Monitoring Anak.
     def __init__(self, id, siswa_id, pengajar_id, kelas_id, isi_catatan, tanggal=None):
         self.id = id
         self.siswa_id = siswa_id
@@ -218,7 +207,7 @@ class CatatanPengajar:
         self.isi_catatan = isi_catatan
         self.tanggal = tanggal
 
-    # (aturan "guru 1 & guru 2 kelas tsb boleh nulis" dan "siswa harus anggota kelas" sudah dicek di sana).
+    # aturan "guru 1 & guru 2 kelas tsb boleh nulis" dan "siswa harus anggota kelas" sudah dicek di sana
     @classmethod
     def dari_row(cls, row):
         return cls(row["id"], row["siswa_id"], row["pengajar_id"], row["kelas_id"],

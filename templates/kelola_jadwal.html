@@ -44,7 +44,7 @@
   {% if bisa_kelola %}<button type="button" class="btn btn-yellow" data-open="modal-tambah-jadwal">+ Buat Jadwal</button>{% endif %}
 </div>
 
-{# BARU: pilih kelas mana yang jadwalnya ditampilkan. Admin dapat semua kelas,
+{# pilih kelas mana yang jadwalnya ditampilkan. Admin dapat semua kelas,
    pengajar hanya kelas yang dia ajar, siswa hanya kelas yang pernah dia ikuti. #}
 {% if kelas_list|length > 1 %}
 <div class="seg seg-kelas">
@@ -66,7 +66,7 @@
     {% for j in items %}
     <tr>
       <td>{{ nama_kelas.get(j.kelas_id, '-') }}</td><td>{{ j.hari }}</td><td>{{ j.tanggal }}</td>
-      {# BARU: penanda guru pengganti, biar jelas kenapa namanya beda dari guru tetap kelas #}
+      {# penanda guru pengganti, biar jelas kenapa namanya beda dari guru tetap kelas #}
       <td><a class="link-plain" href="{{ url_for('profil_pengajar', pengajar_id=j.pengajar_id) }}">{{ j.nama_pengajar }}</a>
         {% if j.pengganti %}<span class="badge badge-ganti" title="Guru pengganti untuk pertemuan ini">Pengganti</span>{% endif %}</td>
       <td>{{ j.jam_mulai }}–{{ j.jam_selesai }}</td><td>{{ j.materi }}</td>

@@ -1,7 +1,3 @@
-# PEMBAGIAN TUGAS DI models/user.py
-# Penanggung jawab utama: JULPA (Backend Auth) untuk class User & Admin.
-# Perubahan terbaru ditandai komentar "# BARU" / "# DIUBAH".
-
 from abc import ABC, abstractmethod
 import re
 from datetime import date, datetime
@@ -17,10 +13,7 @@ class User(ABC):
         self.__password = password
         self.role = role
 
-    # ENCAPSULATION: pencocokan password cuma lewat method ini, bukan dengan membandingkan
-    # atribut dari luar class.
-    # DIUBAH: password disimpan apa adanya supaya admin bisa membukanya lewat tombol mata
-    # di Kelola Akun (keputusan kelompok: skala kursus kecil, admin yang membagikan akun).
+    # ENCAPSULATION: pencocokan password cuma lewat method ini, bukan dengan membandingkan atribut dari luar class.
     def cek_password(self, password):
         if not database.password_sudah_hash(self.__password):
             return self.__password == password
@@ -119,7 +112,7 @@ class Siswa(User):
         self.alamat = alamat
         self.email = email
 
-    # BARU: data siswa yang diisi admin (tambah/edit akun): WA & alamat wajib
+    # data siswa yang diisi admin (tambah/edit akun): WA & alamat wajib
     @staticmethod
     def cek_data_admin(whatsapp, alamat):
         whatsapp = (whatsapp or "").strip()
@@ -183,8 +176,6 @@ class Siswa(User):
         """BARU: semua kelas_id yang boleh dibuka siswa ini (aktif + yang sudah lulus)."""
         return [k["id"] for k in self.lihat_semua_kelas()]
 
-    # ABSTRACTION: siswa cukup bilang "tunjukkan kelasku"; join tabel users-kelas dan
-    # pengumpulan daftar pengajarnya disembunyikan di database.py.
     def lihat_kelas(self):
         """Melihat kelas yang diikuti beserta nama pengajarnya (key pengajar_list)."""
         kelas = database.ambil_kelas_siswa(self.id)
@@ -264,7 +255,7 @@ class Siswa(User):
             user_id=self.id,
             isi_komentar=isi,
             waktu=None,
-            siswa_id=self.id  # DIUBAH: percakapan ini milik siswa ybs
+            siswa_id=self.id  # percakapan ini milik siswa ybs
         )
         komentar.tambah_komentar()
 
@@ -292,7 +283,7 @@ class Siswa(User):
             "catatan_akhir": [dict(item) for item in catatan],
         }
 
-    # DIUBAH: termasuk kelas lama yang sudah dia tamatkan (masih boleh dilihat, bukan diubah)
+    # termasuk kelas lama yang sudah dia tamatkan (masih boleh dilihat, bukan diubah)
     def boleh_akses_kelas(self, kelas_id):
         return kelas_id in self.id_kelas_saya()
 
@@ -307,17 +298,12 @@ class Siswa(User):
                 return True
         return False
 
-    # DIUBAH: "Materi" & "Tugas" dikeluarkan dari navbar karena dua halaman itu selalu
-    # dibuka dari dalam sebuah kelas (butuh kelas_id), bukan dari menu atas. Sekarang
-    # isinya persis seperti dokumen: Kelas, Jadwal, Monitoring Anak.
     def tampilkan_menu(self):
-        # DIUBAH: "Profil" dikeluarkan dari navbar, dibuka lewat dropdown nama pengguna
         return ["Kelas", "Jadwal", "Monitoring Anak"]
 
-# BARU (revisi 3): PENDIDIKAN TERAKHIR PENGAJAR
+# PENDIDIKAN TERAKHIR PENGAJAR
 # Satu pengajar satu pendidikan terakhir. Yang mengisi cuma admin lewat Kelola Akun;
-# pengajar tidak punya jalan untuk mengubahnya (lihat Pengajar.edit_profil yang memang
-# tidak menyentuh data ini sama sekali).
+# pengajar tidak punya jalan untuk mengubahnya (lihat Pengajar.edit_profil yang memang tidak menyentuh data ini sama sekali).
 class Pendidikan:
     GELAR_VALID = ("S1", "S2", "S3")
     # 3 pilihan tetap + "Lainnya" yang jurusannya diketik sendiri oleh admin
@@ -331,8 +317,7 @@ class Pendidikan:
         self.jurusan = jurusan
         self.institusi = institusi
 
-    # ABSTRACTION: pemanggil cukup bilang "pendidikan milik siapa", urusan baca tabel
-    # pendidikan disembunyikan di sini dan di database.py.
+    # urusan baca tabel pendidikan disembunyikan di sini dan di database.py.
     @classmethod
     def dari_row(cls, row):
         return cls(row["pengajar_id"], row["gelar"], row["jurusan"], row["institusi"], row["id"])
@@ -408,7 +393,7 @@ class Pengajar(User):
             raise ValueError("Nomor KTP harus 16 digit angka.")
         return User.rapikan_whatsapp(whatsapp), alamat, nik
 
-    # BARU (revisi 3): pendidikan terakhir ikut dikirim ke halaman profil.
+    # pendidikan terakhir ikut dikirim ke halaman profil.
     def pendidikan(self):
         """Objek Pendidikan milik pengajar ini, atau None kalau belum diisi admin."""
         return Pendidikan.milik(self.id)
@@ -417,7 +402,7 @@ class Pengajar(User):
         p = self.pendidikan()
         return p.jadi_dict() if p else None
 
-    # DIUBAH (revisi 3): + password & pendidikan.
+    # + password & pendidikan.
     def lihat_profil(self):
         """Profil lengkap (NIK & password ikut). Hanya buat admin dan pengajar ybs —
         lihat route profil_pengajar(), yang cuma memanggil method ini kalau yang membuka
@@ -439,7 +424,7 @@ class Pengajar(User):
             "id": self.id, "nama": self.nama, "username": self.username,
             "foto": self.foto, "whatsapp": self.whatsapp, "email": self.email,
             "biodata": self.biodata, "alamat": self.alamat,
-            "pendidikan": self._pendidikan_dict(),  # BARU
+            "pendidikan": self._pendidikan_dict(),
         }
 
     def edit_profil(self, whatsapp, email="", foto=None, alamat=None):
@@ -483,8 +468,6 @@ class Pengajar(User):
 
     def upload_materi(self, kelas, judul, kategori, file):
         """Menyimpan materi untuk kelas yang diajar."""
-        # ENCAPSULATION: syarat sah sebuah materi (judul & file wajib, pengajarnya harus
-        # memang mengajar kelas itu) dikunci di method ini, bukan dititip ke route.
         kelas_id = Pengajar._ke_int(kelas, "Kelas")
 
         judul = (judul or "").strip()
@@ -600,9 +583,6 @@ class Pengajar(User):
         )
 
     def komentar_tugas(self, tugas, isi, siswa=None):
-        """Pengajar memberikan masukan pada tugas SEORANG siswa.
-        DIUBAH: wajib menyebut siswanya, karena komentar sekarang percakapan privat
-        pengajar <-> satu siswa, bukan papan komentar sekelas."""
         from models.akademik import Komentar
 
         tugas_id = Pengajar._ke_int(tugas, "Tugas")
@@ -669,7 +649,7 @@ class Pengajar(User):
         row = database.ambil_kelas_by_id(kelas_id)
         return row is not None and self.id in (row["pengajar_id"], row["pengajar_id2"])
 
-    # BARU: pertemuan di mana dia jadi GURU PENGGANTI. Dua method, dua pertanyaan berbeda:
+    # pertemuan di mana dia jadi GURU PENGGANTI. Dua method, dua pertanyaan berbeda:
     # "kelas apa saja yang boleh dia buka" dan "tanggal mana saja yang boleh dia isi".
     def kelas_pengganti(self):
         return {j["kelas_id"] for j in database.ambil_jadwal_pengganti(self.id)}
@@ -705,7 +685,7 @@ class Pengajar(User):
             kelas_id = int(kelas_id)
         except (TypeError, ValueError):
             raise ValueError("Kelas tidak valid.")
-        # DIUBAH: guru pengganti boleh mengisi presensi, TAPI cuma pada tanggal pertemuan
+        # guru pengganti boleh mengisi presensi, TAPI cuma pada tanggal pertemuan
         # yang memang dijadwalkan untuk dia. Di luar tanggal itu tetap ditolak.
         if not self.mengajar_kelas(kelas_id):
             if str(tanggal or "").strip() not in self.tanggal_pengganti(kelas_id):
@@ -721,9 +701,6 @@ class Pengajar(User):
         return jumlah
 
     def beri_catatan_akhir(self, kelas, siswa, isi, lulus=False):
-        """Membuat atau memperbarui catatan akhir siswa (satu siswa satu catatan per kelas).
-        DIUBAH: + lulus. Pengajar mencentangnya kalau siswa sudah menamatkan seluruh
-        pertemuan kelas ini dan boleh lanjut ke tahap berikutnya."""
         kelas_id = getattr(kelas, "id", kelas)
         siswa_id = getattr(siswa, "id", siswa)
 
@@ -749,9 +726,6 @@ class Pengajar(User):
         )
 
     def hapus_catatan_akhir(self, catatan):
-        """BARU: pengajar menghapus catatan akhir di kelas yang dia ajar.
-        Balikin siswa_id-nya, buat redirect balik ke halaman monitoring anak itu."""
-        # lagi di query database.hapus_catatan_akhir() yang ikut menyaring kelas miliknya.
         catatan_id = Pengajar._ke_int(catatan, "Catatan akhir")
         data = database.ambil_catatan_akhir_by_id(catatan_id)
         if not data:
@@ -763,15 +737,13 @@ class Pengajar(User):
         return data["siswa_id"]
 
     def lihat_monitoring_siswa(self, siswa_id):
-        """Buka monitoring seorang siswa dari profil siswa (cuma siswa di kelas yang diajar)."""
-        # siswa mana pun sedangkan versi Pengajar ini dibatasi kelas yang dia ajar.
         row = database.ambil_user_by_id(siswa_id)
         if not row or row["role"] != "siswa" or not self.boleh_lihat_siswa(row):
             raise ValueError("Siswa tidak ditemukan di kelas yang kamu ajar.")
         return buat_objek_user(row).lihat_monitoring()
 
     # POLYMORPHISM: nama method sama, isi menu beda dari Siswa.
-    # DIUBAH: label disamakan dengan daftar menu di base.html ("Kelas", "Jadwal"). Sebelumnya
+    # label disamakan dengan daftar menu di base.html ("Kelas", "Jadwal"). Sebelumnya
     # labelnya "Kelas dan Jadwal Mengajar" dkk yang tidak dikenal navbar, jadi pengajar cuma
     # kebagian menu Profil. Materi/Tugas/Presensi/Catatan Akhir tetap diakses dari dalam kelas.
     def tampilkan_menu(self):
@@ -802,7 +774,7 @@ class Admin(User):
                 raise ValueError("Password minimal 8 karakter dan wajib kombinasi huruf + angka.")
 
             no_wa = alamat = nik = None
-            didik = None  # BARU (revisi 3): (gelar, jurusan, institusi) untuk pengajar
+            didik = None  # (gelar, jurusan, institusi) untuk pengajar
             if role == "pengajar":
                 no_wa, alamat, nik = Pengajar.cek_data_admin(
                     data.get("whatsapp"), data.get("alamat"), data.get("nik")
@@ -813,7 +785,7 @@ class Admin(User):
                     data.get("gelar"), data.get("jurusan"),
                     data.get("jurusan_lain"), data.get("institusi")
                 )
-            else:  # DIUBAH: siswa sekarang juga wajib WA + alamat (sesuai desain)
+            else:  # siswa sekarang juga wajib WA + alamat (sesuai desain)
                 no_wa, alamat = Siswa.cek_data_admin(data.get("whatsapp"), data.get("alamat"))
 
             kelas_id = None
@@ -839,7 +811,7 @@ class Admin(User):
                 alamat=alamat,
                 nik=nik,
             )
-            if didik:  # BARU (revisi 3): pendidikan disimpan begitu akunnya punya id
+            if didik:  #pendidikan disimpan begitu akunnya punya id
                 Pendidikan(user_id, *didik).simpan()
             return user_id
         elif aksi == "edit":
@@ -863,7 +835,7 @@ class Admin(User):
                 raise ValueError("Password minimal 8 karakter dan wajib kombinasi huruf + angka.")
 
             perubahan = {"nama": nama, "username": username}
-            didik = None  # BARU (revisi 3)
+            didik = None 
             if password:  # kosong = password tidak diubah
                 perubahan["password"] = password
             if target["role"] == "pengajar":
@@ -880,7 +852,7 @@ class Admin(User):
                 perubahan["nik"] = nik
                 if data.get("foto"):
                     perubahan["foto"] = data["foto"]
-            if target["role"] == "siswa":  # BARU: admin bisa ubah WA, alamat, dan kelas siswa
+            if target["role"] == "siswa":  # admin bisa ubah WA, alamat, dan kelas siswa
                 no_wa, alamat = Siswa.cek_data_admin(data.get("whatsapp"), data.get("alamat"))
                 try:
                     kelas_id = int(data.get("kelas_id"))
@@ -890,7 +862,7 @@ class Admin(User):
                     raise ValueError("Kelas yang dipilih tidak ditemukan.")
                 perubahan.update(no_whatsapp=no_wa, alamat=alamat, kelas_id=kelas_id)
             hasil = database.edit_user(user_id, **perubahan)
-            if didik:  # BARU (revisi 3): pendidikan terakhirnya ikut diperbarui
+            if didik:  #pendidikan terakhirnya ikut diperbarui
                 Pendidikan(user_id, *didik).simpan()
             return hasil
         elif aksi == "hapus":
@@ -918,7 +890,7 @@ class Admin(User):
     def kelola_kelas(self, aksi, **data):
         from models.akademik import Kelas
         if aksi == "tambah":
-            # DIUBAH (revisi 2): + header (background kelas), wajib dipilih
+            # + header (background kelas), wajib dipilih
             nama, pengajar_id, pengajar_id2, header = Kelas.cek_input(
                 data["nama_kelas"], data["pengajar_id"], data.get("pengajar_id2"),
                 header=data.get("header")
@@ -956,7 +928,7 @@ class Admin(User):
     def kelola_jadwal(self, aksi, **data):
         from models.akademik import Jadwal
         if aksi == "tambah":
-            # DIUBAH: + pengganti, ikut dicek di Jadwal.cek_input dan ikut disimpan
+            #+ pengganti, ikut dicek di Jadwal.cek_input dan ikut disimpan
             kelas_id, pengajar_id, jam, tanggal, materi, pengganti = Jadwal.cek_input(
                 data["hari"], data["jam_mulai"], data["jam_selesai"],
                 data["kelas_id"], data["pengajar_id"],

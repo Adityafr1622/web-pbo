@@ -14,7 +14,7 @@
 
 {% elif user.role == 'siswa' %}
 {# ---------- siswa: rekap kehadiran dirinya sendiri, semua pertemuan sekaligus ---------- #}
-{# DIUBAH: tabel diberi class presensi-rekap-table (lebar kolom sama rata & rata kiri) dan
+{# tabel diberi class presensi-rekap-table (lebar kolom sama rata & rata kiri) dan
    table-card--kotak (sudut kotak). Sebelumnya class ini tidak terpasang sehingga CSS-nya tidak jalan. #}
 <div class="table-card table-card--kotak"><div class="table-scroll">
 <table class="data-table presensi-rekap-table">
@@ -38,7 +38,7 @@
 
 {% else %}
 {# ---------- pengajar (bisa mengisi) & admin (lihat saja) ---------- #}
-{# DIUBAH: pertemuan yang terbuka mengikuti ?tanggal= dari URL. Dipakai sehabis menyimpan
+{# pertemuan yang terbuka mengikuti ?tanggal= dari URL. Dipakai sehabis menyimpan
    presensi, supaya halamannya tidak balik sendiri ke pertemuan paling baru. #}
 {% set tgl_pilih = request.args.get('tanggal') %}
 {% set ada_pilihan = tgl_pilih and presensi_list | selectattr('tanggal', 'equalto', tgl_pilih) | list %}
@@ -56,13 +56,13 @@
 </div>
 
 {% for p in presensi_list %}
-{# BARU: tanggal_boleh dikirim app.py. None = guru tetap / admin (tidak dibatasi).
+{# tanggal_boleh dikirim app.py. None = guru tetap / admin (tidak dibatasi).
    Daftar tanggal = guru pengganti, cuma boleh mengisi pertemuan yang dijadwalkan untuk dia. #}
 {% set bisa_isi = user.role == 'pengajar' and (tanggal_boleh is none or p.tanggal in tanggal_boleh) %}
 <form class="presensi-panel" id="panel-{{ p.tanggal }}" method="post"
       action="{{ url_for('simpan_presensi', kelas_id=kelas.id) }}" {{ 'hidden' if not ((p.tanggal == tgl_pilih) or (not ada_pilihan and loop.first)) }}>
   <input type="hidden" name="tanggal" value="{{ p.tanggal }}">
-  {# BARU: daftar siswa yang tampil di form. Siswa yang centangnya dilepas akan
+  {# daftar siswa yang tampil di form. Siswa yang centangnya dilepas akan
      dihapus presensinya saat disimpan, bukan dibiarkan memakai nilai lama. #}
   <input type="hidden" name="siswa_tampil" value="{{ siswa_list | map(attribute='id') | join(',') }}">
   <div class="table-card"><div class="table-scroll">

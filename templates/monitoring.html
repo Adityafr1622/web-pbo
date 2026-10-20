@@ -317,7 +317,7 @@
         <div class="catatan-waktu">{{ c.nama_kelas }} · {{ c.tanggal_dibuat|tgl_jam }}</div>
         <p class="pre-line">{{ c.catatan }}</p>
       </div>
-      {# BARU: tombol hapus, cuma muncul buat pengajar kelas catatan tsb — bukan pengajar
+      {# tombol hapus, cuma muncul buat pengajar kelas catatan tsb — bukan pengajar
          kelas lain, apalagi siswa atau admin. Catatan bertanda Lulus dapat peringatan
          tambahan karena menghapusnya ikut membatalkan kelulusan siswa. #}
       {% if bisa_beri_catatan and user.mengajar_kelas(c.kelas_id) %}

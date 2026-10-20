@@ -5,7 +5,7 @@
 
 {% block content %}
 {# data dari app.py: data (dict profil pengajar), lengkap (NIK & password ikut ditampilkan?), bisa_ubah
-   DIUBAH (revisi 3): field Password sekarang ADA di sini, tapi cuma untuk admin dan
+   field Password sekarang ADA di sini, tapi cuma untuk admin dan
    pengajar yang bersangkutan (lengkap=True). Kalau siswa yang membuka halaman ini,
    app.py mengirim profil_publik() yang memang tidak pernah berisi password maupun NIK,
    jadi datanya bukan sekadar disembunyikan di template — memang tidak dikirim. #}
@@ -25,7 +25,7 @@
         <div class="field"><span class="field-label">Nama Lengkap</span><div class="read strong">{{ data.nama }}</div></div>
         <div class="field"><span class="field-label">Username</span><div class="read">{{ data.username }}</div></div>
 
-        {# BARU (revisi 3): Password, titik-titik dengan tombol mata — sama seperti di
+        {# Password, titik-titik dengan tombol mata — sama seperti di
            menu Kelola Akun. Hanya muncul untuk admin & pengajar ybs. #}
         {% if lengkap %}
         <div class="field"><span class="field-label">Password</span>
@@ -41,7 +41,7 @@
         </div>
         {% endif %}
 
-        {# BARU (revisi 3): pendidikan terakhir. Letaknya di bawah Password untuk admin &
+        {# pendidikan terakhir. Letaknya di bawah Password untuk admin &
            pengajar, dan otomatis jatuh tepat di bawah Username untuk siswa — karena buat
            siswa blok Password di atas memang tidak digambar sama sekali. #}
           <div class="field"><span class="field-label">Pendidikan Terakhir</span>
@@ -67,7 +67,7 @@
 
   <div class="profile-col profile-col-right">
     <p class="col-title">Informasi Akun &amp; Kontak</p>
-    {# DIUBAH: nomor WA jadi tautan yang bisa dipencet #}
+    {# nomor WA jadi tautan yang bisa dipencet #}
     <div class="field"><span class="field-label">Nomor WhatsApp</span>
       <div class="read white">{{ wa_link(data.whatsapp) }}</div></div>
     <div class="field"><span class="field-label">Email</span>
@@ -102,7 +102,7 @@
     <div class="field span-2"><label>Photo Profil <span class="label-note">(kosong = tetap)</span></label>
       <input type="file" name="foto" accept="image/*"></div>
   </div>
-  {# DIUBAH (revisi 3): pendidikan ikut disebut, karena sekarang juga cuma admin yang bisa mengubahnya #}
+  {# pendidikan ikut disebut, karena sekarang juga cuma admin yang bisa mengubahnya #}
   <p class="form-note">NIK dan Pendidikan Terakhir hanya bisa diubah oleh admin lewat menu Kelola Akun.</p>
   </div>
   <div class="modal-foot"><button type="button" class="btn btn-light" data-reset-form>Batal</button><button class="btn btn-yellow">Simpan</button></div>

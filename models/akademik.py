@@ -1,19 +1,11 @@
-# PEMBAGIAN TUGAS DI models/akademik.py
-# Kelas, Jadwal                    -> ANGGOTA 1 (Kelola Kelas & Jadwal)
-# Materi, Tugas, Komentar          -> LARRY (Backend Akademik)
-# Pengumpulan.submit_jawaban       -> LARRY
-# Pengumpulan.beri_nilai           -> ANGGOTA 3 (Penilaian)
-
 import os
 import re
 from datetime import date, datetime, time
 import database
 
 HARI_VALID = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
-# BARU (revisi 2): 3 gambar latar kartu kelas yang boleh dipilih admin.
-# Berkasnya ada di static/images. Daftar ini satu-satunya sumber pilihan — dipakai
-# template untuk menggambar pilihannya DAN dipakai Kelas.cek_input untuk menolak
-# nama berkas lain, jadi tidak mungkin ada kelas dengan gambar yang tidak ada.
+
+# 3 gambar latar kartu kelas yang boleh dipilih admin.
 HEADER_KELAS = {
     "header_winter.png": "Winter",
     "header_autum.png": "Autumn",
@@ -54,10 +46,10 @@ class Kelas:
         self.nama_kelas = nama_kelas
         self.pengajar_id = pengajar_id
         self.pengajar_id2 = pengajar_id2  # guru ke-2 (opsional)
-        self.header = header              # BARU: gambar latar kartu kelas
+        self.header = header             
         self.daftar_siswa = []
 
-    # ABSTRACTION: dari_row / muat nyembunyiin proses baca database.
+    # dari_row() dan muat() menyembunyikan proses pengambilan dan pengolahan data kelas dari database menjadi objek Kelas.
     @classmethod
     def dari_row(cls, row):
         nama = row["nama"] if _punya(row, "nama") else row["nama_kelas"]
@@ -74,17 +66,14 @@ class Kelas:
             raise ValueError("Kelas tidak ditemukan.")
         return cls.dari_row(row)
 
-    # validasi input kelas dikunci di sini, Admin.kelola_kelas() tinggal manggil.
-    # DIUBAH (revisi 2): + header. Balikannya sekarang 4 nilai, yang terakhir nama berkas gambar.
+    # exclude_id digunakan saat mengedit kelas agar kelas yang sedang diedit tidak dianggap sebagai kelas duplikat.
     @staticmethod
     def cek_input(nama_kelas, pengajar_id, pengajar_id2=None, exclude_id=None, header=None):
         nama = (nama_kelas or "").strip()
         if not nama:
             raise ValueError("Nama kelas tidak boleh kosong.")
 
-        # BARU: background wajib dipilih, dan hanya boleh salah satu dari 3 berkas yang
-        # memang ada. Dicek di sini (bukan di route) supaya route tambah maupun edit
-        # sama-sama kena aturan yang sama tanpa ditulis dua kali.
+        #background wajib dipilih, dan hanya boleh salah satu dari 3
         header = (header or "").strip()
         if not header:
             raise ValueError("Background kelas wajib dipilih.")
@@ -136,8 +125,7 @@ class Kelas:
         database.hapus_siswa_dari_kelas(self.id, siswa_id)
         self.daftar_siswa.remove(siswa_id)
 
-    # jumlah siswa disediakan lewat method, jadi kalau nanti cara menyimpan
-    # daftar siswanya diubah (misal jadi query langsung), pemanggil tidak ikut rusak.
+    # Menghitung jumlah siswa yang terdaftar di kelas.
     def get_total_siswa(self):
         return len(self.daftar_siswa)
 
@@ -218,11 +206,7 @@ class Jadwal:
         if pengajar is None or pengajar["role"] != "pengajar":
             raise ValueError("Pengajar tidak valid.")
 
-        # BARU: pengajarnya harus memang guru kelas ini. Dulu siapa pun boleh dijadwalkan di
-        # kelas mana pun, padahal hak akses kelas dibaca dari tabel `kelas` — akibatnya ada
-        # pengajar yang dijadwalkan mengajar tapi diblokir waktu mau mengisi presensi.
-        # Kalau memang menggantikan, admin wajib mencentang "guru pengganti" supaya
-        # niatnya tercatat, bukan tertukar karena salah pilih di dropdown.
+        # Pengajar harus dari kelas tersebut saat membuat jadwal, tetapi bisa pilih opsi pengajar pengganti
         kelas = database.ambil_kelas_by_id(kelas_id)
         guru_tetap = (kelas["pengajar_id"], kelas["pengajar_id2"])
         pengganti = bool(pengganti) and pengajar_id not in guru_tetap
@@ -253,20 +237,14 @@ class Jadwal:
                     raise ValueError(
                         f"Bentrok: {j['pengajar_nama']} sudah mengajar kelas {j['kelas_nama']} pada {j['hari']} {j['jam']}."
                     )
-        # DIUBAH: + pengganti di urutan terakhir
         return (kelas_id, pengajar_id, Jadwal.format_jam(mulai, selesai),
                 (tanggal or None), materi, 1 if pengganti else 0)
 
 
 class Materi:
-    # data materi + SEMUA perilaku yang menyangkut
-    # berkasnya (link, nama asli, tipe, ukuran) dikumpulkan jadi satu class, jadi template
-    # dan route tinggal memanggil, tidak menghitung sendiri.
-    # CATATAN JUJUR: atribut di sini sengaja publik karena cuma dibaca untuk ditampilkan.
-    # Penyembunyian data (atribut private) ada di models/user.py -> User.__password dan
-    # Pengajar.profil_publik(), karena di sanalah ada data yang memang tidak boleh dilihat.
+    # atribut di sini sengaja publik karena cuma dibaca untuk ditampilkan.
     def __init__(self, id, judul, kategori, file_path, kelas_id, pengajar_id,
-                 tanggal_upload=None, tanggal_edit=None):  # DIUBAH: + tanggal upload & edit
+                 tanggal_upload=None, tanggal_edit=None):
         self.id = id
         self.judul = judul
         self.kategori = kategori
@@ -323,13 +301,10 @@ class Materi:
 
 
 class Tugas:
-    # aturan deadline (format + cek kedaluwarsa + cek terlambat) ada di class Tugas.
-    # DIUBAH: + format berjam-menit-detik, karena waktu_kumpul dari database bentuknya begitu
-    # dan sekarang ikut diparse di sini (buat menentukan pengumpulan terlambat atau tidak).
     FORMAT_DEADLINE = ("%Y-%m-%d", "%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S")
 
     def __init__(self, id, judul, deskripsi, deadline, kelas_id, pengajar_id,
-                 tanggal_dibuat=None, tanggal_edit=None):  # DIUBAH: + tanggal dibuat & edit
+                 tanggal_dibuat=None, tanggal_edit=None):
         self.id = id
         self.judul = judul
         self.deskripsi = deskripsi
@@ -381,8 +356,6 @@ class Tugas:
 
     # BARU: penanda pengumpulan terlambat. Siswa TETAP boleh mengumpulkan setelah tenggat,
     # tapi berkasnya ditandai "Terlambat" supaya pengajar tahu waktu menilai.
-    # Catatan: dihitung dari waktu_kumpul vs deadline, bukan disimpan di database. Jadi kalau
-    # pengajar memperpanjang tenggat, status terlambatnya otomatis ikut hilang.
     @staticmethod
     def kumpul_terlambat(deadline, waktu_kumpul):
         if not waktu_kumpul:
@@ -392,11 +365,9 @@ class Tugas:
             batas = Tugas.parse_deadline(deadline)
             masuk = Tugas.parse_deadline(waktu_kumpul)
         except ValueError:
-            return False  # salah satunya rusak -> jangan menuduh siswa terlambat
+            return False
         return masuk > batas
 
-    # Versi method biasa, buat kode yang sudah punya objek Tugas (isinya memanggil
-    # staticmethod di atas). Bukan contoh pilar, cuma jalan pintas biar enak dipakai.
     def telat(self, waktu_kumpul):
         return Tugas.kumpul_terlambat(self.deadline, waktu_kumpul)
 
@@ -455,15 +426,6 @@ class Pengumpulan:
 
 
 class Komentar:
-    # komentar cuma bisa masuk ke database lewat
-    # tambah_komentar(), dan method itu selalu memeriksa ulang isinya saat dipanggil —
-    # tidak boleh kosong dan wajib menempel ke satu siswa. Jadi walaupun atributnya diubah
-    # dari luar, aturannya tetap tidak bisa dilewati.
-    # CATATAN JUJUR: ini penjagaan aturan, bukan penyembunyian data. Atribut private
-    # yang sesungguhnya ada di models/user.py (User.__password).
-    # DIUBAH: tambah siswa_id — komentar sekarang percakapan PRIVAT antara seorang siswa
-    # dan pengajar kelasnya, bukan papan komentar yang dibaca satu kelas.
-    # user_id = penulis komentar, siswa_id = pemilik percakapan.
     def __init__(self, id, tugas_id, user_id, isi_komentar, waktu, siswa_id=None):
         self.id = id
         self.tugas_id = tugas_id
