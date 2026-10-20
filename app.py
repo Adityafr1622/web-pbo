@@ -632,12 +632,8 @@ def detail_kelas(kelas_id):
     if user.role == 'siswa':
         siswa_list = [s for s in siswa_list if s['id'] == user.id]
 
-    # guru pengganti cuma boleh mengisi presensi pada tanggal pertemuan yang
-    # dijadwalkan untuk dia. None = guru tetap/admin, tidak dibatasi tanggal.
+    # Pengganti tidak bisa membuka halaman kelas penuh; hanya pengajar tetap/admin sampai di sini.
     tanggal_boleh = None
-    if user.role == 'pengajar' and not user.mengajar_kelas(kelas_id):
-        tanggal_boleh = sorted(user.tanggal_pengganti(kelas_id))
-
     return render_template('detail_kelas.html', kelas=kelas_row, pengajar_list=pengajar_list,
                            siswa_list=siswa_list, user=user, tab='presensi',
                            presensi_list=siapkan_presensi_list(kelas_id),
@@ -645,7 +641,7 @@ def detail_kelas(kelas_id):
 
 
 # --- ROUTE JADWAL ---
-def siapkan_jadwal_list(rows):
+def siapkan_jadwal_list(rows, user=None):
     """Ubah baris tabel jadwal jadi data siap tampil di tabel:
     kelas_id, hari, tanggal, pengajar_id, nama_pengajar, jam_mulai, jam_selesai, materi, minggu.
     Minggu ke-1 = minggu (Senin-Minggu) tempat jadwal paling awal kelas tersebut."""
@@ -656,12 +652,21 @@ def siapkan_jadwal_list(rows):
             return None
 
     awal = {}  # kelas_id -> Senin pada minggu jadwal paling awal
-    for r in rows:
-        d = ke_tanggal(r['tanggal'])
-        if d:
-            senin = d - timedelta(days=d.weekday())
-            if r['kelas_id'] not in awal or senin < awal[r['kelas_id']]:
-                awal[r['kelas_id']] = senin
+
+    # Hitung minggu berdasarkan seluruh jadwal kelas,
+    # bukan hanya jadwal yang terlihat oleh pengajar yang login.
+    kelas_ids = {r['kelas_id'] for r in rows}
+
+    for kelas_id in kelas_ids:
+        semua_jadwal = database.ambil_jadwal_by_kelas(kelas_id)
+
+        for j in semua_jadwal:
+            d = ke_tanggal(j['tanggal'])
+            if d:
+                senin = d - timedelta(days=d.weekday())
+
+                if kelas_id not in awal or senin < awal[kelas_id]:
+                    awal[kelas_id] = senin
 
     hasil = []
     for r in rows:
@@ -679,11 +684,16 @@ def siapkan_jadwal_list(rows):
             'hari': r['hari'],
             'tanggal': f"{d.day} {BULAN[d.month - 1]} {d.year}" if d else '-',
             'pengajar_id': r['pengajar_id'],  # buat link ke profil pengajar
-            'nama_pengajar': r['pengajar_nama'],
+            'nama_pengajar': (r['pengganti_nama'] if r['pengganti_id'] else r['pengajar_nama']),
+            'nama_pengajar_tetap': r['pengajar_nama'],
+            'pengajar_tetap_id': r['pengajar_id'],
+            'tampilan_pengajar_id': (r['pengganti_id'] if r['pengganti_id'] else r['pengajar_id']),
+            'pengganti_id': r['pengganti_id'] if 'pengganti_id' in r.keys() else None,
+            'is_pengganti_saya': bool(user and user.role == 'pengajar' and r['pengganti_id'] == user.id),
             'jam_mulai': jam_mulai,
             'jam_selesai': jam_selesai,
             'materi': r['materi'] or '-',
-            'pengganti': bool(r['pengganti']) if 'pengganti' in r.keys() else False,  # BARU
+            'pengganti': bool(r['pengganti_id']) if 'pengganti_id' in r.keys() else False,
             'minggu': minggu,
             '_urut': (minggu, r['tanggal'] or '', HARI_VALID.index(r['hari']) if r['hari'] in HARI_VALID else 9, jam_mulai),
         })
@@ -713,15 +723,17 @@ def lihat_jadwal():
         kelas_list = user.lihat_kelas_diajar()
         ada = {k['id'] for k in kelas_list}
         for kelas_id in sorted(user.kelas_pengganti() - ada):
-            kelas = database.ambil_kelas_by_id(kelas_id)
-            if kelas:
-                kelas_list.append(kelas)
+            kelas_row = database.ambil_kelas_by_id(kelas_id)
+            if kelas_row:
+                kelas_list.append(database.kelas_jadi_dict(kelas_row))
         pilih = kelas_terpilih(kelas_list)
         rows = user.lihat_jadwal_mengajar()
+        if pilih:
+            rows = [j for j in rows if j['kelas_id'] == pilih]
 
-    return render_template('kelola_jadwal.html', jadwal_list=siapkan_jadwal_list(rows),
+    return render_template('kelola_jadwal.html', jadwal_list=siapkan_jadwal_list(rows, user),
                            kelas_list=kelas_list, pengajar_list=[], bisa_kelola=False,
-                           kelas_pilih=pilih)
+                           kelas_pilih=pilih, user=user)
 
 
 @app.route('/admin/jadwal', methods=['GET', 'POST'])
@@ -738,12 +750,12 @@ def kelola_jadwal():
         pengajar_id = request.form.get('pengajar_id', '')
         tanggal = request.form.get('tanggal', '')
         materi = request.form.get('materi', '')
-        pengganti = bool(request.form.get('pengganti'))  # centang "guru pengganti"
+        pengganti_id = request.form.get('pengganti_id') or None
 
         try:
             user.kelola_jadwal('tambah', hari=hari, jam_mulai=jam_mulai, jam_selesai=jam_selesai,
                                kelas_id=kelas_id, pengajar_id=pengajar_id,
-                               tanggal=tanggal, materi=materi, pengganti=pengganti)
+                               tanggal=tanggal, materi=materi, pengganti_id=pengganti_id)
             flash('Jadwal berhasil ditambahkan!', 'success')
         except ValueError as e:
             flash(str(e), 'danger')
@@ -756,9 +768,9 @@ def kelola_jadwal():
     if pilih:
         rows = [j for j in rows if j['kelas_id'] == pilih]
 
-    return render_template('kelola_jadwal.html', jadwal_list=siapkan_jadwal_list(rows),
+    return render_template('kelola_jadwal.html', jadwal_list=siapkan_jadwal_list(rows, user),
                            kelas_list=kelas_list, pengajar_list=database.ambil_semua_pengajar(),
-                           bisa_kelola=True, kelas_pilih=pilih)
+                           bisa_kelola=True, kelas_pilih=pilih, user=user)
 
 
 @app.route('/admin/jadwal/edit/<int:jadwal_id>', methods=['POST'])  # route edit jadwal
@@ -775,7 +787,7 @@ def edit_jadwal(jadwal_id):
                            pengajar_id=request.form.get('pengajar_id', ''),
                            tanggal=request.form.get('tanggal', ''),
                            materi=request.form.get('materi', ''),
-                           pengganti=bool(request.form.get('pengganti')))  # BARU
+                           pengganti_id=request.form.get('pengganti_id') or None)
         flash('Jadwal berhasil diperbarui!', 'success')
     except ValueError as e:
         flash(str(e), 'danger')
@@ -1180,7 +1192,8 @@ def siapkan_presensi_list(kelas_id):
     # materi pertemuan ikut ditampilkan di pilihan tanggal ("Senin, 5 Oktober 2026 · Descriptive Text")
     jadwal_kelas = database.ambil_jadwal_by_kelas(kelas_id)
     materi_per_tanggal = {j['tanggal']: j['materi'] for j in jadwal_kelas if j['tanggal']}
-    pengajar_jadwal = {j['tanggal']: j['pengajar_nama'] for j in jadwal_kelas if j['tanggal']}
+    pengajar_jadwal = {j['tanggal']: (j['pengganti_nama'] if j['pengganti_id'] else j['pengajar_nama'])
+                       for j in jadwal_kelas if j['tanggal']}
     hasil = []
     for tanggal in sorted(semua_tanggal, reverse=True):
         try:
@@ -1230,6 +1243,51 @@ def simpan_presensi(kelas_id):
     # tidak balik sendiri ke pertemuan paling baru.
     return redirect(url_for('detail_kelas', kelas_id=kelas_id,
                             tanggal=request.form.get('tanggal', '') or None))
+
+
+@app.route('/jadwal/<int:jadwal_id>/presensi', methods=['GET', 'POST'])
+def presensi_jadwal(jadwal_id):
+    """Halaman presensi terbatas untuk satu jadwal, terutama bagi pengajar pengganti."""
+    user = get_current_user()
+    if not user or user.role != 'pengajar':
+        return redirect(url_for('login'))
+
+    jadwal = database.ambil_jadwal_by_id(jadwal_id)
+    if not jadwal or not jadwal['tanggal'] or not user.boleh_presensi_jadwal(jadwal):
+        flash('Kamu tidak memiliki akses presensi untuk jadwal ini.', 'danger')
+        return redirect(url_for('lihat_jadwal'))
+
+    kelas_id = jadwal['kelas_id']
+    tanggal = jadwal['tanggal']
+    if request.method == 'POST':
+        tampil = {int(x) for x in request.form.get('siswa_tampil', '').split(',') if x.strip().isdigit()}
+        data_status, kosongkan = {}, []
+        for siswa in database.ambil_siswa_by_kelas(kelas_id):
+            st = request.form.get(f"st_{siswa['id']}")
+            if st:
+                data_status[siswa['id']] = st
+            elif siswa['id'] in tampil:
+                kosongkan.append(siswa['id'])
+        try:
+            # Pastikan form tidak dapat mengganti tanggal jadwal lewat POST.
+            if request.form.get('tanggal') != tanggal:
+                raise ValueError('Tanggal presensi tidak sesuai dengan jadwal yang ditugaskan.')
+            jumlah = user.catat_presensi_kelas(kelas_id, tanggal, data_status, kosongkan)
+            flash(f'Presensi {jumlah} siswa berhasil disimpan!', 'success')
+        except ValueError as e:
+            flash(str(e), 'danger')
+        return redirect(url_for('presensi_jadwal', jadwal_id=jadwal_id))
+
+    siswa_list = database.ambil_siswa_by_kelas(kelas_id)
+    status = {p.siswa_id: p.status.lower() for p in Presensi.ambil_kelas(kelas_id, tanggal)
+              if p.status in Presensi.STATUS_VALID}
+    try:
+        label_tanggal = Presensi.format_label(tanggal)
+    except ValueError:
+        label_tanggal = tanggal
+    return render_template('presensi_jadwal.html', user=user, jadwal=jadwal,
+                           kelas=database.ambil_kelas_by_id(kelas_id), siswa_list=siswa_list,
+                           status=status, label_tanggal=label_tanggal)
 
 
 if __name__ == '__main__':

@@ -457,7 +457,11 @@ class Pengajar(User):
         return database.ambil_kelas_by_pengajar(self.id)
 
     def lihat_jadwal_mengajar(self):
-        return database.ambil_jadwal_by_pengajar(self.id)
+        """Gabungkan jadwal tetap dan penugasan pengganti tanpa memberi akses kelas."""
+        tetap = list(database.ambil_jadwal_by_pengajar(self.id))
+        ids = {j["id"] for j in tetap}
+        tetap.extend(j for j in database.ambil_jadwal_pengganti(self.id) if j["id"] not in ids)
+        return tetap
 
     @staticmethod
     def _ke_int(nilai, nama):
@@ -649,8 +653,7 @@ class Pengajar(User):
         row = database.ambil_kelas_by_id(kelas_id)
         return row is not None and self.id in (row["pengajar_id"], row["pengajar_id2"])
 
-    # pertemuan di mana dia jadi GURU PENGGANTI. Dua method, dua pertanyaan berbeda:
-    # "kelas apa saja yang boleh dia buka" dan "tanggal mana saja yang boleh dia isi".
+    # Pengganti hanya mendapat akses ke jadwal tertentu, bukan akses kelas.
     def kelas_pengganti(self):
         return {j["kelas_id"] for j in database.ambil_jadwal_pengganti(self.id)}
 
@@ -659,7 +662,17 @@ class Pengajar(User):
                 if j["kelas_id"] == kelas_id and j["tanggal"]}
 
     def boleh_akses_kelas(self, kelas_id):
-        return self.mengajar_kelas(kelas_id) or kelas_id in self.kelas_pengganti()
+        # Akses kelas penuh hanya untuk pengajar tetap.
+        return self.mengajar_kelas(kelas_id)
+
+    def boleh_akses_jadwal(self, jadwal):
+        """Terima row jadwal atau ID jadwal; pengganti hanya lolos untuk jadwalnya."""
+        if isinstance(jadwal, (int, str)):
+            jadwal = database.ambil_jadwal_by_id(int(jadwal))
+        return bool(jadwal and self.id in (jadwal["pengajar_id"], jadwal["pengganti_id"]))
+
+    def boleh_presensi_jadwal(self, jadwal):
+        return self.boleh_akses_jadwal(jadwal)
 
     def boleh_lihat_siswa(self, siswa_row):
         return siswa_row["kelas_id"] is not None and self.mengajar_kelas(siswa_row["kelas_id"])
@@ -685,11 +698,14 @@ class Pengajar(User):
             kelas_id = int(kelas_id)
         except (TypeError, ValueError):
             raise ValueError("Kelas tidak valid.")
-        # guru pengganti boleh mengisi presensi, TAPI cuma pada tanggal pertemuan
-        # yang memang dijadwalkan untuk dia. Di luar tanggal itu tetap ditolak.
+        # Pengajar tetap dapat mengelola presensi kelas. Pengganti harus cocok
+        # dengan jadwal spesifik (kelas + tanggal), bukan sekadar pernah mengganti kelas.
         if not self.mengajar_kelas(kelas_id):
-            if str(tanggal or "").strip() not in self.tanggal_pengganti(kelas_id):
-                raise ValueError("Kamu bukan pengajar di kelas ini.")
+            jadwal = next((j for j in database.ambil_jadwal_by_kelas(kelas_id)
+                           if j["tanggal"] == str(tanggal or "").strip()
+                           and j["pengganti_id"] == self.id), None)
+            if not jadwal or not self.boleh_presensi_jadwal(jadwal):
+                raise ValueError("Kamu tidak ditugaskan sebagai pengganti untuk jadwal presensi ini.")
 
         kosongkan = list(kosongkan or [])
         if not data_status and not kosongkan:
@@ -928,39 +944,34 @@ class Admin(User):
     def kelola_jadwal(self, aksi, **data):
         from models.akademik import Jadwal
         if aksi == "tambah":
-            #+ pengganti, ikut dicek di Jadwal.cek_input dan ikut disimpan
-            kelas_id, pengajar_id, jam, tanggal, materi, pengganti = Jadwal.cek_input(
+            kelas_id, pengajar_id, jam, tanggal, materi, pengganti_id = Jadwal.cek_input(
                 data["hari"], data["jam_mulai"], data["jam_selesai"],
                 data["kelas_id"], data["pengajar_id"],
                 tanggal=data.get("tanggal"), materi=data.get("materi"),
-                pengganti=data.get("pengganti"),
+                pengganti_id=data.get("pengganti_id"),
             )
             return database.tambah_jadwal(data["hari"], jam, kelas_id, pengajar_id, tanggal,
-                                          materi, pengganti)
+                                          materi, pengganti_id)
 
         try:
             jadwal_id = int(data["jadwal_id"])
         except (TypeError, ValueError):
             raise ValueError("Jadwal tidak valid.")
-
         if database.ambil_jadwal_by_id(jadwal_id) is None:
             raise ValueError("Jadwal tidak ditemukan.")
 
         if aksi == "edit":
-            kelas_id, pengajar_id, jam, tanggal, materi, pengganti = Jadwal.cek_input(
+            kelas_id, pengajar_id, jam, tanggal, materi, pengganti_id = Jadwal.cek_input(
                 data["hari"], data["jam_mulai"], data["jam_selesai"],
                 data["kelas_id"], data["pengajar_id"], exclude_id=jadwal_id,
                 tanggal=data.get("tanggal"), materi=data.get("materi"),
-                pengganti=data.get("pengganti"),
+                pengganti_id=data.get("pengganti_id"),
             )
             return database.edit_jadwal(jadwal_id, data["hari"], jam, kelas_id, pengajar_id,
-                                        tanggal, materi, pengganti)
-
+                                        tanggal, materi, pengganti_id)
         elif aksi == "hapus":
             return database.hapus_jadwal(jadwal_id)
-
-        else:
-            raise ValueError(f"Aksi tidak dikenal: {aksi}")
+        raise ValueError(f"Aksi tidak dikenal: {aksi}")
 
     def monitoring_sistem(self):
         """Ringkasan data sistem + daftar monitoring tiap siswa (nilai, presensi, jumlah catatan akhir)."""

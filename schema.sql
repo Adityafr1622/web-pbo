@@ -59,10 +59,11 @@ CREATE TABLE IF NOT EXISTS jadwal (
     pengajar_id INTEGER NOT NULL,
     tanggal TEXT,
     materi TEXT,
-    -- 1 kalau pengajarnya guru pengganti (bukan guru tetap kelas tsb)
-    pengganti INTEGER DEFAULT 0,
+    -- Pengganti hanya berlaku untuk jadwal/pertemuan ini.
+    pengganti_id INTEGER,
     FOREIGN KEY(kelas_id) REFERENCES kelas(id),
-    FOREIGN KEY(pengajar_id) REFERENCES users(id)
+    FOREIGN KEY(pengajar_id) REFERENCES users(id),
+    FOREIGN KEY(pengganti_id) REFERENCES users(id)
 );
 
 -- tanggal_upload & tanggal_edit dipakai feed kelas: "02 Oktober (Diedit 03 Oktober)"

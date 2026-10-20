@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import ic %}
+{% block title %}Presensi Jadwal · Fluenglo{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Isi Presensi</h1>
+    <p class="sub">{{ kelas.nama_kelas }} · {{ label_tanggal }} · {{ jadwal.jam }}</p>
+    <p class="form-note">Kamu ditugaskan sebagai pengganti hanya untuk jadwal ini. Halaman ini tidak memberikan akses ke materi, tugas, atau jadwal lain di kelas.</p>
+  </div>
+  <a class="btn btn-light" href="{{ url_for('lihat_jadwal') }}">Kembali ke Jadwal</a>
+</div>
+{% set STATUS = [('hadir', 'Hadir'), ('izin', 'Izin'), ('sakit', 'Sakit'), ('alfa', 'Alpha')] %}
+<form class="presensi-panel" method="post" action="{{ url_for('presensi_jadwal', jadwal_id=jadwal.id) }}">
+  <input type="hidden" name="tanggal" value="{{ jadwal.tanggal }}">
+  <input type="hidden" name="siswa_tampil" value="{{ siswa_list | map(attribute='id') | join(',') }}">
+  <div class="table-card"><div class="table-scroll">
+    <table class="data-table presensi-table">
+      <thead><tr><th class="th-left">Nama Siswa</th>{% for kode, nama in STATUS %}<th>{{ nama }}<label class="chk-semua"><input type="checkbox" data-semua-status="{{ kode }}"><span class="chk"></span> Semua</label></th>{% endfor %}</tr></thead>
+      <tbody>
+      {% for siswa in siswa_list %}<tr>
+        <td class="td-left td-strong">{{ siswa.nama }}</td>
+        {% for kode, nama in STATUS %}<td><label class="chk-wrap"><input type="radio" name="st_{{ siswa.id }}" value="{{ kode }}" {{ 'checked' if status.get(siswa.id) == kode }}><span class="chk">{{ ic('check', 13) }}</span><span class="sr-only">{{ nama }} {{ siswa.nama }}</span></label></td>{% endfor %}
+      </tr>{% else %}<tr class="row-empty"><td colspan="5">Belum ada siswa di kelas ini.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div></div>
+  {% if siswa_list %}<div class="presensi-foot"><button class="btn btn-yellow">Simpan Presensi</button></div>{% endif %}
+</form>
+{% endblock %}

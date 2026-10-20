@@ -105,24 +105,19 @@
     if (inp.scrollIntoView) inp.scrollIntoView({ block: 'center', behavior: 'smooth' });
   };
 
-  // ---------- dropdown Pengajar mengikuti kelas yang dipilih ----------
-  // Dulu semua pengajar muncul walau tidak mengajar kelas itu, padahal hak akses kelas
-  // dibaca dari tabel kelas — hasilnya pengajar bisa dijadwalkan tapi diblokir waktu mau
-  // mengisi presensi. Sekarang disaring, kecuali centang "Guru pengganti" dinyalakan.
+  // Pengajar tetap hanya boleh dipilih dari pengajar kelas tersebut.
+  // Pengajar pengganti dipilih terpisah dan hanya ditugaskan ke satu jadwal.
   const saringGuru = form => {
     const kelas = $('[data-kelas-pick]', form), guru = $('[data-guru-pick]', form);
-    const ganti = $('[data-guru-ganti]', form);
     if (!kelas || !guru) return;
-    const bebas = ganti && ganti.checked;
     $$('option', guru).forEach(o => {
-      if (!o.value) return;                                   // "Pilih pengajar" selalu ada
+      if (!o.value) return;
       const miliknya = (o.dataset.kelas || '').split(' ').includes(kelas.value);
-      const boleh = bebas || (kelas.value && miliknya);
-      o.hidden = !boleh;
-      o.disabled = !boleh;
+      o.hidden = !(kelas.value && miliknya);
+      o.disabled = !(kelas.value && miliknya);
     });
     const dipilih = guru.selectedOptions[0];
-    if (dipilih && dipilih.disabled) guru.value = '';         // pilihan lama jadi tidak sah
+    if (dipilih && dipilih.disabled) guru.value = '';
   };
 
   // ---------- jurusan "Lainnya" di form akun pengajar ----------
@@ -263,8 +258,8 @@
       t.form.elements.hari.value = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][new Date(t.value + 'T00:00').getDay()];
     }
 
-    // ganti kelas atau centang "guru pengganti" -> dropdown pengajar disaring ulang
-    if (t.matches('[data-kelas-pick], [data-guru-ganti]')) {
+    // ganti kelas -> dropdown pengajar tetap disaring ulang
+    if (t.matches('[data-kelas-pick]')) {
       const form = t.closest('form');
       if (form) saringGuru(form);
       return;

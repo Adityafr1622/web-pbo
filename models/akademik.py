@@ -132,7 +132,7 @@ class Kelas:
 
 class Jadwal:
     # hari, tanggal, jam, materi + aturan bentrok dibungkus di class Jadwal.
-    def __init__(self, id, hari, jam, kelas_id, pengajar_id, tanggal=None, materi=None):
+    def __init__(self, id, hari, jam, kelas_id, pengajar_id, tanggal=None, materi=None, pengganti_id=None):
         self.id = id
         self.hari = hari
         self.jam = jam
@@ -140,12 +140,14 @@ class Jadwal:
         self.pengajar_id = pengajar_id
         self.tanggal = tanggal
         self.materi = materi
+        self.pengganti_id = pengganti_id
 
     @classmethod
     def dari_row(cls, row):
         return cls(row["id"], row["hari"], row["jam"], row["kelas_id"], row["pengajar_id"],
                    row["tanggal"] if _punya(row, "tanggal") else None,
-                   row["materi"] if _punya(row, "materi") else None)
+                   row["materi"] if _punya(row, "materi") else None,
+                   row["pengganti_id"] if _punya(row, "pengganti_id") else None)
 
     def get_info_jadwal(self):
         """'Senin, 5 Oktober 2026, 08.00 - 09.30' (tanpa tanggal: 'Senin, 08.00 - 09.30')."""
@@ -176,7 +178,7 @@ class Jadwal:
 
     @staticmethod
     def cek_input(hari, jam_mulai, jam_selesai, kelas_id, pengajar_id, exclude_id=None,
-                  tanggal=None, materi=None, pengganti=False):  # DIUBAH: + pengganti
+                  tanggal=None, materi=None, pengganti_id=None):
         if hari not in HARI_VALID:
             raise ValueError("Hari tidak valid.")
 
@@ -192,35 +194,33 @@ class Jadwal:
                     f"bukan {hari}."
                 )
         materi = (materi or "").strip() or None
-
         mulai = _ke_menit(jam_mulai)
         selesai = _ke_menit(jam_selesai)
         if mulai >= selesai:
             raise ValueError("Jam selesai harus lebih besar dari jam mulai.")
 
         kelas_id = _ke_int(kelas_id, "Kelas")
-        pengajar_id = _ke_int(pengajar_id, "Pengajar")
-        if database.ambil_kelas_by_id(kelas_id) is None:
-            raise ValueError("Kelas tidak ditemukan.")
-        pengajar = database.ambil_user_by_id(pengajar_id)
-        if pengajar is None or pengajar["role"] != "pengajar":
-            raise ValueError("Pengajar tidak valid.")
-
-        # Pengajar harus dari kelas tersebut saat membuat jadwal, tetapi bisa pilih opsi pengajar pengganti
+        pengajar_id = _ke_int(pengajar_id, "Pengajar tetap")
         kelas = database.ambil_kelas_by_id(kelas_id)
+        if kelas is None:
+            raise ValueError("Kelas tidak ditemukan.")
         guru_tetap = (kelas["pengajar_id"], kelas["pengajar_id2"])
-        pengganti = bool(pengganti) and pengajar_id not in guru_tetap
-        if pengajar_id not in guru_tetap and not pengganti:
-            raise ValueError(
-                f"{pengajar['nama']} bukan pengajar kelas {kelas['nama_kelas']}. "
-                f"Centang \"Guru pengganti\" kalau memang menggantikan pada pertemuan ini."
-            )
+        if pengajar_id not in guru_tetap:
+            raise ValueError("Pengajar tetap harus dipilih dari pengajar yang terdaftar pada kelas ini.")
 
-        # bentrok dicek pada tanggal yang sama (kalau nggak ada tanggal: sesama jadwal mingguan di hari itu)
-        if tanggal:
-            kandidat = database.ambil_jadwal_by_tanggal(tanggal)
+        if pengganti_id in (None, "", 0, "0"):
+            pengganti_id = None
         else:
-            kandidat = [j for j in database.ambil_jadwal_by_hari(hari) if not j["tanggal"]]
+            pengganti_id = _ke_int(pengganti_id, "Pengajar pengganti")
+            pengganti = database.ambil_user_by_id(pengganti_id)
+            if not pengganti or pengganti["role"] != "pengajar":
+                raise ValueError("Pengajar pengganti tidak valid.")
+            if pengganti_id in guru_tetap:
+                raise ValueError("Pengajar pengganti harus berbeda dari pengajar tetap kelas.")
+
+        # Bentrok dicek pada tanggal yang sama; jadwal tanpa tanggal dianggap mingguan.
+        kandidat = (database.ambil_jadwal_by_tanggal(tanggal) if tanggal else
+                    [j for j in database.ambil_jadwal_by_hari(hari) if not j["tanggal"]])
         for j in kandidat:
             if exclude_id is not None and j["id"] == exclude_id:
                 continue
@@ -233,12 +233,12 @@ class Jadwal:
                     raise ValueError(
                         f"Bentrok: kelas {j['kelas_nama']} sudah punya jadwal {j['hari']} {j['jam']}."
                     )
-                if j["pengajar_id"] == pengajar_id:
-                    raise ValueError(
-                        f"Bentrok: {j['pengajar_nama']} sudah mengajar kelas {j['kelas_nama']} pada {j['hari']} {j['jam']}."
-                    )
+                if pengajar_id in (j["pengajar_id"], j["pengganti_id"]):
+                    raise ValueError(f"Pengajar sudah memiliki jadwal lain pada {j['hari']} {j['jam']}.")
+                if pengganti_id is not None and pengganti_id in (j["pengajar_id"], j["pengganti_id"]):
+                    raise ValueError(f"Pengajar pengganti sudah memiliki jadwal lain pada {j['hari']} {j['jam']}.")
         return (kelas_id, pengajar_id, Jadwal.format_jam(mulai, selesai),
-                (tanggal or None), materi, 1 if pengganti else 0)
+                (tanggal or None), materi, pengganti_id)
 
 
 class Materi:
