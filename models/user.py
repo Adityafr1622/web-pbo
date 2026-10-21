@@ -307,7 +307,7 @@ class Siswa(User):
 class Pendidikan:
     GELAR_VALID = ("S1", "S2", "S3")
     # 3 pilihan tetap + "Lainnya" yang jurusannya diketik sendiri oleh admin
-    JURUSAN_VALID = ("Pendidikan Bahasa Inggris", "Sastra Inggris", "Pendidikan Bahasa")
+    JURUSAN_VALID = ("Pendidikan Bahasa Inggris", "Sastra Inggris")
     JURUSAN_LAIN = "Lainnya"
 
     def __init__(self, pengajar_id, gelar, jurusan, institusi, id=None):
