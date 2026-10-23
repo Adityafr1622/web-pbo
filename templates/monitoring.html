@@ -4,7 +4,7 @@
 
 {% block content %}
 {# data dari app.py:
-   mode daftar    -> daftar (semua siswa), ringkasan (khusus admin)
+   mode daftar    -> daftar siswa (admin/pengajar), tanpa kartu statistik
    mode satu anak -> data (presensi, nilai, daftar_nilai, catatan_akhir), siswa,
                      kelas, pengajar_list, bisa_beri_catatan, kelas_id #}
 
@@ -16,19 +16,6 @@
     <p class="sub">{{ 'Rekap nilai, presensi, dan catatan akhir seluruh siswa.' if user.role == 'admin' else 'Rekap siswa di kelas yang kamu ajar.' }}</p>
   </div>
 </div>
-
-{% if ringkasan %}
-<div class="stat-grid">
-  <div class="stat"><span class="stat-angka">{{ ringkasan.total_siswa }}</span><span class="stat-label">Siswa</span></div>
-  <div class="stat"><span class="stat-angka">{{ ringkasan.total_pengajar }}</span><span class="stat-label">Pengajar</span></div>
-  <div class="stat"><span class="stat-angka">{{ ringkasan.total_kelas }}</span><span class="stat-label">Kelas</span></div>
-  <div class="stat"><span class="stat-angka">{{ ringkasan.total_materi }}</span><span class="stat-label">Materi</span></div>
-  <div class="stat"><span class="stat-angka">{{ ringkasan.total_tugas }}</span><span class="stat-label">Tugas</span></div>
-  <div class="stat"><span class="stat-angka">{{ ringkasan.total_penilaian }}</span><span class="stat-label">Tugas Dinilai</span></div>
-  <div class="stat"><span class="stat-angka">{{ ringkasan.total_presensi }}</span><span class="stat-label">Catatan Presensi</span></div>
-  <div class="stat"><span class="stat-angka">{{ ringkasan.total_catatan_akhir }}</span><span class="stat-label">Catatan Akhir</span></div>
-</div>
-{% endif %}
 
 <div class="table-card"><div class="table-scroll">
 <table class="data-table">
@@ -52,16 +39,17 @@
 {# ================= monitoring satu anak ================= #}
 {% set p = data.presensi %}
 {% set total_temu = p.hadir + p.izin + p.sakit + p.alfa %}
-{% set persen = (p.hadir * 100 / total_temu)|round|int if total_temu else 0 %}
+{% set persen = ((p.hadir + 0.5 * p.izin + 0.5 * p.sakit) * 100 / total_temu)|round|int if total_temu else 0 %}
 
 {# Data grafik. daftar_nilai urutannya tugas terbaru dulu, dibalik jadi kronologis.
    `semua` = seluruh tugas (dipakai sumbu X, termasuk yang belum dinilai),
    `urut`  = yang sudah dinilai saja (dipakai rata-rata, tertinggi, terendah). #}
-{% set semua = data.daftar_nilai | list | reverse | list %}
+{% set semua = data.daftar_nilai | selectattr('nilai', 'ne', none) | list | reverse | list %}
 {% set urut = semua | selectattr('nilai', 'ne', none) | list %}
 {% set n = urut | length %}
-{% set n_semua = semua | length %}
-{% set step = (684 / (n_semua - 1)) if n_semua > 1 else 0 %}
+{% set n_semua = data.daftar_nilai | length %}
+{% set n_plot = semua | length %}
+{% set step = (684 / (n_plot - 1)) if n_plot > 1 else 0 %}
 {% set rata = data.nilai.rata_rata %}
 
 <div class="page-head">
@@ -69,9 +57,19 @@
     <h1>Monitoring Anak</h1>
     <p class="sub">Rekap presensi, perkembangan nilai, dan catatan akhir dari pengajar.</p>
   </div>
-  {% if user.role != 'siswa' %}
-  <a class="btn btn-light" href="{{ url_for('profil_siswa', siswa_id=siswa.id) }}">{{ ic('user', 16) }} Buka Profil</a>
-  {% endif %}
+  <div class="dash-controls">
+    {% if daftar_kelas and daftar_kelas|length > 1 %}
+    <form method="get" action="{{ url_for('monitoring') if user.role == 'siswa' else url_for('monitoring_siswa', siswa_id=siswa.id) }}">
+      <label for="monitoring-kelas">Kelas</label>
+      <select id="monitoring-kelas" name="kelas" onchange="this.form.requestSubmit()">
+        {% for k in daftar_kelas %}<option value="{{ k.id }}" {{ 'selected' if k.id == kelas_id }}>{{ k.nama_kelas }}{{ ' · Riwayat' if k.selesai else ' · Aktif' }}</option>{% endfor %}
+      </select>
+    </form>
+    {% endif %}
+    {% if user.role != 'siswa' %}
+    <a class="btn btn-light" href="{{ url_for('profil_siswa', siswa_id=siswa.id) }}">{{ ic('user', 16) }} Buka Profil</a>
+    {% endif %}
+  </div>
 </div>
 
 {# ---------- identitas siswa ---------- #}
@@ -132,7 +130,7 @@
 <div class="mon-row">
 
   {# ===== GRAFIK PERKEMBANGAN NILAI (fitur baru) ===== #}
-  <section class="card">
+  <section class="card" id="nilai">
     <div class="card-head">
       <div>
         <h2>Perkembangan Nilai</h2>
@@ -141,23 +139,22 @@
       <span class="pick">{{ n }} dari {{ n_semua }} tugas dinilai</span>
     </div>
 
-    {% if n_semua %}
-    {# Satu titik per tugas, SEMUA tugas ikut digambar dan garisnya menyambung penuh.
-       Tugas yang belum dinilai dihitung 0, jadi garisnya turun sampai dasar. #}
+    {% if n_plot %}
+    {# Hanya nilai sungguhan menjadi titik; yang belum dinilai bukan nilai nol. #}
     {% set ns = namespace(titik=[]) %}
     {% for t in semua %}
       {% set _ = ns.titik.append({
           'x': (406 if n_semua == 1 else 64 + step * loop.index0) | round(1),
-          'y': (296 - (t.nilai or 0) * 2.4) | round(1),
+          'y': (296 - t.nilai * 2.4) | round(1),
           'judul': t.judul_tugas, 'nilai': t.nilai, 'ke': loop.index }) %}
     {% endfor %}
-    {% set lebar_hit = ([step, 48] | min) if n_semua > 1 else 48 %}
+    {% set lebar_hit = ([step, 48] | min) if n_plot > 1 else 48 %}
 
     <div class="chart-scroll">
     {# lebar minimum dipasang lewat class, bukan style inline, biar editor nggak
        salah membaca {{ ... }} sebagai CSS #}
-    <svg class="chart-nilai {{ 'chart-panjang' if n_semua > 10 }}" viewBox="0 0 800 330"
-         role="img" aria-label="Grafik nilai {{ siswa.nama }} dari {{ n_semua }} tugas">
+    <svg class="chart-nilai {{ 'chart-panjang' if n_plot > 10 }}" viewBox="0 0 800 330"
+         role="img" aria-label="Grafik nilai {{ siswa.nama }} dari {{ n_plot }} nilai tugas">
       <defs>
         <linearGradient id="isiNilai" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stop-color="#2e3a66" stop-opacity=".17"/>
@@ -211,7 +208,7 @@
       {% endfor %}
 
       {# angka ditulis hanya di titik pertama & terakhir, bukan di semua titik #}
-      {% if n_semua > 1 %}
+      {% if n_plot > 1 %}
       <text class="label-titik" x="{{ ns.titik[0].x }}" y="{{ ns.titik[0].y + 22 }}" text-anchor="middle">{{ (ns.titik[0].nilai or 0) | round | int }}</text>
       <text class="label-titik kuat" x="{{ ns.titik[-1].x }}" y="{{ ns.titik[-1].y - 14 }}" text-anchor="middle">{{ (ns.titik[-1].nilai or 0) | round | int }}</text>
       {% endif %}
@@ -225,7 +222,10 @@
     </svg>
     </div>
     {% else %}
-    <div class="empty-card" style="margin-top:14px">Belum ada tugas di kelas ini, jadi grafiknya belum bisa ditampilkan.</div>
+    <div class="chart-empty" role="img" aria-label="Grafik nilai belum memiliki data">
+      <div class="chart-empty-axes"><span>100</span><span>75</span><span>50</span><span>25</span><span>0</span></div>
+      <p>Belum ada data nilai</p>
+    </div>
     {% endif %}
   </section>
 

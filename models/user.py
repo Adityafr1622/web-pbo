@@ -166,10 +166,12 @@ class Siswa(User):
         if aktif:
             hasil.append(dict(aktif, selesai=False))
             sudah.add(aktif["id"])
-        for row in database.ambil_kelas_lulus_siswa(self.id):
+        for row in database.ambil_riwayat_kelas_siswa(self.id):
             if row["id"] not in sudah:
-                hasil.append(dict(database.kelas_jadi_dict(row), selesai=True))
-                sudah.add(row["id"])
+                kelas = database.ambil_kelas_by_id(row["id"])
+                if kelas:
+                    hasil.append(dict(database.kelas_jadi_dict(kelas), selesai=True))
+                    sudah.add(row["id"])
         return hasil
 
     def id_kelas_saya(self):
@@ -261,20 +263,23 @@ class Siswa(User):
 
         return komentar
 
-    def lihat_monitoring(self):
+    def lihat_monitoring(self, kelas_id=None):
         """Satu menu monitoring: rekap presensi, rekap nilai, dan catatan akhir dari pengajar."""
-        # (rekap presensi, rekap nilai, daftar nilai, catatan akhir) digabung di sini.
+        # Setiap pemilihan kelas hanya memuat data kelas tersebut.
+        kelas_id = self.kelas_id if kelas_id is None else kelas_id
+        if kelas_id and not database.siswa_anggota_kelas(self.id, kelas_id):
+            raise ValueError('Kelas bukan milik siswa.')
         presensi = {"hadir": 0, "izin": 0, "sakit": 0, "alfa": 0}
-        for r in database.rekap_presensi_siswa(self.id):
+        for r in database.rekap_presensi_siswa(self.id, kelas_id):
             status = (r["status"] or "").lower()
             if status == "alpha":
                 status = "alfa"
             if status in presensi:
                 presensi[status] += r["jumlah"]
 
-        rekap_nilai = database.rekap_nilai_siswa(self.id)
-        daftar_nilai = database.ambil_daftar_nilai_siswa(self.id)
-        catatan = database.ambil_catatan_akhir_by_siswa(self.id)
+        rekap_nilai = database.rekap_nilai_siswa(self.id, kelas_id)
+        daftar_nilai = database.ambil_daftar_nilai_siswa(self.id, kelas_id)
+        catatan = [x for x in database.ambil_catatan_akhir_by_siswa(self.id) if x["kelas_id"] == kelas_id]
 
         return {
             "presensi": presensi,
@@ -299,7 +304,7 @@ class Siswa(User):
         return False
 
     def tampilkan_menu(self):
-        return ["Kelas", "Jadwal", "Monitoring Anak"]
+        return ["Dashboard", "Kelas", "Jadwal", "Monitoring Anak"]
 
 # PENDIDIKAN TERAKHIR PENGAJAR
 # Satu pengajar satu pendidikan terakhir. Yang mengisi cuma admin lewat Kelola Akun;
@@ -764,7 +769,7 @@ class Pengajar(User):
     # kebagian menu Profil. Materi/Tugas/Presensi/Catatan Akhir tetap diakses dari dalam kelas.
     def tampilkan_menu(self):
         # DIUBAH: "Profil" dikeluarkan dari navbar, dibuka lewat dropdown nama pengguna
-        return ["Kelas", "Jadwal"]
+        return ["Dashboard", "Kelas", "Jadwal"]
 
 # INHERITANCE: Admin turunan User juga
 class Admin(User):
@@ -1024,7 +1029,7 @@ class Admin(User):
 
     # POLYMORPHISM: lagi-lagi override, menu admin
     def tampilkan_menu(self):
-        return ["Kelola Akun", "Kelola Jadwal", "Kelola Kelas", "Monitoring"]
+        return ["Dashboard", "Kelola Akun", "Kelola Jadwal", "Kelola Kelas", "Monitoring"]
 
 # dipanggil pas login / get_current_user, tinggal kasih row, objek yang cocok keluar sendiri.
 # atau Admin. Setelah keluar dari sini, pemanggil memperlakukan ketiganya sama saja

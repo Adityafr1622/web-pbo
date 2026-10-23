@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% from '_dashboard_widgets.html' import metric, line_chart, activities %}
+{% from '_macros.html' import ic %}
+{% block title %}Dashboard Siswa · Fluenglo{% endblock %}
+{% block content %}
+<div class="dash-head">
+  <div><h1>Selamat Datang, {{ user.nama }}!</h1><p>Semangat belajar dan raih prestasi terbaikmu!</p></div>
+  {% if kelas_list %}<form class="dash-picker" method="get" action="{{ url_for('dashboard') }}"><label for="kelas-siswa">Kelas Saat Ini</label>
+  <select id="kelas-siswa" name="kelas" onchange="this.form.requestSubmit()">{% for k in kelas_list %}<option value="{{ k.id }}" {{ 'selected' if k.id==kelas_id }}>{{ k.nama }}{{ ' · Selesai' if k.selesai else ' · Aktif' }}</option>{% endfor %}</select></form>{% endif %}
+</div>
+{% if kelas_id %}
+<div class="dash-metrics dash-metrics-student">
+ {{ metric('Statistik Kehadiran', data.stat.kehadiran|string~'%' if data.stat.kehadiran is not none else '–', 'users','blue','Skor kumulatif',url_for('detail_kelas',kelas_id=kelas_id)) }}
+ {{ metric('Tugas Sudah Dikerjakan', data.stat.dikerjakan, 'check','green','dari '~data.stat.total_tugas~' tugas',url_for('dashboard',kelas=kelas_id,panel='dikerjakan')~'#dashboard-daftar') }}
+ {{ metric('Tugas Belum Dikerjakan', data.stat.belum_tugas, 'note','rose','dari '~data.stat.total_tugas~' tugas',url_for('dashboard',kelas=kelas_id,panel='belum_tugas')~'#dashboard-daftar') }}
+ {{ metric('Total Pertemuan', data.stat.total, 'calendar','violet','Target 8 pertemuan',url_for('lihat_jadwal',kelas=kelas_id)) }}
+ {{ metric('Sisa Pertemuan', data.stat.sisa, 'clock','gold',data.stat.selesai|string~' dari 8 sudah dipresensi',url_for('lihat_jadwal',kelas=kelas_id)) }}
+ {{ metric('Tugas Dinilai', data.stat.dinilai,'check','blue','dari '~data.stat.dikerjakan~' dikumpulkan',url_for('dashboard',kelas=kelas_id,panel='dinilai')~'#dashboard-daftar') }}
+ {{ metric('Tugas Belum Dinilai', data.stat.belum_nilai,'book','violet','Menunggu penilaian',url_for('dashboard',kelas=kelas_id,panel='belum_nilai')~'#dashboard-daftar') }}
+</div>
+<div class="dash-layout dash-layout-main">
+ <section class="dash-panel dash-span-2"><div class="dash-panel-heading"><h2>Grafik Kehadiran</h2><p>Persentase presensi kumulatif berdasarkan pertemuan yang sudah tercatat.</p></div>
+ {% if data.presensi %}
+ {{ line_chart(data.presensi|map(attribute='nilai')|list, data.presensi|map(attribute='label')|list, 100, '%') }}
+ <div class="dash-trend-summary">{% for point in data.presensi %}<span>Pertemuan {{ point.label }}: <strong>{{ point.nilai }}%</strong>{% if point.arah %} <small class="trend-{{ point.arah }}">{{ '↑' if point.arah=='naik' else ('↓' if point.arah=='turun' else '=') }} {{ point.arah|capitalize }}</small>{% endif %}</span>{% endfor %}</div>
+ {% else %}<div class="dash-no-data"><div class="dash-chart-grid"></div><p>Belum ada data presensi</p></div>{% endif %}
+ </section>
+ <section class="dash-panel"><div class="dash-panel-heading"><h2>Aktivitas Terbaru</h2><p>Aktivitas pembelajaran kelas yang dipilih.</p></div>{{ activities(data.aktivitas) }}</section>
+</div>
+<div class="dash-layout dash-layout-two">
+<section class="dash-panel"><div class="dash-panel-heading"><h2>Kelas yang Diikuti</h2><p>{{ 'Kelas aktif' if kelas_id==user.kelas_id else 'Riwayat kelas selesai' }}</p></div>
+<a class="dash-class-tile" href="{{ url_for('lihat_kelas') }}"><span class="dash-icon dash-blue">{{ kelas.nama[0] }}</span><span><strong>{{ kelas.nama }}</strong><small>Lihat detail kelas ›</small></span></a></section>
+<section class="dash-panel"><div class="dash-panel-heading"><h2>Materi Pembelajaran</h2><p>Materi kelas yang dipilih.</p></div><a class="dash-class-tile" href="{{ url_for('kelola_materi',kelas_id=kelas_id) }}"><span class="dash-icon dash-violet">{{ ic('book',21) }}</span><span><strong>{{ data.stat.materi }} materi</strong><small>Buka daftar materi ›</small></span></a></section>
+</div>
+{% if panel %}
+<section id="dashboard-daftar" class="dash-panel dash-bottom" tabindex="-1">
+ <div class="dash-panel-heading dash-panel-heading-actions">
+  <div><h2>{{ {'dikerjakan':'Tugas Sudah Dikerjakan','belum_tugas':'Tugas Belum Dikerjakan','dinilai':'Tugas Sudah Dinilai','belum_nilai':'Tugas Belum Dinilai'}[panel] }}</h2>
+   <p>Daftar tugas {{ kelas.nama }} sesuai pilihan pada kartu statistik.</p></div>
+  <a class="dash-list-close" href="{{ url_for('dashboard',kelas=kelas_id) }}">Tutup daftar</a>
+ </div>
+ <div class="table-scroll"><table class="dash-table"><thead><tr><th>Judul Tugas</th><th>Status</th><th>Nilai</th><th>Aksi</th></tr></thead><tbody>
+ {% for t in data.daftar %}
+ <tr><th>{{ t.judul }}</th><td>{{ t.status }}</td><td>{{ t.nilai if t.nilai is not none else '–' }}</td>
+  <td><a href="{{ url_for('detail_tugas',tugas_id=t.id) }}">{{ 'Kerjakan tugas ›' if panel=='belum_tugas' else 'Lihat tugas ›' }}</a></td></tr>
+ {% else %}<tr><td colspan="4">Belum ada tugas pada kategori ini.</td></tr>{% endfor %}
+ </tbody></table></div>
+</section>
+{% endif %}
+{% else %}<section class="dash-panel"><h2>Belum ada kelas aktif</h2><p class="dash-empty">Hubungi administrator untuk mendaftar ke kelas.</p></section>{% endif %}
+{% endblock %}

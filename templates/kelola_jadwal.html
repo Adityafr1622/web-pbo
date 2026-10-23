@@ -57,7 +57,7 @@
   <h2 class="group-title">Jadwal Mengajar Minggu Ke-{{ minggu }}</h2>
   <div class="table-card"><div class="table-scroll">
   <table class="data-table align-left">
-    <thead><tr><th>Kelas</th><th>Hari</th><th>Tanggal</th><th>Pengajar</th><th>Jam</th><th>Materi</th>{% if bisa_kelola or punya_tombol_presensi %}<th>Aksi</th>{% endif %}</tr></thead>
+    <thead><tr><th>Kelas</th><th>Hari</th><th>Tanggal</th><th>Pengajar</th><th>Jam</th><th>Materi</th>{% if bisa_kelola or punya_tombol_presensi %}<th>Aksi</th>{% endif %}<th>Status</th></tr></thead>
     <tbody>
     {% for j in items %}
     <tr>
@@ -77,6 +77,7 @@
           data-text="Yakin ingin menghapus jadwal {{ j.materi }} ({{ j.hari }}, {{ j.tanggal }})? Tindakan ini tidak dapat dibatalkan.">{{ ic('trash', 16) }}</button>
       </div></td>
       {% endif %}
+      <td><span class="badge {{ 'badge-ok' if j.selesai else 'badge-abu' }}" title="{{ 'Sudah ada catatan presensi untuk pertemuan ini' if j.selesai else 'Belum ada catatan presensi untuk pertemuan ini' }}">{{ 'Selesai' if j.selesai else 'Belum Selesai' }}</span></td>
     </tr>
     {% endfor %}
     </tbody>

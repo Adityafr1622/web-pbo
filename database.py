@@ -6,6 +6,9 @@ from datetime import datetime
 # terlanjur tersimpan ter-hash (lihat User.cek_password di models/user.py).
 from werkzeug.security import check_password_hash
 
+# Setiap kelas memiliki delapan pertemuan; jumlah selesai ditentukan dari presensi.
+TOTAL_PERTEMUAN_KELAS = 8
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # path absolut, jadi nggak peduli app dijalankan dari folder mana
 DB_NAME = os.path.join(BASE_DIR, 'fluenglo.db')
@@ -90,6 +93,32 @@ def migrasi():
                 WHERE pengganti = 1 AND pengganti_id IS NULL
                   AND EXISTS (SELECT 1 FROM kelas k WHERE k.id = jadwal.kelas_id)
             """)
+        # Data yang sudah ada hanya menyimpan kelas aktif. Backfill satu kali
+        # dari jadwal pertama kelas sebagai perkiraan awal keanggotaan lama;
+        # tidak membuat/menghapus catatan presensi, nilai, atau tugas apa pun.
+        conn.execute("""
+            INSERT INTO riwayat_kelas(siswa_id, kelas_id, tanggal_mulai)
+            SELECT u.id, u.kelas_id,
+                   COALESCE((SELECT MIN(j.tanggal) FROM jadwal j
+                             WHERE j.kelas_id = u.kelas_id AND j.tanggal IS NOT NULL),
+                            date('now','localtime'))
+            FROM users u WHERE u.role = 'siswa' AND u.kelas_id IS NOT NULL
+              AND NOT EXISTS(SELECT 1 FROM riwayat_kelas r
+                             WHERE r.siswa_id = u.id AND r.kelas_id = u.kelas_id
+                               AND r.tanggal_selesai IS NULL)
+        """)
+        conn.execute("""
+            INSERT INTO riwayat_kelas(siswa_id, kelas_id, tanggal_mulai, tanggal_selesai)
+            SELECT c.siswa_id, c.kelas_id,
+                   COALESCE((SELECT MIN(j.tanggal) FROM jadwal j
+                             WHERE j.kelas_id = c.kelas_id AND j.tanggal IS NOT NULL),
+                            substr(c.tanggal_dibuat, 1, 10)),
+                   substr(c.tanggal_dibuat, 1, 10)
+            FROM catatan_akhir c
+            WHERE c.lulus = 1 AND NOT EXISTS
+                (SELECT 1 FROM riwayat_kelas r
+                 WHERE r.siswa_id = c.siswa_id AND r.kelas_id = c.kelas_id)
+        """)
         conn.commit()
     finally:
         conn.close()
@@ -135,6 +164,9 @@ def tambah_user(nama, username, password, role, foto=None, no_whatsapp=None, bio
         ''', (nama, username, password, role,  # password disimpan apa adanya
               foto or 'default_avatar.png', no_whatsapp,
               biodata, kelas_id, alamat, nik, email))
+        if role == 'siswa' and kelas_id:
+            conn.execute('INSERT INTO riwayat_kelas(siswa_id, kelas_id, tanggal_mulai) VALUES(?,?,?)',
+                         (cursor.lastrowid, kelas_id, sekarang()[:10]))
         conn.commit()
         return cursor.lastrowid
     except sqlite3.IntegrityError:
@@ -168,10 +200,22 @@ def edit_user(user_id, **kwargs):
 
     conn = get_connection()
     try:
-        cursor = conn.execute(
-            f"UPDATE users SET {assignments} WHERE id = ?",
-            values
-        )
+        sebelumnya = conn.execute('SELECT role, kelas_id FROM users WHERE id=?', (user_id,)).fetchone()
+        pindah = (sebelumnya and sebelumnya['role'] == 'siswa' and 'kelas_id' in kwargs
+                  and sebelumnya['kelas_id'] != kwargs['kelas_id'])
+        if pindah and sebelumnya['kelas_id']:
+            lulus = conn.execute('''SELECT 1 FROM catatan_akhir
+                WHERE siswa_id=? AND kelas_id=? AND lulus=1''',
+                (user_id, sebelumnya['kelas_id'])).fetchone()
+            if not lulus:
+                raise ValueError('Siswa belum dinyatakan lulus dari kelas sebelumnya oleh pengajar.')
+        cursor = conn.execute(f"UPDATE users SET {assignments} WHERE id = ?", values)
+        if pindah:
+            conn.execute('UPDATE riwayat_kelas SET tanggal_selesai=? WHERE siswa_id=? AND tanggal_selesai IS NULL',
+                         (sekarang()[:10], user_id))
+            if kwargs['kelas_id']:
+                conn.execute('INSERT INTO riwayat_kelas(siswa_id, kelas_id, tanggal_mulai) VALUES(?,?,?)',
+                             (user_id, kwargs['kelas_id'], sekarang()[:10]))
         conn.commit()
         return cursor.rowcount > 0
     except sqlite3.IntegrityError as exc:
@@ -190,6 +234,7 @@ def hapus_user(user_id):
         conn.execute('DELETE FROM presensi WHERE siswa_id = ?', (user_id,))
         conn.execute('DELETE FROM pengumpulan WHERE siswa_id = ?', (user_id,))
         conn.execute('DELETE FROM catatan_akhir WHERE siswa_id = ?', (user_id,))
+        conn.execute('DELETE FROM riwayat_kelas WHERE siswa_id = ?', (user_id,))
         conn.execute('DELETE FROM komentar WHERE user_id = ?', (user_id,))
         conn.execute('DELETE FROM riwayat_password WHERE user_id = ?', (user_id,))
         # BARU (revisi 3): data pendidikan ikut dibuang biar nggak jadi data yatim
@@ -356,9 +401,14 @@ def edit_kelas(kelas_id, nama, pengajar_id, pengajar_id2=None, deskripsi=None, h
 
 def hapus_kelas(kelas_id):
     conn = get_connection()
+    # Kelas yang pernah diikuti siswa tidak boleh menghapus histori pendidikan.
+    if conn.execute('SELECT 1 FROM riwayat_kelas WHERE kelas_id=? LIMIT 1', (kelas_id,)).fetchone():
+        conn.close()
+        raise ValueError('Kelas tidak dapat dihapus karena memiliki riwayat keanggotaan siswa.')
     # jadwal & catatan akhir kelas ikut dihapus, siswa dilepas dari kelas, supaya tidak ada data yatim
     conn.execute('DELETE FROM jadwal WHERE kelas_id = ?', (kelas_id,))
     conn.execute('DELETE FROM catatan_akhir WHERE kelas_id = ?', (kelas_id,))
+    conn.execute('DELETE FROM riwayat_kelas WHERE kelas_id = ?', (kelas_id,))
     conn.execute('UPDATE users SET kelas_id = NULL WHERE kelas_id = ?', (kelas_id,))
     conn.execute('DELETE FROM kelas WHERE id = ?', (kelas_id,))
     conn.commit()
@@ -383,15 +433,15 @@ def ambil_kelas_siswa(siswa_id):
 
 def tambah_siswa_ke_kelas(kelas_id, siswa_id):
     conn = get_connection()
-    conn.execute('UPDATE users SET kelas_id = ? WHERE id = ?', (kelas_id, siswa_id))
-    conn.commit()
     conn.close()
+    return edit_user(siswa_id, kelas_id=kelas_id)
 
 def hapus_siswa_dari_kelas(kelas_id, siswa_id):
-    conn = get_connection()
-    conn.execute('UPDATE users SET kelas_id = NULL WHERE id = ? AND kelas_id = ?', (siswa_id, kelas_id))
-    conn.commit()
-    conn.close()
+    """Lepas siswa hanya setelah lulus; gunakan jalur yang mencatat riwayat."""
+    row = ambil_user_by_id(siswa_id)
+    if not row or row['kelas_id'] != kelas_id:
+        raise ValueError('Siswa tidak ada di kelas ini.')
+    return edit_user(siswa_id, kelas_id=None)
 
 def hitung_data_terkait_kelas(kelas_id):
     conn = get_connection()
@@ -907,6 +957,38 @@ def ambil_tanggal_jadwal_kelas(kelas_id):
     conn.close()
     return [r['tanggal'] for r in rows]
 
+def ambil_jadwal_terpresensi(jadwal_ids):
+    """ID jadwal yang sudah dicatat presensinya (bukan sekadar lewat tanggal).
+
+    Skema presensi lama berelasi ke (kelas_id, tanggal), bukan jadwal_id.
+    Karena itu satu tanggal dalam satu kelas dihitung sebagai satu pertemuan,
+    sama dengan progres dashboard. Status yang belum dipilih bukan catatan sah.
+    """
+    ids = list(dict.fromkeys(int(j) for j in jadwal_ids))
+    if not ids:
+        return set()
+    conn = get_connection()
+    try:
+        # Chunk agar tidak melebihi batas jumlah parameter pada versi SQLite lama.
+        selesai = set()
+        for awal in range(0, len(ids), 800):
+            potongan = ids[awal:awal + 800]
+            penanda = ','.join('?' for _ in potongan)
+            rows = conn.execute(f"""
+                SELECT j.id FROM jadwal j
+                WHERE j.id IN ({penanda}) AND EXISTS (
+                    SELECT 1 FROM presensi p
+                    WHERE p.kelas_id = j.kelas_id AND p.tanggal = j.tanggal
+                      AND LOWER(TRIM(p.status)) IN
+                          ('hadir','izin','sakit','alfa','alpha','alpa')
+                )
+            """, potongan).fetchall()
+            selesai.update(r['id'] for r in rows)
+        return selesai
+    finally:
+        conn.close()
+
+
 def ambil_tanggal_presensi_kelas(kelas_id):
     conn = get_connection()
     rows = conn.execute('SELECT DISTINCT tanggal FROM presensi WHERE kelas_id = ?', (kelas_id,)).fetchall()
@@ -967,10 +1049,10 @@ def update_status_presensi(presensi_id, status):
     conn.commit()
     conn.close()
 
-def rekap_presensi_siswa(siswa_id):
+def rekap_presensi_siswa(siswa_id, kelas_id=None):
     conn = get_connection()
-    rows = conn.execute('SELECT status, COUNT(*) AS jumlah FROM presensi WHERE siswa_id = ? GROUP BY status',
-                        (siswa_id,)).fetchall()
+    rows = conn.execute('SELECT status, COUNT(*) AS jumlah FROM presensi WHERE siswa_id = ? AND (? IS NULL OR kelas_id = ?) GROUP BY status',
+                        (siswa_id, kelas_id, kelas_id)).fetchall()
     conn.close()
     return rows
 
@@ -1071,7 +1153,7 @@ def ambil_penilaian_by_tugas(tugas_id):
     finally:
         conn.close()
 
-def ambil_daftar_nilai_siswa(siswa_id):
+def ambil_daftar_nilai_siswa(siswa_id, kelas_id=None):
     """Semua tugas di kelas siswa + nilainya. Tugas yang belum dikumpul/dinilai nilainya None."""
     conn = get_connection()
     try:
@@ -1079,15 +1161,15 @@ def ambil_daftar_nilai_siswa(siswa_id):
             SELECT t.id AS tugas_id, t.judul AS judul_tugas, t.deadline,
                    p.file_jawaban, p.nilai, p.waktu_kumpul
             FROM users u
-            JOIN tugas t ON t.kelas_id = u.kelas_id
+            JOIN tugas t ON t.kelas_id = COALESCE(?, u.kelas_id)
             LEFT JOIN pengumpulan p ON p.tugas_id = t.id AND p.siswa_id = u.id
             WHERE u.id = ?
             ORDER BY t.id DESC
-        """, (siswa_id,)).fetchall()
+        """, (kelas_id, siswa_id)).fetchall()
     finally:
         conn.close()
 
-def rekap_nilai_siswa(siswa_id):
+def rekap_nilai_siswa(siswa_id, kelas_id=None):
     """Menghitung jumlah nilai, rata-rata, tertinggi, dan terendah."""
     conn = get_connection()
     try:
@@ -1097,9 +1179,9 @@ def rekap_nilai_siswa(siswa_id):
                 ROUND(AVG(nilai), 2) AS rata_rata,
                 MAX(nilai) AS nilai_tertinggi,
                 MIN(nilai) AS nilai_terendah
-            FROM pengumpulan
-            WHERE siswa_id = ?
-        """, (siswa_id,)).fetchone()
+            FROM pengumpulan p JOIN tugas t ON t.id = p.tugas_id
+            WHERE p.siswa_id = ? AND (? IS NULL OR t.kelas_id = ?)
+        """, (siswa_id, kelas_id, kelas_id)).fetchone()
     finally:
         conn.close()
 
@@ -1131,13 +1213,13 @@ def ambil_monitoring_semua_siswa():
         return conn.execute("""
             SELECT u.id AS siswa_id, u.nama AS nama_siswa, u.foto AS foto_siswa,
                    k.id AS kelas_id, k.nama AS nama_kelas,
-                   (SELECT ROUND(AVG(nilai), 2) FROM pengumpulan WHERE siswa_id = u.id) AS rata_rata,
-                   (SELECT COUNT(*) FROM presensi WHERE siswa_id = u.id AND LOWER(status) = 'hadir') AS hadir,
-                   (SELECT COUNT(*) FROM presensi WHERE siswa_id = u.id AND LOWER(status) = 'izin') AS izin,
-                   (SELECT COUNT(*) FROM presensi WHERE siswa_id = u.id AND LOWER(status) = 'sakit') AS sakit,
-                   (SELECT COUNT(*) FROM presensi WHERE siswa_id = u.id
+                   (SELECT ROUND(AVG(p.nilai), 2) FROM pengumpulan p JOIN tugas t ON t.id=p.tugas_id WHERE p.siswa_id=u.id AND t.kelas_id=u.kelas_id) AS rata_rata,
+                   (SELECT COUNT(*) FROM presensi WHERE siswa_id = u.id AND kelas_id=u.kelas_id AND LOWER(status) = 'hadir') AS hadir,
+                   (SELECT COUNT(*) FROM presensi WHERE siswa_id = u.id AND kelas_id=u.kelas_id AND LOWER(status) = 'izin') AS izin,
+                   (SELECT COUNT(*) FROM presensi WHERE siswa_id = u.id AND kelas_id=u.kelas_id AND LOWER(status) = 'sakit') AS sakit,
+                   (SELECT COUNT(*) FROM presensi WHERE siswa_id = u.id AND kelas_id=u.kelas_id
                         AND LOWER(status) IN ('alfa', 'alpha')) AS alfa,
-                   (SELECT COUNT(*) FROM catatan_akhir WHERE siswa_id = u.id) AS jumlah_catatan
+                   (SELECT COUNT(*) FROM catatan_akhir WHERE siswa_id = u.id AND kelas_id=u.kelas_id) AS jumlah_catatan
             FROM users u
             LEFT JOIN kelas k ON k.id = u.kelas_id
             WHERE u.role = 'siswa'
@@ -1201,6 +1283,40 @@ def tambah_catatan_akhir(siswa_id, kelas_id, pengajar_id, catatan, lulus=0):
     finally:
         conn.close()
 
+def ambil_riwayat_kelas_siswa(siswa_id):
+    """Kelas aktif dan kelas lampau; hasil dibatasi ke pemilik akun."""
+    conn = get_connection()
+    try:
+        return conn.execute("""
+          SELECT DISTINCT k.id, k.nama AS nama_kelas,
+                 CASE WHEN u.kelas_id=k.id THEN 0 ELSE 1 END AS selesai
+          FROM riwayat_kelas r JOIN kelas k ON k.id=r.kelas_id
+          JOIN users u ON u.id=r.siswa_id
+          WHERE r.siswa_id=?
+          ORDER BY selesai, k.nama
+        """, (siswa_id,)).fetchall()
+    finally:
+        conn.close()
+
+
+def siswa_anggota_kelas(siswa_id, kelas_id):
+    conn = get_connection()
+    try:
+        return conn.execute('SELECT 1 FROM riwayat_kelas WHERE siswa_id=? AND kelas_id=? LIMIT 1',
+                            (siswa_id, kelas_id)).fetchone() is not None
+    finally:
+        conn.close()
+
+
+def kelas_lulus(siswa_id, kelas_id):
+    conn = get_connection()
+    try:
+        return conn.execute('SELECT 1 FROM catatan_akhir WHERE siswa_id=? AND kelas_id=? AND lulus=1',
+                            (siswa_id, kelas_id)).fetchone() is not None
+    finally:
+        conn.close()
+
+
 def ambil_kelas_lulus_siswa(siswa_id):
     """BARU: kelas-kelas yang sudah DITAMATKAN siswa (ditandai lulus oleh pengajar).
     Dipakai buat menampilkan kelas lama bertanda 'Selesai' dan jadwalnya yang masih bisa dilihat."""
@@ -1255,5 +1371,234 @@ def hapus_catatan_akhir(catatan_id, pengajar_id):
         """, (catatan_id, pengajar_id, pengajar_id))
         conn.commit()
         return cursor.rowcount > 0
+    finally:
+        conn.close()# --- DASHBOARD BERDASARKAN DATA NYATA ---
+def data_dashboard_admin(tahun):
+    conn = get_connection()
+    try:
+        tahun = int(tahun)
+        def rekap(y):
+            periode = str(y)
+            jadwal = "substr(j.tanggal,1,4)=?"
+            siswa_sql = """SELECT COUNT(DISTINCT r.siswa_id) FROM riwayat_kelas r
+                JOIN jadwal j ON j.kelas_id=r.kelas_id
+                WHERE substr(j.tanggal,1,4)=? AND substr(r.tanggal_mulai,1,4) <= substr(j.tanggal,1,4)
+                  AND (r.tanggal_selesai IS NULL OR substr(r.tanggal_selesai,1,4) >= substr(j.tanggal,1,4))"""
+            q = lambda sql: conn.execute(sql, (periode,)).fetchone()[0]
+            return dict(siswa=q(siswa_sql), pengajar=conn.execute("""SELECT COUNT(DISTINCT id) FROM (
+                   SELECT k.pengajar_id AS id FROM kelas k JOIN jadwal j ON j.kelas_id=k.id
+                        WHERE substr(j.tanggal,1,4)=?
+                   UNION SELECT k.pengajar_id2 FROM kelas k JOIN jadwal j ON j.kelas_id=k.id
+                        WHERE substr(j.tanggal,1,4)=? AND k.pengajar_id2 IS NOT NULL
+                   )""",(periode,periode)).fetchone()[0],
+                kelas=q('SELECT COUNT(DISTINCT kelas_id) FROM jadwal WHERE substr(tanggal,1,4)=?'),
+                materi=q('SELECT COUNT(*) FROM materi WHERE substr(tanggal_upload,1,4)=?'),
+                tugas=q('SELECT COUNT(*) FROM tugas WHERE substr(tanggal_dibuat,1,4)=?'),
+                pertemuan=q('SELECT COUNT(*) FROM jadwal WHERE substr(tanggal,1,4)=?'))
+        # Opsi hanya tahun dengan data yang benar-benar ada; tahun kosong tidak
+        # ditambahkan sekadar karena berada di rentang tiga tahun terakhir.
+        tahun_opsi = [int(r[0]) for r in conn.execute("""
+            SELECT tahun FROM (
+                SELECT substr(tanggal,1,4) AS tahun FROM jadwal
+                UNION ALL SELECT substr(tanggal_upload,1,4) FROM materi
+                UNION ALL SELECT substr(tanggal_dibuat,1,4) FROM tugas
+            ) WHERE tahun GLOB '[0-9][0-9][0-9][0-9]'
+              AND CAST(tahun AS INTEGER) BETWEEN 2000 AND 2100
+            GROUP BY tahun ORDER BY tahun DESC
+        """)]
+        # Link tahun yang tak tersedia tidak boleh menghasilkan dashboard kosong.
+        if tahun_opsi and tahun not in tahun_opsi:
+            tahun = tahun_opsi[0]
+        bulanan = []
+        for month in range(1,13):
+            q = conn.execute('''SELECT COUNT(DISTINCT r.siswa_id)
+                FROM riwayat_kelas r JOIN jadwal j ON j.kelas_id=r.kelas_id
+                WHERE substr(j.tanggal,1,7)=?
+                  AND substr(r.tanggal_mulai,1,7)<=substr(j.tanggal,1,7)
+                  AND (r.tanggal_selesai IS NULL OR substr(r.tanggal_selesai,1,7)>=substr(j.tanggal,1,7))''',
+                (f'{tahun}-{month:02d}',)).fetchone()[0]
+            bulanan.append(q)
+        rekap3 = [(y, rekap(y)) for y in tahun_opsi if y <= tahun][:3]
+        # Progress adalah jumlah tanggal pertemuan yang sudah dipresensi,
+        # maksimal 8; lewatnya tanggal jadwal bukan bukti pertemuan terlaksana.
+        progress = [dict(r) for r in conn.execute('''SELECT k.id,k.nama,
+             ? AS total,
+             MIN(?, (SELECT COUNT(DISTINCT p.tanggal) FROM presensi p
+                  WHERE p.kelas_id=k.id AND LOWER(TRIM(p.status))
+                    IN ('hadir','izin','sakit','alfa','alpha','alpa'))) AS selesai
+             FROM kelas k
+             WHERE EXISTS (SELECT 1 FROM jadwal j WHERE j.kelas_id=k.id
+                           AND substr(j.tanggal,1,4)=?)
+             ORDER BY k.nama''', (TOTAL_PERTEMUAN_KELAS,TOTAL_PERTEMUAN_KELAS,str(tahun)))]
+        aktivitas = [dict(r) for r in conn.execute('''SELECT tipe, judul, waktu, kelas_id FROM (
+          SELECT 'materi' tipe, 'Materi: '||judul judul, tanggal_upload waktu, kelas_id FROM materi
+          UNION ALL SELECT 'tugas', 'Tugas: '||judul, tanggal_dibuat, kelas_id FROM tugas
+          UNION ALL SELECT 'jadwal', 'Pertemuan: '||COALESCE(materi, 'Kelas'), tanggal, kelas_id FROM jadwal
+          UNION ALL SELECT 'nilai', 'Pengumpulan tugas', waktu_kumpul, t.kelas_id FROM pengumpulan p JOIN tugas t ON t.id=p.tugas_id
+        ) WHERE waktu IS NOT NULL AND substr(waktu,1,4)=? ORDER BY waktu DESC LIMIT 6''',(str(tahun),))]
+        stats = rekap(tahun)
+        # Setiap irisan diagram benar-benar mewakili kategori tersendiri.
+        # Nilai nol tetap dicatat untuk legenda, tetapi tanpa lebar irisan.
+        warna = (
+            ('siswa', '#5297fa'), ('pengajar', '#ffd260'),
+            ('kelas', '#50d5b1'), ('materi', '#86c7f8'),
+            ('tugas', '#c276f1'), ('pertemuan', '#387af0'),
+        )
+        total_rekap = sum(stats[k] for k, _ in warna)
+        posisi = 0.0
+        irisan = []
+        warna_diagram = []
+        for k, color in warna:
+            jumlah = stats[k]
+            persen = 100.0 * jumlah / total_rekap if total_rekap else 0.0
+            irisan.append(dict(kategori=k, jumlah=jumlah, warna=color, persen=persen))
+            if persen:
+                warna_diagram.append(f'{color} {posisi:.5f}% {posisi+persen:.5f}%')
+                posisi += persen
+        gradien = 'conic-gradient(' + ', '.join(warna_diagram) + ')' if warna_diagram else '#e6eef9'
+        return dict(tahun=tahun, tahun_opsi=tahun_opsi, stat=stats, bulanan=bulanan,
+                    rekap=rekap3, progress=progress, aktivitas=aktivitas,
+                    diagram_rekap=dict(total=total_rekap, irisan=irisan, gradien=gradien))
+    finally:
+        conn.close()
+
+
+def data_dashboard_pengajar(pengajar_id, kelas_id=None, panel=None):
+    kelas_list = ambil_kelas_by_pengajar(pengajar_id)
+    boleh = {k['id'] for k in kelas_list}
+    if kelas_id is not None and kelas_id not in boleh:
+        raise ValueError('Kelas bukan tanggung jawab pengajar.')
+    ids = [kelas_id] if kelas_id is not None else list(boleh)
+    if not ids:
+        return dict(kelas_list=kelas_list, kelas_id=kelas_id, stat=dict(kelas=0,siswa=0,rata=None,sisa=0,
+              dinilai=0,belum=0,materi=0), minggu=[], aktivitas=[], progress=[], daftar=[])
+    mark = ','.join('?' for _ in ids)
+    conn = get_connection()
+    try:
+        def satu(sql, params=()):return conn.execute(sql, tuple(params)).fetchone()[0]
+        siswa = satu(f'SELECT COUNT(DISTINCT id) FROM users WHERE role="siswa" AND kelas_id IN ({mark})',ids)
+        # Sisa pertemuan dihitung di bawah dari progres presensi tiap kelas;
+        # jadwal yang hanya lewat tanggalnya belum dianggap terlaksana.
+        row = conn.execute(f'''SELECT COUNT(CASE WHEN p.nilai IS NOT NULL THEN 1 END) dinilai,
+              COUNT(CASE WHEN p.nilai IS NULL THEN 1 END) belum, AVG(p.nilai) rata
+              FROM pengumpulan p JOIN tugas t ON t.id=p.tugas_id
+              WHERE t.kelas_id IN ({mark})''',ids).fetchone()
+        materi = satu(f'SELECT COUNT(*) FROM materi WHERE pengajar_id=? AND kelas_id IN ({mark})',[pengajar_id,*ids])
+        # Pengukuran mingguan mengikuti tanggal pengumpulan karena kolom tanggal penilaian belum tersedia.
+        minggu = [dict(r) for r in conn.execute(f'''SELECT strftime('%Y-W%W', p.waktu_kumpul) label,
+             ROUND(AVG(p.nilai),2) nilai FROM pengumpulan p JOIN tugas t ON t.id=p.tugas_id
+             WHERE t.kelas_id IN ({mark}) AND p.nilai IS NOT NULL
+             GROUP BY strftime('%Y-W%W', p.waktu_kumpul) ORDER BY label DESC LIMIT 8''',ids)][::-1]
+        aktivitas = [dict(r) for r in conn.execute(f'''SELECT tipe,judul,waktu,kelas_id FROM (
+          SELECT 'materi' tipe,'Materi: '||judul judul,tanggal_upload waktu,kelas_id,pengajar_id FROM materi
+          UNION ALL SELECT 'tugas','Tugas: '||judul,tanggal_dibuat,kelas_id,pengajar_id FROM tugas
+          UNION ALL SELECT 'jadwal','Pertemuan: '||COALESCE(materi,'Kelas'),tanggal,kelas_id,pengajar_id FROM jadwal
+        ) WHERE kelas_id IN ({mark}) AND pengajar_id=? AND waktu IS NOT NULL ORDER BY waktu DESC LIMIT 5''',[*ids,pengajar_id])]
+        progress = [dict(r) for r in conn.execute(f'''SELECT k.id,k.nama,
+          ? AS total,
+          MIN(?, (SELECT COUNT(DISTINCT p.tanggal) FROM presensi p
+             WHERE p.kelas_id=k.id AND LOWER(TRIM(p.status))
+               IN ('hadir','izin','sakit','alfa','alpha','alpa'))) AS selesai
+          FROM kelas k WHERE k.id IN ({mark}) ORDER BY k.nama''',
+          [TOTAL_PERTEMUAN_KELAS,TOTAL_PERTEMUAN_KELAS,*ids])]
+        sisa = sum(k['total'] - k['selesai'] for k in progress)
+        daftar=[]
+        if panel=='siswa':
+            daftar=[dict(r) for r in conn.execute(f'SELECT u.id,u.nama,k.nama kelas_nama,k.id kelas_id FROM users u JOIN kelas k ON k.id=u.kelas_id WHERE k.id IN ({mark}) AND u.role="siswa" ORDER BY k.nama,u.nama',ids)]
+        if panel in ('dinilai','belum'):
+            daftar=[dict(r) for r in conn.execute(f'''SELECT p.id,p.nilai,u.nama,t.judul,k.nama kelas_nama,t.id tugas_id
+                FROM pengumpulan p JOIN tugas t ON t.id=p.tugas_id
+                JOIN users u ON u.id=p.siswa_id JOIN kelas k ON k.id=t.kelas_id
+                WHERE t.kelas_id IN ({mark}) AND p.nilai IS {'NOT ' if panel=='dinilai' else ''}NULL
+                ORDER BY p.waktu_kumpul DESC''',ids)]
+        if panel=='materi':
+            daftar=[dict(r) for r in conn.execute(f'''SELECT m.id,m.judul,k.nama kelas_nama,m.kelas_id
+                FROM materi m JOIN kelas k ON k.id=m.kelas_id WHERE m.kelas_id IN ({mark})
+                AND m.pengajar_id=? ORDER BY m.tanggal_upload DESC''',[*ids,pengajar_id])]
+        return dict(kelas_list=kelas_list,kelas_id=kelas_id,stat=dict(kelas=len(ids),siswa=siswa,
+            rata=round(row['rata'],2) if row['rata'] is not None else None,sisa=sisa,
+            dinilai=row['dinilai'],belum=row['belum'],materi=materi),
+            minggu=minggu,aktivitas=aktivitas,progress=progress,daftar=daftar)
+    finally:
+        conn.close()
+
+
+def grafik_presensi_siswa(siswa_id, kelas_id):
+    """Kumulatif hanya jadwal lampau yang benar-benar memiliki catatan presensi."""
+    conn = get_connection()
+    try:
+        rows=conn.execute('''SELECT DISTINCT j.tanggal,LOWER(p.status) status
+            FROM jadwal j LEFT JOIN presensi p ON p.kelas_id=j.kelas_id AND p.siswa_id=? AND p.tanggal=j.tanggal
+            WHERE j.kelas_id=? AND j.tanggal<date('now','localtime') ORDER BY j.tanggal''',
+            (siswa_id,kelas_id)).fetchall()
+        nilai={'hadir':1,'izin':.5,'sakit':.5,'alfa':0,'alpha':0}
+        total=0; hasil=[]
+        for r in rows:
+            if r['status'] not in nilai:continue
+            total+=nilai[r['status']]
+            score=round(total/(len(hasil)+1)*100,2)
+            prev=hasil[-1]['nilai'] if hasil else None
+            delta=None if prev is None else round(score-prev,2)
+            hasil.append(dict(label=len(hasil)+1, tanggal=r['tanggal'],nilai=score,
+                              delta=delta,arah='tetap' if delta is not None and abs(delta)<.1
+                              else ('naik' if delta is not None and delta>0 else 'turun' if delta is not None else None)))
+        return hasil
+    finally:
+        conn.close()
+
+
+def data_dashboard_siswa(siswa_id,kelas_id,panel=None):
+    if kelas_id is None:
+        return dict(stat={}, presensi=[], aktivitas=[], kelas=None, daftar=[])
+    if not siswa_anggota_kelas(siswa_id, kelas_id):
+        raise ValueError('Kelas bukan milik siswa.')
+    conn=get_connection()
+    try:
+        q=lambda sql,params=():conn.execute(sql,tuple(params)).fetchone()[0]
+        total=TOTAL_PERTEMUAN_KELAS
+        # Satu hari presensi tercatat = satu pertemuan terlaksana untuk kelas,
+        # tanpa menghitung jumlah siswa dan tanpa melihat tanggal sudah lewat.
+        terlaksana=min(total,q("""SELECT COUNT(DISTINCT tanggal) FROM presensi
+            WHERE kelas_id=? AND LOWER(TRIM(status))
+              IN ('hadir','izin','sakit','alfa','alpha','alpa')""",(kelas_id,)))
+        sisa=total-terlaksana
+        tugas=q('SELECT COUNT(*) FROM tugas WHERE kelas_id=?',(kelas_id,))
+        dikerjakan=q('''SELECT COUNT(*) FROM pengumpulan p JOIN tugas t ON t.id=p.tugas_id
+              WHERE p.siswa_id=? AND t.kelas_id=?''',(siswa_id,kelas_id))
+        dinilai=q('''SELECT COUNT(*) FROM pengumpulan p JOIN tugas t ON t.id=p.tugas_id
+              WHERE p.siswa_id=? AND t.kelas_id=? AND p.nilai IS NOT NULL''',(siswa_id,kelas_id))
+        belum=q('''SELECT COUNT(*) FROM pengumpulan p JOIN tugas t ON t.id=p.tugas_id
+              WHERE p.siswa_id=? AND t.kelas_id=? AND p.nilai IS NULL''',(siswa_id,kelas_id))
+        materi=q('SELECT COUNT(*) FROM materi WHERE kelas_id=?',(kelas_id,))
+        aktivitas=[dict(r) for r in conn.execute('''SELECT tipe,judul,waktu,kelas_id FROM (
+           SELECT 'materi' tipe,'Materi: '||judul judul,tanggal_upload waktu,kelas_id FROM materi
+           UNION ALL SELECT 'tugas','Tugas: '||judul,tanggal_dibuat,kelas_id FROM tugas
+           UNION ALL SELECT 'jadwal','Jadwal: '||COALESCE(materi,'Pertemuan'),tanggal,kelas_id FROM jadwal
+           ) WHERE kelas_id=? AND waktu IS NOT NULL ORDER BY waktu DESC LIMIT 4''',(kelas_id,))]
+        # Detail kartu tugas ditampilkan di bawah dashboard, bukan dialihkan
+        # ke halaman lain; seluruh query selalu dibatasi kelas dan siswa login.
+        daftar=[]
+        kriteria={
+            'dikerjakan': 'p.id IS NOT NULL',
+            'belum_tugas': 'p.id IS NULL',
+            'dinilai': 'p.nilai IS NOT NULL',
+            'belum_nilai': 'p.id IS NOT NULL AND p.nilai IS NULL',
+        }
+        if panel in kriteria:
+            daftar=[dict(r) for r in conn.execute(f"""SELECT t.id,t.judul,
+                 t.deadline,p.nilai,p.waktu_kumpul,
+                 CASE WHEN p.id IS NULL THEN 'Belum dikerjakan'
+                      WHEN p.nilai IS NULL THEN 'Menunggu nilai'
+                      ELSE 'Sudah dinilai' END AS status
+                 FROM tugas t LEFT JOIN pengumpulan p
+                   ON p.tugas_id=t.id AND p.siswa_id=?
+                 WHERE t.kelas_id=? AND {kriteria[panel]}
+                 ORDER BY t.id DESC""",(siswa_id,kelas_id))]
+        presensi=grafik_presensi_siswa(siswa_id,kelas_id)
+        return dict(stat=dict(kehadiran=presensi[-1]['nilai'] if presensi else None,
+              dikerjakan=dikerjakan,belum_tugas=max(0,tugas-dikerjakan),total=total,
+              selesai=terlaksana,sisa=sisa,
+              dinilai=dinilai,belum_nilai=belum,materi=materi,total_tugas=tugas),
+              presensi=presensi,aktivitas=aktivitas,daftar=daftar)
     finally:
         conn.close()

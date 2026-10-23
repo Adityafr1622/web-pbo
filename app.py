@@ -172,14 +172,37 @@ def get_current_user():
     return buat_objek_user(row) if row else None
 
 
+def tujuan_back(user):
+    """Back bertingkat hanya untuk isi kelas; fitur utama kembali ke dashboard."""
+    ep = request.endpoint
+    arg = request.view_args or {}
+    if ep == 'detail_materi' and arg.get('materi_id'):
+        materi = database.ambil_materi_by_id(arg['materi_id'])
+        if materi:
+            return url_for('kelola_materi', kelas_id=materi['kelas_id'])
+    if ep == 'detail_tugas' and arg.get('tugas_id'):
+        tugas = database.ambil_tugas_by_id(arg['tugas_id'])
+        if tugas:
+            return url_for('daftar_tugas', kelas_id=tugas['kelas_id'])
+    if ep in ('kelola_materi', 'daftar_tugas', 'detail_kelas'):
+        return url_for('kelola_kelas' if user.role == 'admin' else 'lihat_kelas')
+    if ep == 'presensi_jadwal':
+        # Guru pengganti mengakses presensi melalui jadwal, bukan kelas penuh.
+        return url_for('lihat_jadwal')
+    return url_for('dashboard')
+
+
 @app.context_processor
 def info_pengguna():
     """Nama pengguna + daftar menu navbar, dipakai di semua template."""
     user = get_current_user()
     return {
         'nama_login': user.nama if user else '',
+        'foto_login': database.ambil_user_by_id(user.id)['foto'] if user else None,
+        'id_login': user.id if user else None,
         # POLYMORPHISM: cukup panggil tampilkan_menu(), ga perlu cek role satu-satu
         'menu_user': user.tampilkan_menu() if user else [],
+        'back_url': tujuan_back(user) if user and request.endpoint not in ('dashboard', 'login') else None,
     }
 
 
@@ -214,8 +237,37 @@ def dashboard():
         return redirect(url_for('login'))
 
     if user.role == 'admin':
-        return redirect(url_for('kelola_akun'))
-    return redirect(url_for('profil'))
+        try:
+            tahun = int(request.args.get('tahun', datetime.now().year))
+            if not 2000 <= tahun <= 2100:
+                raise ValueError()
+        except (ValueError, TypeError):
+            tahun = datetime.now().year
+        return render_template('dashboard_admin.html', user=user,
+                               data=database.data_dashboard_admin(tahun))
+    if user.role == 'pengajar':
+        pilih = request.args.get('kelas', type=int)
+        panel = request.args.get('panel')
+        if panel not in ('siswa', 'dinilai', 'belum', 'materi'):
+            panel = None
+        try:
+            data = database.data_dashboard_pengajar(user.id, pilih, panel)
+        except ValueError:
+            flash('Kelas yang dipilih bukan tanggung jawab pengajar.', 'danger')
+            return redirect(url_for('dashboard'))
+        return render_template('dashboard_pengajar.html', user=user, data=data, panel=panel)
+    kelas_list = user.lihat_semua_kelas()
+    pilihan = request.args.get('kelas', type=int)
+    if pilihan is not None and pilihan not in {k['id'] for k in kelas_list}:
+        flash('Kelas tidak tersedia.', 'danger')
+        return redirect(url_for('dashboard'))
+    kelas_id = pilihan if pilihan is not None else user.kelas_id
+    panel = request.args.get('panel')
+    if panel not in ('dikerjakan', 'belum_tugas', 'dinilai', 'belum_nilai'):
+        panel = None
+    return render_template('dashboard_siswa.html', user=user, kelas_list=kelas_list,
+                           kelas_id=kelas_id, kelas=database.ambil_kelas_by_id(kelas_id) if kelas_id else None,
+                           data=database.data_dashboard_siswa(user.id, kelas_id, panel), panel=panel)
 
 
 @app.route('/logout')
@@ -228,8 +280,10 @@ def logout():
 @app.route('/profil')
 def profil():
     user = get_current_user()
-    if not user or user.role == 'admin':
+    if not user:
         return redirect(url_for('login'))
+    if user.role == 'admin':
+        return render_template('profil_admin.html', user=user)
 
     # POLYMORPHISM: lihat_profil() dipanggil sama, hasilnya beda tiap role
     data = user.lihat_profil()
@@ -630,7 +684,7 @@ def detail_kelas(kelas_id):
     siswa_list = database.ambil_siswa_by_kelas(kelas_id)
     # siswa cuma boleh lihat kehadiran dirinya sendiri, bukan absensi teman sekelas
     if user.role == 'siswa':
-        siswa_list = [s for s in siswa_list if s['id'] == user.id]
+        siswa_list = [database.ambil_user_by_id(user.id)]
 
     # Pengganti tidak bisa membuka halaman kelas penuh; hanya pengajar tetap/admin sampai di sini.
     tanggal_boleh = None
@@ -668,6 +722,10 @@ def siapkan_jadwal_list(rows, user=None):
                 if kelas_id not in awal or senin < awal[kelas_id]:
                     awal[kelas_id] = senin
 
+    # Set status tiap jadwal dari catatan presensi kelas pada tanggal jadwal,
+    # bukan dari tanggal yang sudah lewat. Query dibatasi pada jadwal yang tampil.
+    jadwal_terpresensi = database.ambil_jadwal_terpresensi([r['id'] for r in rows])
+
     hasil = []
     for r in rows:
         d = ke_tanggal(r['tanggal'])
@@ -680,6 +738,7 @@ def siapkan_jadwal_list(rows, user=None):
             minggu = ((d - timedelta(days=d.weekday())) - awal[r['kelas_id']]).days // 7 + 1
         hasil.append({
             'id': r['id'],
+            'selesai': r['id'] in jadwal_terpresensi,
             'kelas_id': r['kelas_id'],
             'hari': r['hari'],
             'tanggal': f"{d.day} {BULAN[d.month - 1]} {d.year}" if d else '-',
@@ -1133,24 +1192,26 @@ def monitoring():
 
     if user.role == 'siswa':
         row = database.ambil_user_by_id(user.id)
-        # DIUBAH: + kelas & pengajar_list buat kartu identitas di halaman monitoring
-        kelas = database.ambil_kelas_by_id(row['kelas_id']) if row['kelas_id'] else None
-        return render_template('monitoring.html', user=user, data=user.lihat_monitoring(),
-                               siswa=row, daftar=None, ringkasan=None,
-                               bisa_beri_catatan=False, kelas_id=user.kelas_id, kelas=kelas,
+        daftar_kelas = user.lihat_semua_kelas()
+        pilih = request.args.get('kelas', type=int) or row['kelas_id']
+        if pilih and pilih not in {k['id'] for k in daftar_kelas}:
+            flash('Kelas tidak tersedia.', 'danger')
+            return redirect(url_for('monitoring'))
+        kelas = database.ambil_kelas_by_id(pilih) if pilih else None
+        return render_template('monitoring.html', user=user, data=user.lihat_monitoring(pilih),
+                               siswa=row, daftar=None, ringkasan=None, daftar_kelas=daftar_kelas,
+                               bisa_beri_catatan=False, kelas_id=pilih, kelas=kelas,
                                pengajar_list=database.ambil_pengajar_kelas(kelas) if kelas else [])
 
     daftar = database.ambil_monitoring_semua_siswa()
-    ringkasan = None
-    if user.role == 'admin':
-        ringkasan = user.monitoring_sistem()
-    else:
+    # Statistik keseluruhan tersedia di Dashboard, tidak diduplikasi di Monitoring.
+    if user.role != 'admin':
         # pengajar cuma melihat siswa di kelas yang dia ajar
         kelas_diajar = {k['id'] for k in user.lihat_kelas_diajar()}
         daftar = [d for d in daftar if d['kelas_id'] in kelas_diajar]
 
     return render_template('monitoring.html', user=user, data=None, siswa=None,
-                           daftar=daftar, ringkasan=ringkasan, bisa_beri_catatan=False)
+                           daftar=daftar, ringkasan=None, bisa_beri_catatan=False)
 
 
 @app.route('/monitoring/<int:siswa_id>')
@@ -1170,17 +1231,23 @@ def monitoring_siswa(siswa_id):
         flash('Kamu tidak punya akses ke monitoring siswa ini.', 'danger')
         return redirect(url_for('dashboard'))
 
-    if user.id == siswa_id:
-        data = user.lihat_monitoring()
-    else:
-        data = user.lihat_monitoring_siswa(siswa_id)  # dipunyai Admin maupun Pengajar
-
-    # + kelas & pengajar_list buat kartu identitas di halaman monitoring
-    kelas = database.ambil_kelas_by_id(row['kelas_id']) if row['kelas_id'] else None
+    daftar_kelas = [dict(r) for r in database.ambil_riwayat_kelas_siswa(siswa_id)]
+    pilih = request.args.get('kelas', type=int) or row['kelas_id']
+    if pilih and pilih not in {k['id'] for k in daftar_kelas}:
+        flash('Riwayat kelas tidak tersedia.', 'danger')
+        return redirect(url_for('monitoring_siswa', siswa_id=siswa_id))
+    if user.role == 'pengajar' and pilih and not user.mengajar_kelas(pilih):
+        flash('Kelas bukan tanggung jawab pengajar.', 'danger')
+        return redirect(url_for('monitoring'))
+    siswa_objek = buat_objek_user(row)
+    data = siswa_objek.lihat_monitoring(pilih)
+    kelas = database.ambil_kelas_by_id(pilih) if pilih else None
     return render_template('monitoring.html', user=user, data=data, siswa=row, daftar=None,
-                           ringkasan=None, kelas_id=row['kelas_id'], kelas=kelas,
+                           ringkasan=None, kelas_id=pilih, kelas=kelas, daftar_kelas=daftar_kelas,
                            pengajar_list=database.ambil_pengajar_kelas(kelas) if kelas else [],
-                           bisa_beri_catatan=(user.role == 'pengajar'))
+                           bisa_beri_catatan=(user.role == 'pengajar' and bool(pilih)
+                                              and user.mengajar_kelas(pilih)
+                                              and row['kelas_id'] == pilih))
 
 # --- ROUTE PRESENSI ---
 def siapkan_presensi_list(kelas_id):

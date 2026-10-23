@@ -1,6 +1,6 @@
-{% from '_macros.html' import ic %}
+{% from '_macros.html' import ic, avatar %}
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" data-theme-user="{{ id_login or 'guest' }}" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,7 +8,18 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+{# Baca pilihan sebelum CSS dirender agar tidak berkedip ketika berpindah halaman. #}
+<script>
+(function () {
+  var root = document.documentElement;
+  var user = root.getAttribute('data-theme-user') || 'guest';
+  try {
+    root.dataset.theme = (user === 'guest' ? localStorage.getItem('fluenglo-theme-v1:browser') : localStorage.getItem('fluenglo-theme-v1:' + user)) === 'dark' ? 'dark' : 'light';
+  } catch (error) { root.dataset.theme = 'light'; }
+}());
+</script>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/themes.css') }}">
 </head>
 <body class="{% block body_class %}{% endblock %}">
 {% block shell %}
@@ -16,6 +27,7 @@
 {# + entri Monitoring (admin) & Monitoring Anak (siswa), + endpoint detail_materi #}
 {% set HAL_KELAS = ['detail_kelas','kelola_materi','detail_materi','daftar_tugas','detail_tugas'] %}
 {% set NAV = [
+ ('Dashboard','dashboard','home',[]),
  ('Kelola Akun','kelola_akun','users',['biodata_akun','profil_siswa','profil_pengajar']),
  ('Kelola Kelas','kelola_kelas','door',HAL_KELAS),
  ('Kelola Jadwal','kelola_jadwal','calendar',[]),
@@ -33,11 +45,18 @@
   </nav>
   <div class="usermenu">
     <button type="button" class="user-btn" data-menu aria-expanded="false">
-      <span class="avatar avatar-sm avatar-init">{{ (nama_login or '?')[0]|upper }}</span>
+      {{ avatar(foto_login, nama_login, 'avatar-sm') }}
       <span class="user-name">{{ nama_login }}</span>{{ ic('chevron', 16) }}
     </button>
     <div class="user-dropdown" hidden>
-      {% if session.get('role') != 'admin' %}<a href="{{ url_for('profil') }}">{{ ic('user', 20) }} Lihat Profil</a>{% endif %}
+      <a href="{{ url_for('profil') }}">{{ ic('user', 20) }} Lihat Profil</a>
+      <div class="theme-switcher" role="group" aria-label="Tema tampilan">
+        <div class="theme-switcher-title">{{ ic('sun', 18) }} <span>Tema Tampilan</span></div>
+        <div class="theme-options">
+          <button type="button" class="theme-option" data-theme-choice="light" aria-pressed="true" title="Gunakan Light Mode">{{ ic('sun', 16) }} Light</button>
+          <button type="button" class="theme-option" data-theme-choice="dark" aria-pressed="false" title="Gunakan Dark Mode">{{ ic('moon', 16) }} Dark</button>
+        </div>
+      </div>
       {# logout lewat konfirmasi dulu, biar nggak kelepasan pencet waktu lagi
          mengisi presensi atau menulis komentar. Modalnya modal yang sama dengan tombol
          hapus, cuma judul & tombolnya diganti lewat data-judul / data-ok / data-warna. #}
@@ -47,7 +66,14 @@
     </div>
   </div>
 </header>
-<main class="page">{% block content %}{% endblock %}</main>
+<main class="page">
+  {% if request.endpoint not in ('dashboard', 'login') %}
+  <div class="back-navigation"><a class="back-button" href="{{ back_url or url_for('dashboard') }}">
+    {{ ic('arrow-left', 18) }} <span>Back</span>
+  </a></div>
+  {% endif %}
+  {% block content %}{% endblock %}
+</main>
 {% endblock %}
 
 {% with msgs = get_flashed_messages(with_categories=true) %}{% if msgs %}
@@ -66,5 +92,6 @@
 </div></div>
 
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+<script src="{{ url_for('static', filename='js/theme.js') }}"></script>
 </body>
 </html>

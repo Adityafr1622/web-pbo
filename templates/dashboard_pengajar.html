@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% from '_dashboard_widgets.html' import metric, line_chart, activities %}
+{% block title %}Dashboard Pengajar · Fluenglo{% endblock %}
+{% block content %}
+<div class="dash-head">
+  <div><h1>Selamat Datang, {{ user.nama }}!</h1><p>Semoga hari ini menjadi hari yang produktif dalam mengajar dan membimbing siswa.</p></div>
+  <form class="dash-picker" method="get" action="{{ url_for('dashboard') }}"><label for="kelas-diajarkan">Kelas Saat Ini</label>
+    <select id="kelas-diajarkan" name="kelas" onchange="this.form.requestSubmit()"><option value="">Semua Kelas</option>
+    {% for k in data.kelas_list %}<option value="{{ k.id }}" {{ 'selected' if data.kelas_id==k.id }}>{{ k.nama }}</option>{% endfor %}
+    </select></form>
+</div>
+{% set suffix = ('&kelas='~data.kelas_id) if data.kelas_id else '' %}
+{% set pilih = data.kelas_id %}
+<div class="dash-metrics dash-metrics-teacher">
+ {{ metric('Jumlah Kelas yang Diajar', data.stat.kelas, 'cap', 'blue', 'Kelas yang diajar', url_for('lihat_kelas')) }}
+ {{ metric('Jumlah Siswa', data.stat.siswa, 'users', 'green', 'Siswa aktif', url_for('dashboard',kelas=pilih,panel='siswa')~'#dashboard-daftar') }}
+ {{ metric('Rata-rata Nilai per Minggu', data.minggu[-1].nilai if data.minggu else '–', 'chart', 'violet', 'Minggu terakhir dengan nilai') }}
+ {{ metric('Sisa Pertemuan', data.stat.sisa, 'calendar','green','Dari 8 pertemuan per kelas',url_for('lihat_jadwal',kelas=pilih)) }}
+ {{ metric('Jumlah Tugas Dinilai', data.stat.dinilai, 'check', 'gold','Pengumpulan sudah dinilai',url_for('dashboard',kelas=pilih,panel='dinilai')~'#dashboard-daftar') }}
+ {{ metric('Tugas Belum Dinilai', data.stat.belum, 'note', 'rose','Pengumpulan menunggu nilai',url_for('dashboard',kelas=pilih,panel='belum')~'#dashboard-daftar') }}
+ {{ metric('Jumlah Materi Diunggah', data.stat.materi, 'book', 'violet','Materi yang kamu unggah',url_for('dashboard',kelas=pilih,panel='materi')~'#dashboard-daftar') }}
+</div>
+<div class="dash-layout dash-layout-main">
+ <section class="dash-panel dash-span-2"><div class="dash-panel-heading"><h2>Grafik Perkembangan Nilai Rata-rata Siswa</h2><p>Rata-rata nilai berdasarkan minggu pengumpulan tugas yang telah dinilai.</p></div>
+ {% if data.minggu %}{{ line_chart(data.minggu|map(attribute='nilai')|list, data.minggu|map(attribute='label')|list, 100) }}
+ {% else %}<div class="dash-no-data"><div class="dash-chart-grid"></div><p>Belum ada data nilai</p></div>{% endif %}
+ </section>
+ <section class="dash-panel"><div class="dash-panel-heading"><h2>Aktivitas Terbaru</h2><p>Aktivitas di kelas yang diajar.</p></div>{{ activities(data.aktivitas) }}</section>
+</div>
+<section class="dash-panel dash-bottom"><div class="dash-panel-heading"><h2>Kelas yang Diajar / Progress Kelas</h2><p>Pertemuan yang telah dicatat presensinya, dari target 8 per kelas.</p></div>
+<div class="dash-class-grid">{% for k in data.progress %}
+<a href="{{ url_for('detail_kelas', kelas_id=k.id) }}" class="dash-class-tile"><span class="dash-icon dash-blue">{{ k.nama[0] }}</span><span><strong>{{ k.nama }}</strong><small>{{ k.selesai }} / {{ k.total }} pertemuan</small></span><span class="dashboard-next">›</span></a>
+{% else %}<p class="dash-empty">Belum ada kelas yang diajar.</p>{% endfor %}</div></section>
+{% if panel %}<section id="dashboard-daftar" class="dash-panel dash-bottom"><div class="dash-panel-heading"><h2>{{ {'siswa':'Daftar Siswa','dinilai':'Pengumpulan Sudah Dinilai','belum':'Pengumpulan Belum Dinilai','materi':'Materi yang Diunggah'}[panel] }}</h2><p>Daftar sesuai filter kelas di atas.</p></div>
+<div class="table-scroll"><table class="dash-table"><thead><tr><th>{{ 'Nama Siswa' if panel=='siswa' else 'Judul' }}</th><th>Kelas</th><th>Aksi</th></tr></thead><tbody>
+{% for d in data.daftar %}<tr><th>{{ d.nama if panel=='siswa' else d.judul }}</th><td>{{ d.kelas_nama }}</td><td>
+{% if panel=='siswa' %}<a href="{{ url_for('monitoring_siswa',siswa_id=d.id,kelas=d.kelas_id) }}">Monitoring ›</a>
+{% elif panel=='materi' %}<a href="{{ url_for('detail_materi',materi_id=d.id) }}">Buka materi ›</a>
+{% else %}<a href="{{ url_for('detail_tugas',tugas_id=d.tugas_id) }}">Buka tugas ›</a> {% if panel=='dinilai' %}· {{ d.nilai }}{% endif %}{% endif %}
+</td></tr>{% else %}<tr><td colspan="3">Belum ada data untuk pilihan ini.</td></tr>{% endfor %}
+</tbody></table></div></section>{% endif %}
+{% endblock %}

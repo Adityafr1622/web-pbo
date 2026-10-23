@@ -1,0 +1,61 @@
+{% from '_macros.html' import ic %}
+{% macro metric(label, number, icon='chart', tone='blue', info='', url=none) %}
+{% if url %}<a class="dash-metric dash-metric-link" href="{{ url }}" aria-label="{{ label }}: {{ number }}">
+{% else %}<div class="dash-metric">{% endif %}
+  <span class="dash-icon dash-{{ tone }}">{{ ic(icon, 23) }}</span>
+  <span class="dash-metric-label">{{ label }}</span>
+  <strong class="dash-metric-value">{{ number }}</strong>
+  {% if info %}<span class="dash-metric-info">{{ info }}</span>{% endif %}
+  {% if url %}<span class="dash-metric-arrow" aria-hidden="true">↗</span>{% endif %}
+{% if url %}</a>{% else %}</div>{% endif %}
+{% endmacro %}
+
+{% macro line_chart(values, labels, max_y=none, unit='') %}
+{% set maxdata = values|max if values else 0 %}
+{% set ceiling = max_y if max_y else ([maxdata, 1]|max) %}
+{% set ada = values|select('ne', none)|list|length %}
+<div class="dashboard-chart">
+<svg viewBox="0 0 920 320" role="img" aria-label="Grafik perkembangan berdasarkan data yang tercatat">
+  <defs><linearGradient id="dashboardArea{{ labels|length }}{{ unit }}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2381fb" stop-opacity=".22"/><stop offset="1" stop-color="#2381fb" stop-opacity=".015"/></linearGradient></defs>
+  {% for tick in range(5) %}
+  {% set y = 262 - tick*55 %}
+  <line x1="55" y1="{{ y }}" x2="905" y2="{{ y }}" stroke="#e4ecf8" stroke-width="1"/>
+  <text x="44" y="{{ y+4 }}" text-anchor="end" class="dashboard-axis">{{ (ceiling*tick/4)|round|int }}{{ unit }}</text>
+  {% endfor %}
+  {% set plots = namespace(points=[]) %}
+  {% for v in values %}
+    {% if v is not none %}
+      {% set px = 75+(loop.index0*805/([values|length-1,1]|max)) %}
+      {% set py = 262-(([v,ceiling]|min)/ceiling)*220 %}
+      {% set _=plots.points.append({'x':px,'y':py,'v':v,'label':labels[loop.index0]}) %}
+    {% endif %}
+  {% endfor %}
+  {% if plots.points %}
+    {% set pairs=[] %}{% for d in plots.points %}{% set _=pairs.append(d.x|string ~ ',' ~ d.y|string) %}{% endfor %}
+    <path d="M{{ pairs|join(' L') }} L{{ plots.points[-1].x }},262 L{{ plots.points[0].x }},262 Z" fill="url(#dashboardArea{{ labels|length }}{{ unit }})"/>
+    <polyline points="{{ pairs|join(' ') }}" fill="none" stroke="#1678fa" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+    {% for d in plots.points %}
+    <circle cx="{{ d.x }}" cy="{{ d.y }}" r="5" fill="#1678fa" stroke="white" stroke-width="2.5"><title>{{ d.label }}: {{ d.v }}{{ unit }}</title></circle>
+    <text x="{{ d.x }}" y="{{ d.y-13 }}" text-anchor="middle" class="dashboard-plot-label">{{ d.v }}{{ unit }}</text>
+    {% endfor %}
+  {% endif %}
+  {% for label in labels %}
+    {% if labels|length <= 12 %}<text x="{{ 75+(loop.index0*805/([labels|length-1,1]|max)) }}" y="290" text-anchor="middle" class="dashboard-axis">{{ label }}</text>{% endif %}
+  {% endfor %}
+</svg>
+{% if not ada %}<div class="dashboard-chart-empty">Belum ada data</div>{% endif %}
+</div>
+{% endmacro %}
+
+{% macro activities(items) %}
+{% if items %}<div class="dashboard-activities">
+  {% for a in items %}
+    {% set target = url_for('kelola_materi',kelas_id=a.kelas_id) if a.tipe=='materi' else (url_for('daftar_tugas',kelas_id=a.kelas_id) if a.tipe in ('tugas','nilai') else url_for('detail_kelas',kelas_id=a.kelas_id)) %}
+    <a href="{{ target }}" class="dashboard-activity">
+      <span class="dash-icon dash-{{ 'violet' if a.tipe=='tugas' else ('green' if a.tipe=='nilai' else ('gold' if a.tipe=='jadwal' else 'blue')) }}">{{ ic('note' if a.tipe in ('tugas','materi','nilai') else 'calendar',19) }}</span>
+      <span class="dashboard-activity-text"><strong>{{ a.judul }}</strong><small>{{ a.waktu|tgl_jam if a.waktu|length > 10 else a.waktu|tgl }}</small></span>
+      <span class="dashboard-next">›</span>
+    </a>
+  {% endfor %}
+</div>{% else %}<p class="dash-empty">Belum ada aktivitas yang tercatat untuk pilihan ini.</p>{% endif %}
+{% endmacro %}

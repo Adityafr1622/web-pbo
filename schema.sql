@@ -148,3 +148,15 @@ CREATE TABLE IF NOT EXISTS catatan_akhir (
     FOREIGN KEY (pengajar_id) REFERENCES users(id),
     UNIQUE (siswa_id, kelas_id)
 );
+
+-- Riwayat keanggotaan siswa untuk mempertahankan kelas lama dan statistik menurut jadwal.
+-- users.kelas_id tetap menjadi kelas aktif sehingga route lama tidak perlu dirombak.
+CREATE TABLE IF NOT EXISTS riwayat_kelas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    siswa_id INTEGER NOT NULL REFERENCES users(id),
+    kelas_id INTEGER NOT NULL REFERENCES kelas(id),
+    tanggal_mulai TEXT NOT NULL,
+    tanggal_selesai TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_riwayat_kelas_siswa ON riwayat_kelas(siswa_id, kelas_id);
+CREATE INDEX IF NOT EXISTS idx_riwayat_kelas_tanggal ON riwayat_kelas(kelas_id, tanggal_mulai, tanggal_selesai);
