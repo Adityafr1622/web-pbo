@@ -19,7 +19,8 @@
   };
   const pulihkanStateForm = m => {
     const f = $('form', m);
-    if (!f || !m._stateAwal) return;
+    if (!f) return;
+    if (!m._stateAwal) { f.reset(); return; }
     const daftar = m._stateAwal;
     for (const state of daftar) {
       const fields = [...f.elements].filter(i => i.name === state.name && i.type === state.type);
@@ -180,7 +181,9 @@
       }
       return;
     }
-    if ((el = up('[data-reset-form]'))) { pulihkanStateForm(up('.modal')); return; }
+    if ((el = up('[data-reset-form]'))) {
+      const m = up('.modal'); pulihkanStateForm(m); return;
+    }
     if (up('[data-close]')) return closeM(up('.modal'));
     if (t.classList.contains('modal')) {
       // Popup formulir hanya boleh ditutup lewat tombol X. Klik area gelap di luar
@@ -319,6 +322,46 @@
     e.preventDefault();
     const salah = $$('input, select, textarea', f).find(i => i.willValidate && !i.checkValidity());
     if (salah) tampilkanPesan(f, salah);
+  });
+
+  // Preflight username sebelum form akun dikirim: saat duplikat, file upload tetap ada.
+  document.addEventListener('submit', async e => {
+    const f = e.target;
+    if (!f.matches('[data-check-username]') || !f.checkValidity()) return;
+    e.preventDefault();
+    if (f.dataset.cekSedang === '1') return;
+    f.dataset.cekSedang = '1';
+    const submit = f.querySelector('[type="submit"], button:not([type])');
+    if (submit) submit.disabled = true;
+    try {
+      const username = f.elements.username?.value.trim() || '';
+      const cocok = /\/edit\/(\d+)/.exec(f.action);
+      const url = new URL(f.dataset.checkUsername, location.origin);
+      url.searchParams.set('username', username);
+      if (cocok) url.searchParams.set('exclude', cocok[1]);
+      const response = await fetch(url, {credentials: 'same-origin'});
+      if (!response.ok) throw new Error('Gagal memeriksa username.');
+      const data = await response.json();
+      if (!data.available) {
+        const inp = f.elements.username;
+        bersihkanPesan(f);
+        const box = document.createElement('p');
+        box.className = 'form-error'; box.textContent = 'Username sudah digunakan.';
+        ($('.modal-body', f) || f).prepend(box);
+        inp.classList.add('is-salah'); inp.focus();
+        return;
+      }
+      HTMLFormElement.prototype.submit.call(f);
+    } catch (error) {
+      bersihkanPesan(f);
+      const box = document.createElement('p');
+      box.className = 'form-error';
+      box.textContent = error.message || 'Pemeriksaan username gagal. Coba lagi.';
+      ($('.modal-body', f) || f).prepend(box);
+    } finally {
+      f.dataset.cekSedang = '0';
+      if (submit) submit.disabled = false;
+    }
   });
 
   // pesan hilang sendiri begitu isian yang salah sudah dibetulkan

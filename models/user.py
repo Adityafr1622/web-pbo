@@ -23,7 +23,7 @@ class User(ABC):
         # otomatis kebaca admin setelah pemiliknya login sekali, tanpa perlu di-reset manual.
         if not database.cocok_hash_lama(self.__password, password):
             return False
-        database.edit_user(self.id, password=password)
+        database.edit_user(self.id, record_password_history=False, password=password)
         self.__password = password
         return True
 
@@ -43,8 +43,7 @@ class User(ABC):
         if password_baru == password_lama:
             raise ValueError("Password baru tidak boleh sama dengan password lama.")
         database.edit_user(self.id, password=password_baru)
-        # DIUBAH: password lama & barunya ikut dicatat, dipakai kartu Riwayat Perubahan Password
-        database.catat_riwayat_password(self.id, password_lama, password_baru)
+        # Histori dicatat secara atomik oleh database.edit_user().
         self.__password = password_baru
 
     @staticmethod
@@ -140,13 +139,16 @@ class Siswa(User):
         }
 
     def edit_profil(self, whatsapp, email="", foto=None, alamat=None):
-        """Ubah Profil siswa. WA wajib valid, email opsional, alamat boleh dikosongkan.
-        alamat=None artinya alamat tidak diubah. Ganti password lewat ganti_password() (warisan User)."""
+        """Ubah Profil siswa: WA dan alamat wajib; email tetap opsional.
+        alamat=None artinya gunakan alamat tersimpan (form lama yang belum punya field alamat)."""
         whatsapp, email = User.cek_kontak(whatsapp, email)  # INHERITANCE: aturan kontak dipakai bareng Pengajar
+        alamat_baru = self.alamat if alamat is None else alamat.strip()
+        if not (alamat_baru or "").strip():
+            raise ValueError("Alamat wajib diisi.")
 
         perubahan = {"no_whatsapp": whatsapp, "email": email}
         if alamat is not None:
-            perubahan["alamat"] = alamat.strip() or None
+            perubahan["alamat"] = alamat_baru
         if foto:
             perubahan["foto"] = foto
         database.edit_user(self.id, **perubahan)
@@ -154,7 +156,7 @@ class Siswa(User):
         self.whatsapp = whatsapp
         self.email = email
         if alamat is not None:
-            self.alamat = perubahan["alamat"]
+            self.alamat = alamat_baru
         if foto:
             self.foto = foto
 
@@ -536,7 +538,7 @@ class Pengajar(User):
                 continue
         raise ValueError("Format deadline tidak valid.")
 
-    def buat_tugas(self, kelas, judul, deskripsi, deadline):
+    def buat_tugas(self, kelas, judul, deskripsi, deadline, file_lampiran=None):
         """Membuat tugas untuk kelas yang diajar."""
         kelas_id = Pengajar._ke_int(kelas, "Kelas")
 
@@ -557,7 +559,8 @@ class Pengajar(User):
             deskripsi=deskripsi,
             deadline=deadline,
             kelas_id=kelas_id,
-            pengajar_id=self.id
+            pengajar_id=self.id,
+            file_lampiran=file_lampiran
         )
 
     def beri_nilai(self, pengumpulan, nilai):
@@ -620,7 +623,7 @@ class Pengajar(User):
 
         return komentar
 
-    def edit_tugas(self, tugas, judul, deskripsi, deadline):
+    def edit_tugas(self, tugas, judul, deskripsi, deadline, file_lampiran=None, hapus_lampiran=False):
         """BARU: ubah tugas di kelas yang diajar. Balikin kelas_id-nya (buat redirect)."""
         tugas_id = Pengajar._ke_int(tugas, "Tugas")
         data = database.ambil_tugas_by_id(tugas_id)
@@ -638,7 +641,7 @@ class Pengajar(User):
             raise ValueError("Deadline tugas wajib diisi.")
         Pengajar._cek_deadline(deadline)
 
-        database.edit_tugas(tugas_id, judul, deskripsi, deadline)
+        database.edit_tugas(tugas_id, judul, deskripsi, deadline, file_lampiran, hapus_lampiran)
         return data["kelas_id"]
 
     def hapus_tugas(self, tugas):
@@ -693,7 +696,7 @@ class Pengajar(User):
         tanggal = tanggal or date.today().isoformat()
         return self.catat_presensi_kelas(kelas_id, tanggal, {siswa_id: status})
 
-    def catat_presensi_kelas(self, kelas, tanggal, data_status, kosongkan=None):
+    def catat_presensi_kelas(self, kelas, tanggal, data_status, kosongkan=None, jadwal_id=None):
         """Catat presensi banyak siswa sekaligus. data_status: {siswa_id: status}.
         DIUBAH: + kosongkan, daftar siswa yang centangnya dilepas pengajar supaya
         presensinya ikut terhapus, bukan tertinggal memakai status lama."""
@@ -703,12 +706,15 @@ class Pengajar(User):
             kelas_id = int(kelas_id)
         except (TypeError, ValueError):
             raise ValueError("Kelas tidak valid.")
+        jadwal_terpilih = database.ambil_jadwal_by_id(jadwal_id) if jadwal_id else None
+        if not jadwal_terpilih or jadwal_terpilih['kelas_id'] != kelas_id or jadwal_terpilih['tanggal'] != tanggal:
+            raise ValueError('Pilih pertemuan yang valid untuk mencatat presensi.')
         # Pengajar tetap dapat mengelola presensi kelas. Pengganti harus cocok
         # dengan jadwal spesifik (kelas + tanggal), bukan sekadar pernah mengganti kelas.
+        if jadwal_terpilih['pengganti_id'] and jadwal_terpilih['pengganti_id'] != self.id:
+            raise ValueError('Presensi pertemuan ini ditugaskan kepada pengajar pengganti.')
         if not self.mengajar_kelas(kelas_id):
-            jadwal = next((j for j in database.ambil_jadwal_by_kelas(kelas_id)
-                           if j["tanggal"] == str(tanggal or "").strip()
-                           and j["pengganti_id"] == self.id), None)
+            jadwal = jadwal_terpilih if jadwal_terpilih['pengganti_id'] == self.id else None
             if not jadwal or not self.boleh_presensi_jadwal(jadwal):
                 raise ValueError("Kamu tidak ditugaskan sebagai pengganti untuk jadwal presensi ini.")
 
@@ -716,9 +722,9 @@ class Pengajar(User):
         if not data_status and not kosongkan:
             raise ValueError("Belum ada status kehadiran yang dipilih.")
 
-        jumlah = Presensi.simpan_massal(kelas_id, tanggal, data_status, pengajar_id=self.id) if data_status else 0
+        jumlah = Presensi.simpan_massal(kelas_id, tanggal, data_status, pengajar_id=self.id, jadwal_id=jadwal_id) if data_status else 0
         if kosongkan:
-            Presensi.hapus_banyak(kelas_id, tanggal, kosongkan)
+            Presensi.hapus_banyak(kelas_id, tanggal, kosongkan, jadwal_id=jadwal_id)
         return jumlah
 
     def beri_catatan_akhir(self, kelas, siswa, isi, lulus=False):
@@ -854,6 +860,8 @@ class Admin(User):
                 raise ValueError("Username minimal 5 karakter.")
             if password and not User.validasi_password(password):
                 raise ValueError("Password minimal 8 karakter dan wajib kombinasi huruf + angka.")
+            if password and password == target['password']:
+                raise ValueError("Password baru tidak boleh sama dengan password lama.")
 
             perubahan = {"nama": nama, "username": username}
             didik = None 
@@ -949,14 +957,14 @@ class Admin(User):
     def kelola_jadwal(self, aksi, **data):
         from models.akademik import Jadwal
         if aksi == "tambah":
-            kelas_id, pengajar_id, jam, tanggal, materi, pengganti_id = Jadwal.cek_input(
+            kelas_id, pengajar_id, jam, tanggal, materi, pengganti_id, ruangan = Jadwal.cek_input(
                 data["hari"], data["jam_mulai"], data["jam_selesai"],
                 data["kelas_id"], data["pengajar_id"],
                 tanggal=data.get("tanggal"), materi=data.get("materi"),
-                pengganti_id=data.get("pengganti_id"),
+                pengganti_id=data.get("pengganti_id"), ruangan=data.get("ruangan"),
             )
             return database.tambah_jadwal(data["hari"], jam, kelas_id, pengajar_id, tanggal,
-                                          materi, pengganti_id)
+                                          materi, pengganti_id, ruangan)
 
         try:
             jadwal_id = int(data["jadwal_id"])
@@ -966,14 +974,14 @@ class Admin(User):
             raise ValueError("Jadwal tidak ditemukan.")
 
         if aksi == "edit":
-            kelas_id, pengajar_id, jam, tanggal, materi, pengganti_id = Jadwal.cek_input(
+            kelas_id, pengajar_id, jam, tanggal, materi, pengganti_id, ruangan = Jadwal.cek_input(
                 data["hari"], data["jam_mulai"], data["jam_selesai"],
                 data["kelas_id"], data["pengajar_id"], exclude_id=jadwal_id,
                 tanggal=data.get("tanggal"), materi=data.get("materi"),
-                pengganti_id=data.get("pengganti_id"),
+                pengganti_id=data.get("pengganti_id"), ruangan=data.get("ruangan"),
             )
             return database.edit_jadwal(jadwal_id, data["hari"], jam, kelas_id, pengajar_id,
-                                        tanggal, materi, pengganti_id)
+                                        tanggal, materi, pengganti_id, ruangan)
         elif aksi == "hapus":
             return database.hapus_jadwal(jadwal_id)
         raise ValueError(f"Aksi tidak dikenal: {aksi}")

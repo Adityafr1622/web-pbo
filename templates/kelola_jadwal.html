@@ -20,6 +20,10 @@
 <div class="modal-body"><div class="form-grid">
   <div class="field"><label>Kelas</label><select name="kelas_id" required data-kelas-pick><option value="">Pilih kelas</option>
     {% for k in kelas_list %}<option value="{{ k.id }}">{{ k.nama_kelas }}</option>{% endfor %}</select></div>
+  <div class="field"><label>Ruangan</label><select name="ruangan" required>
+    <option value="">Pilih ruangan</option>
+    {% for ruang in ['A01','A02','A03'] %}<option value="{{ ruang }}">{{ ruang }}</option>{% endfor %}
+  </select></div>
   <div class="field"><label>Pengajar tetap</label><select name="pengajar_id" required data-guru-pick><option value="">Pilih pengajar tetap</option>
     {% for p in pengajar_list %}<option value="{{ p.id }}" data-kelas="{{ guru_kelas.get(p.id, '')|trim }}">{{ p.nama }}</option>{% endfor %}</select></div>
   <div class="field"><label>Pengajar pengganti <span class="label-note">(opsional)</span></label><select name="pengganti_id" data-pengganti-pick><option value="">Tidak ada pengganti</option>
@@ -36,32 +40,41 @@
 
 <div class="page-head">
   <div><h1>Jadwal</h1><p class="sub">{{ 'Jadwal mengajar per minggu.' if bisa_kelola else 'Jadwal kelas per minggu.' }}</p></div>
-  {% if bisa_kelola %}<button type="button" class="btn btn-yellow" data-open="modal-tambah-jadwal">+ Buat Jadwal</button>{% endif %}
+  <div class="toolbar-actions">
+    {% if bisa_kelola %}<button type="button" class="btn btn-yellow" data-open="modal-tambah-jadwal">+ Buat Jadwal</button>{% endif %}
+    <a class="back-button" href="{{ url_for('dashboard') }}">{{ ic('arrow-left', 18) }} <span>Back</span></a>
+  </div>
 </div>
 
 {# pilih kelas mana yang jadwalnya ditampilkan. Admin dapat semua kelas,
    pengajar hanya kelas yang dia ajar, siswa hanya kelas yang pernah dia ikuti. #}
-{% if kelas_list|length > 1 %}
-<div class="seg seg-kelas">
-  <a class="seg-btn {{ 'is-active' if not kelas_pilih }}" href="{{ url_for(request.endpoint, kelas='') }}">Semua Kelas</a>
-  {% for k in kelas_list %}
-  <a class="seg-btn {{ 'is-active' if kelas_pilih == k.id }}" href="{{ url_for(request.endpoint, kelas=k.id) }}">
-    {{ k.nama_kelas }}{% if k.selesai %} <span class="seg-tanda">selesai</span>{% endif %}</a>
-  {% endfor %}
-</div>
+{% if kelas_list %}
+<form method="get" action="{{ url_for(request.endpoint) }}" class="kelas-filter-row">
+  <label for="filter-kelas-jadwal">Tampilkan kelas</label>
+  <select id="filter-kelas-jadwal" name="kelas" onchange="this.form.requestSubmit()">
+    <option value="" {{ 'selected' if not kelas_pilih }}>Semua Kelas</option>
+    {% for pilihan in [('Kelas Aktif', false),('Kelas Selesai', true)] %}
+      {% set grup = kelas_list|selectattr('status_kelas', 'equalto', 'Selesai')|list if pilihan[1] else kelas_list|rejectattr('status_kelas', 'equalto', 'Selesai')|list %}
+      {% if grup %}<optgroup label="{{ pilihan[0] }}">
+      {% for k in grup %}<option value="{{ k.id }}" {{ 'selected' if kelas_pilih == k.id }}>{{ k.nama_kelas }} · {{ k.pertemuan_selesai }}/8{{ ' · Selesai' if k.status_kelas == 'Selesai' }}</option>{% endfor %}
+      </optgroup>{% endif %}
+    {% endfor %}
+  </select>
+</form>
 {% endif %}
 
+<div class="table-tools" data-search-global="jadwal"><input class="table-search" type="search" placeholder="Cari kelas, pengajar, tanggal, atau ruangan..." aria-label="Cari jadwal"></div>
 {% set punya_tombol_presensi = user.role == 'pengajar' and jadwal_list|selectattr('is_pengganti_saya')|list|length > 0 %}
 {% for minggu, items in jadwal_list|groupby('minggu') %}
 <section class="jadwal-group">
   <h2 class="group-title">Jadwal Mengajar Minggu Ke-{{ minggu }}</h2>
-  <div class="table-card"><div class="table-scroll">
+  <div class="table-card" data-table-page data-list-group="jadwal"><div class="table-scroll">
   <table class="data-table align-left">
-    <thead><tr><th>Kelas</th><th>Hari</th><th>Tanggal</th><th>Pengajar</th><th>Jam</th><th>Materi</th>{% if bisa_kelola or punya_tombol_presensi %}<th>Aksi</th>{% endif %}<th>Status</th></tr></thead>
+    <thead><tr><th>Kelas</th><th>Hari</th><th>Tanggal</th><th>Ruangan</th><th>Pengajar</th><th>Jam</th><th>Materi</th>{% if bisa_kelola or punya_tombol_presensi %}<th>Aksi</th>{% endif %}<th>Status</th></tr></thead>
     <tbody>
     {% for j in items %}
     <tr>
-      <td>{{ nama_kelas.get(j.kelas_id, '-') }}</td><td>{{ j.hari }}</td><td>{{ j.tanggal }}</td>
+      <td>{{ nama_kelas.get(j.kelas_id, '-') }}</td><td>{{ j.hari }}</td><td>{{ j.tanggal }}</td><td>{{ j.ruangan }}</td>
       {# penanda guru pengganti, biar jelas kenapa namanya beda dari guru tetap kelas #}
       <td><a class="link-plain" href="{{ url_for('profil_pengajar', pengajar_id=j.tampilan_pengajar_id) }}">{{ j.nama_pengajar }}</a>
         {% if j.pengganti %}<span class="badge badge-ganti" title="Guru pengganti untuk pertemuan ini">Pengganti</span><div class="label-note">Pengajar tetap: {{ j.nama_pengajar_tetap }}</div>{% endif %}</td>
@@ -72,7 +85,7 @@
       {% if j.tanggal != '-' %}{% set p = j.tanggal.split(' ') %}{% set iso = '%s-%02d-%02d'|format(p[2], BULAN.index(p[1]) + 1, p[0]|int) %}{% endif %}
       <td><div class="aksi">
         <button type="button" class="icon-btn icon-edit" title="Edit" data-edit="modal-edit-jadwal" data-action="/admin/jadwal/edit/{{ j.id }}"
-          data-fill='{{ {"kelas_id": j.kelas_id, "pengajar_id": j.pengajar_id, "tanggal": iso, "hari": j.hari, "jam_mulai": j.jam_mulai, "jam_selesai": j.jam_selesai, "materi": (j.materi if j.materi != "-" else ""), "pengganti_id": j.pengganti_id}|tojson }}'>{{ ic('pencil', 16) }}</button>
+          data-fill='{{ {"kelas_id": j.kelas_id, "pengajar_id": j.pengajar_id, "tanggal": iso, "hari": j.hari, "jam_mulai": j.jam_mulai, "jam_selesai": j.jam_selesai, "materi": (j.materi if j.materi != "-" else ""), "pengganti_id": j.pengganti_id, "ruangan": (j.ruangan if j.ruangan != "—" else "")}|tojson }}'>{{ ic('pencil', 16) }}</button>
         <button type="button" class="icon-btn icon-del" title="Hapus" data-confirm="/admin/jadwal/delete/{{ j.id }}"
           data-text="Yakin ingin menghapus jadwal {{ j.materi }} ({{ j.hari }}, {{ j.tanggal }})? Tindakan ini tidak dapat dibatalkan.">{{ ic('trash', 16) }}</button>
       </div></td>

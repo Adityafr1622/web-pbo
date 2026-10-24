@@ -42,17 +42,22 @@
 </td>
 {% endmacro %}
 
+<div class="page-head"><div><h1>Kelola Akun</h1><p class="sub">Kelola data siswa, pengajar, dan riwayat password.</p></div></div>
 <div class="toolbar">
   <div class="seg">
     <button type="button" class="seg-btn is-active" data-tab="siswa">Siswa ({{ siswa|length }})</button>
     <button type="button" class="seg-btn" data-tab="pengajar">Pengajar ({{ pengajar|length }})</button>
   </div>
-  <button type="button" class="btn btn-yellow" data-for="siswa" data-open="modal-tambah-siswa">+ Tambah Siswa</button>
-  <button type="button" class="btn btn-yellow" data-for="pengajar" data-open="modal-tambah-pengajar" hidden>+ Tambah Pengajar</button>
+  <div class="toolbar-actions">
+    <button type="button" class="btn btn-yellow" data-for="siswa" data-open="modal-tambah-siswa">+ Tambah Siswa</button>
+    <button type="button" class="btn btn-yellow" data-for="pengajar" data-open="modal-tambah-pengajar" hidden>+ Tambah Pengajar</button>
+    <a class="back-button" href="{{ url_for('dashboard') }}">{{ ic('arrow-left', 18) }} Back</a>
+  </div>
 </div>
 
 {# ===== tabel siswa ===== #}
-<div class="table-card" data-panel="siswa"><div class="table-scroll">
+<div class="table-tools" data-panel="siswa" data-search-panel="akun-siswa"><input class="table-search" type="search" placeholder="Cari nama, username, atau email siswa..." aria-label="Cari akun siswa"></div>
+<div class="table-card" data-panel="siswa" data-table-page><div class="table-scroll">
 <table class="data-table table-akun">
   <thead><tr><th>Nama</th><th>Kelas</th><th>Username</th><th>Email</th><th>No. WhatsApp</th><th>Alamat</th><th>Password</th><th>Diubah</th><th>Profil Lengkap</th><th>Aksi</th></tr></thead>
   <tbody>
@@ -78,7 +83,8 @@
 </table></div></div>
 
 {# ===== tabel pengajar ===== #}
-<div class="table-card" data-panel="pengajar" hidden><div class="table-scroll">
+<div class="table-tools" data-panel="pengajar" data-search-panel="akun-pengajar" hidden><input class="table-search" type="search" placeholder="Cari nama, username, atau email pengajar..." aria-label="Cari akun pengajar"></div>
+<div class="table-card" data-panel="pengajar" data-table-page hidden><div class="table-scroll">
 <table class="data-table table-akun">
   {# + kolom Pendidikan #}
   <thead><tr><th>Nama</th><th>Username</th><th>Pendidikan</th><th>Email</th><th>No. WhatsApp</th><th>Alamat</th><th>NIK</th><th>Password</th><th>Diubah</th><th>Profil Lengkap</th><th>Aksi</th></tr></thead>
@@ -144,7 +150,7 @@
 
 {# ===== modal tambah siswa ===== #}
 {% call modal('modal-tambah-siswa', 'Tambah Akun Siswa') %}
-<form method="post" action="{{ url_for('kelola_akun') }}">
+<form method="post" action="{{ url_for('kelola_akun') }}" data-check-username="{{ url_for('cek_username_admin') }}">
   <input type="hidden" name="role" value="siswa">
   <div class="modal-body">
     <div class="form-grid">
@@ -166,7 +172,7 @@
 
 {# ===== modal edit siswa ===== #}
 {% call modal('modal-edit-siswa', 'Edit Akun Siswa') %}
-<form method="post">
+<form method="post" data-check-username="{{ url_for('cek_username_admin') }}">
   <div class="modal-body"><div class="form-grid">
     {{ field('Nama Lengkap', 'nama', '') }}
     <div class="field"><label>Kelas</label>
@@ -184,7 +190,7 @@
 
 {# ===== modal tambah pengajar ===== #}
 {% call modal('modal-tambah-pengajar', 'Tambah Akun Pengajar') %}
-<form method="post" action="{{ url_for('kelola_akun') }}" enctype="multipart/form-data">
+<form method="post" action="{{ url_for('kelola_akun') }}" enctype="multipart/form-data" data-check-username="{{ url_for('cek_username_admin') }}">
   <input type="hidden" name="role" value="pengajar">
   <div class="modal-body"><div class="form-grid">
     {{ field('Nama Lengkap', 'nama', 'Masukkan nama lengkap') }}
@@ -202,7 +208,7 @@
 
 {# ===== modal edit pengajar ===== #}
 {% call modal('modal-edit-pengajar', 'Edit Akun Pengajar') %}
-<form method="post" enctype="multipart/form-data">
+<form method="post" enctype="multipart/form-data" data-check-username="{{ url_for('cek_username_admin') }}">
   <div class="modal-body"><div class="form-grid">
     {{ field('Nama Lengkap', 'nama', '') }}
     {{ field('NIK', 'nik', '', pat=pat_nik, pesan=pesan_nik) }}

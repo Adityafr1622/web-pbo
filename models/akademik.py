@@ -178,7 +178,7 @@ class Jadwal:
 
     @staticmethod
     def cek_input(hari, jam_mulai, jam_selesai, kelas_id, pengajar_id, exclude_id=None,
-                  tanggal=None, materi=None, pengganti_id=None):
+                  tanggal=None, materi=None, pengganti_id=None, ruangan=None):
         if hari not in HARI_VALID:
             raise ValueError("Hari tidak valid.")
 
@@ -218,6 +218,15 @@ class Jadwal:
             if pengganti_id in guru_tetap:
                 raise ValueError("Pengajar pengganti harus berbeda dari pengajar tetap kelas.")
 
+        if not tanggal:
+            raise ValueError('Tanggal wajib diisi agar jadwal tidak bentrok.')
+        ruangan = (ruangan or '').strip().upper()
+        if ruangan not in ('A01', 'A02', 'A03'):
+            raise ValueError('Ruangan wajib dipilih: A01, A02, atau A03.')
+
+        # Bentrok dicek menurut tanggal, irisan jam, kelas, ruangan, dan pengajar
+        # yang benar-benar bertugas (pengganti jika ada, bukan nama guru tetap).
+        pengajar_aktif = pengganti_id or pengajar_id
         # Bentrok dicek pada tanggal yang sama; jadwal tanpa tanggal dianggap mingguan.
         kandidat = (database.ambil_jadwal_by_tanggal(tanggal) if tanggal else
                     [j for j in database.ambil_jadwal_by_hari(hari) if not j["tanggal"]])
@@ -233,12 +242,13 @@ class Jadwal:
                     raise ValueError(
                         f"Bentrok: kelas {j['kelas_nama']} sudah punya jadwal {j['hari']} {j['jam']}."
                     )
-                if pengajar_id in (j["pengajar_id"], j["pengganti_id"]):
-                    raise ValueError(f"Pengajar sudah memiliki jadwal lain pada {j['hari']} {j['jam']}.")
-                if pengganti_id is not None and pengganti_id in (j["pengajar_id"], j["pengganti_id"]):
-                    raise ValueError(f"Pengajar pengganti sudah memiliki jadwal lain pada {j['hari']} {j['jam']}.")
+                if j['ruangan'] and j['ruangan'] == ruangan:
+                    raise ValueError(f"Ruangan {ruangan} sudah terpakai pada tanggal/jam tersebut.")
+                pengajar_lain = j['pengganti_id'] or j['pengajar_id']
+                if pengajar_aktif == pengajar_lain:
+                    raise ValueError(f"Pengajar yang bertugas sudah memiliki jadwal lain pada {j['hari']} {j['jam']}.")
         return (kelas_id, pengajar_id, Jadwal.format_jam(mulai, selesai),
-                (tanggal or None), materi, pengganti_id)
+                (tanggal or None), materi, pengganti_id, ruangan)
 
 
 class Materi:

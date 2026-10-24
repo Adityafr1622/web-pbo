@@ -11,14 +11,18 @@
     <h1>{{ 'Kelola Kelas' if bisa_kelola else 'Kelas' }}</h1>
     <p class="sub">{{ 'Administrator dapat menambahkan kelas untuk siswa dan pengajar.' if bisa_kelola else 'Daftar kelas kamu.' }}</p>
   </div>
-  {% if bisa_kelola %}<button type="button" class="btn btn-yellow" data-open="modal-tambah-kelas">+ Tambah Kelas</button>{% endif %}
+  <div class="toolbar-actions">
+    {% if bisa_kelola %}<button type="button" class="btn btn-yellow" data-open="modal-tambah-kelas">+ Tambah Kelas</button>{% endif %}
+    <a class="back-button" href="{{ url_for('dashboard') }}">{{ ic('arrow-left', 18) }} <span>Back</span></a>
+  </div>
 </div>
 
-<div class="kelas-grid">
+{% if kelas_list %}<div class="table-tools" data-search-panel="kelas-grid"><input class="table-search" type="search" placeholder="Cari nama kelas atau pengajar..." aria-label="Cari kelas"></div>{% endif %}
+<div class="kelas-grid" data-list-page data-list-name="kelas">
   {% for k in kelas_list %}
   {# background kartu mengikuti pilihan admin. Kelas lama yang
      belum punya pilihan tetap memakai gambar bawaan (class kelas-bg). #}
-  <article class="kelas-card {{ 'kelas-foto' if k.header else 'kelas-bg' }} {{ 'kelas-selesai' if k.selesai }}"
+  <article data-list-item class="kelas-card {{ 'kelas-foto' if k.header else 'kelas-bg' }} {{ 'kelas-selesai' if k.selesai }}"
     {% if k.header %}style="--kelas-img: url('{{ url_for('static', filename='images/' ~ k.header) }}')"{% endif %}>
 
     {# kartu kelas TIDAK lagi bisa dipencet seluruhnya. Satu-satunya
@@ -41,6 +45,7 @@
     {% if k.selesai %}<span class="tanda-selesai">{{ ic('check', 14) }} Selesai</span>{% endif %}
 
     <h2 class="kelas-title">{{ k.nama_kelas }}</h2>
+    <span class="kelas-status-label {{ 'is-finished' if k.status_kelas == 'Selesai' }}">{{ k.status_kelas }} · {{ k.pertemuan_selesai }}/8</span>
     <div class="kelas-guru">
       {% for p in k.pengajar_list %}<a href="{{ url_for('profil_pengajar', pengajar_id=p.id) }}">{{ p.nama }}</a>{% endfor %}
     </div>

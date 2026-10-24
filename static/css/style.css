@@ -1545,3 +1545,155 @@ html { scrollbar-gutter: stable; overflow-y: scroll; }
 .dash-list-close { font-size:12px; font-weight:600; text-decoration:none; color:#1666d3; background:#eef6ff; border:1px solid #d7e7fd; padding:8px 13px; border-radius:9px; }
 .dash-list-close:hover { background:#deecff; }
 #dashboard-daftar:focus { outline:none; }
+
+/* === Focused refinements: admin controls, bounded tables, aligned panels === */
+.nav { gap: 0; }
+.nav a { border-radius: 999px; padding-inline: 13px; }
+.topbar .brand .brand-dark { display: none; }
+/* Reserve the logo slot before either PNG loads (prevents Dark Mode navbar shift). */
+.topbar .brand {
+  width: 115px;
+  min-width: 115px;
+  height: 46px;
+  flex: 0 0 115px;
+}
+.topbar .brand img {
+  display: block;
+  width: 115px;
+  height: 46px;
+  object-fit: contain;
+}
+@media (max-width: 620px) {
+  .topbar .brand { width: 95px; min-width: 95px; height: 38px; flex-basis: 95px; }
+  .topbar .brand img { width: 95px; height: 38px; }
+}
+.toolbar-actions { display:flex; gap:10px; align-items:center; justify-content:flex-end; flex-wrap:wrap; }
+.page { max-width: none; width:100%; box-sizing:border-box; }
+.page-head { min-height:0; }
+.page-head h1 { color: var(--navy-dark); }
+/* Equal-height dashboard/monitoring rows, no stretched empty gaps. */
+.dash-layout { align-items:stretch; }
+.dash-layout > .dash-panel { height:100%; }
+.dash-metric { height:100%; }
+.dash-layout-main > .dash-panel { min-height:320px; }
+.dash-layout-two > .dash-panel { min-height:240px; }
+.kpi-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
+.kpi-grid > .kpi { min-width:0; min-height:105px; }
+.mon-row { align-items:stretch; }
+.mon-row > .card { min-width:0; height:100%; }
+.dash-class-grid > .dash-class-tile { min-width:0; }
+/* Square tables for all user roles; preserve cards elsewhere. */
+.table-card, .table-card .table-scroll, .mon-tabel, .mon-tabel .data-table th,
+.jadwal-group .table-card, .jadwal-group .table-scroll { border-radius:0 !important; }
+.table-scroll, .chart-scroll { width:100%; max-width:100%; overflow-x:auto; overscroll-behavior-inline:contain; }
+.table-scroll { max-height:min(65vh,680px); overflow-y:auto; scrollbar-gutter:stable; }
+.table-scroll .data-table thead th, .table-scroll .dash-table thead th { position:sticky; top:0; z-index:2; }
+/* A growing student list never pushes its neighbors or the viewport outward. */
+.dash-table { min-width:480px; }
+.dash-table td, .dash-table th { box-sizing:border-box; }
+.dash-recap-content { width:100%; }
+.dash-empty-ring { width:146px; height:146px; border:18px solid #9ca6b5; border-radius:50%;
+    display:grid; place-items:center; color:#788494; position:relative; background:transparent; }
+.dash-empty-ring > span { text-align:center; line-height:1.1; font-size:24px; font-weight:700; }
+.dash-empty-ring small { display:block; margin-top:7px; font-size:10px; line-height:1.25; font-weight:500; }
+@media(max-width:1200px) { .kpi-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:620px) { .toolbar-actions { width:100%; justify-content:flex-end; }
+  .nav { overflow-x:auto; max-width:calc(100vw - 190px); }
+  .topbar { gap:8px; }
+  .nav a { padding-inline:10px; }
+  .dash-layout-main > .dash-panel { min-height:0; }
+  .kpi-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+
+/* No rounded corner on any data-table header, including presensi. */
+.data-table thead th { border-radius:0!important; }
+
+/* Dropdown kelas pada jadwal dan monitoring, dibatasi agar rapi di layar kecil. */
+.kelas-filter-row { display:flex; align-items:center; gap:12px; margin:16px 0 20px; flex-wrap:wrap; }
+.kelas-filter-row label { font-size:14px; font-weight:600; color:var(--ink); }
+.kelas-filter-row select { min-width:210px; max-width:100%; padding:10px 14px; border:1px solid var(--line); background:var(--card); color:var(--ink); border-radius:10px; font:inherit; }
+@media(max-width:560px){.kelas-filter-row select {width:100%}}
+
+
+/* Refinemen tombol Fluenglo: terasa responsif, tidak mengubah layout. */
+:is(.btn,.back-button,.icon-btn,.seg-btn,.nav a,.user-btn,.theme-option,.dash-list-close) {
+  transition: background-color .18s ease, color .18s ease, border-color .18s ease,
+              box-shadow .18s ease, transform .18s ease;
+}
+@media (hover: hover) {
+  :is(.btn,.back-button,.icon-btn,.user-btn,.theme-option):not(:disabled):hover {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(23, 62, 117, .13);
+  }
+}
+:is(.btn,.back-button,.icon-btn,.seg-btn,.user-btn,.theme-option):active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+:is(.btn,.back-button,.icon-btn,.seg-btn,.nav a,.user-btn,.theme-option):focus-visible {
+  outline: 2px solid #4387db;
+  outline-offset: 3px;
+}
+.profile-photo-actions { display:flex; flex-direction:column; align-items:center; gap:10px; }
+.profile-photo-actions .btn-remove-photo { font-size:12px; padding:7px 12px; }
+@media (prefers-reduced-motion: reduce) {
+  :is(.btn,.back-button,.icon-btn,.seg-btn,.nav a,.user-btn,.theme-option,.dash-list-close) {
+    transition: none;
+  }
+}
+
+/* Revisi UTS: 6 statistik Admin lebih ringkas, tetap 3 x 2 di desktop. */
+.dash-metrics-admin { gap:12px; margin-bottom:18px; }
+.dash-metrics-admin .dash-metric { min-height:122px; padding:14px 18px 13px; border-radius:15px; }
+.dash-metrics-admin .dash-icon { width:36px; height:36px; }
+.dash-metrics-admin .dash-metric-label { min-height:0; margin:3px 0 0; font-size:12px; }
+.dash-metrics-admin .dash-metric-value { font-size:29px; margin:2px 0 3px; }
+.dash-metrics-admin .dash-metric-info { margin-top:0; font-size:10px; }
+@media(max-width:770px) { .dash-metrics-admin { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:480px) { .dash-metrics-admin { grid-template-columns:1fr; } }
+
+/* Pencarian dan paginasi mengikuti bentuk asli tabel, tanpa mengubah navbar. */
+.table-tools { display:flex; align-items:center; gap:10px; margin:10px 0 12px; }
+.table-card > .table-tools { margin:0; padding:12px 14px; }
+.table-search { min-width:0; width:min(100%,410px); padding:10px 14px;
+  border-radius:10px; border:1px solid var(--line); font:inherit;
+  background:var(--card); color:var(--ink); }
+.table-search:focus { outline:2px solid #7caaff; outline-offset:1px; }
+.pagination-bar { display:flex; gap:12px; align-items:center; justify-content:space-between;
+  flex-wrap:wrap; padding:12px 14px; color:var(--muted); font-size:12px; }
+.pagination-controls { display:flex; align-items:center; gap:10px; }
+.pagination-controls .btn { padding:7px 11px; }
+.pagination-controls .btn:disabled { opacity:.45; cursor:default; }
+.pagination-current { font-weight:600; color:var(--ink); }
+.search-empty { color:var(--muted); margin:0; padding:12px 15px; font-size:13px; }
+tr[hidden], [data-list-item][hidden], .jadwal-group[hidden], .pagination-controls[hidden], .search-empty[hidden] { display:none!important; }
+.table-scroll { max-height:min(65vh,660px); }
+.kelas-status-label { width:fit-content; color:#e8f3ff; font-size:12px;
+  padding:4px 9px; border-radius:8px; background:rgba(15,52,99,.48); margin:8px 0; }
+.kelas-status-label.is-finished { color:#1f533a; background:#d7f8e4; }
+.file-delete-choice { display:flex; align-items:center; gap:8px; font-size:13px; padding:7px 0; }
+.file-delete-choice input { width:16px; height:16px; }
+/* Semua Back ada di header sendiri, di sisi kanan; tidak menambah baris di atas judul. */
+.page-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.page-head > .back-button { flex:none; order:10; margin-left:auto; }
+@media(max-width:600px) { .page-head { flex-wrap:wrap; } .table-search { width:100%; } }
+/* Tata letak compact yang disetujui: ikon di kiri, informasi di kanan. */
+.dash-metrics-admin .dash-metric {
+  display:grid;
+  grid-template-columns:52px minmax(0,1fr);
+  grid-template-rows:auto auto auto;
+  gap:3px 12px;
+  align-content:center;
+  min-height:135px;
+  padding:15px 19px;
+}
+.dash-metrics-admin .dash-icon { grid-column:1; grid-row:1 / span 2; width:42px; height:42px; align-self:center; }
+.dash-metrics-admin .dash-metric-label { grid-column:2; grid-row:1; margin:0; align-self:end; font-size:13px; }
+.dash-metrics-admin .dash-metric-value { grid-column:2; grid-row:2; margin:0; font-size:30px; }
+.dash-metrics-admin .dash-metric-info { grid-column:2; grid-row:3; margin:0; font-size:11px; }
+
+/* Progress Admin: daftar terbatasi agar sejajar dengan Aktivitas Terbaru.
+   Hanya konten progress yang scroll, bukan panel/halaman seluruhnya. */
+.dash-layout-two .dash-progress-panel { min-height:0; display:flex; flex-direction:column; }
+.dash-layout-two .dash-progress-list { max-height:335px; min-height:0; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; scrollbar-width:thin; flex:0 1 auto; }
+.dash-layout-two .dash-progress-list:focus-visible { outline:2px solid #4387db; outline-offset:2px; }

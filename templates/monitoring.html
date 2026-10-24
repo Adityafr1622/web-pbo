@@ -15,9 +15,25 @@
     <h1>Monitoring</h1>
     <p class="sub">{{ 'Rekap nilai, presensi, dan catatan akhir seluruh siswa.' if user.role == 'admin' else 'Rekap siswa di kelas yang kamu ajar.' }}</p>
   </div>
+  <a class="back-button" href="{{ back_url }}">{{ ic('arrow-left', 18) }} Back</a>
 </div>
 
-<div class="table-card"><div class="table-scroll">
+{% if kelas_list %}
+<form method="get" action="{{ url_for('monitoring') }}" class="kelas-filter-row">
+  <label for="filter-kelas-monitoring">Tampilkan kelas</label>
+  <select id="filter-kelas-monitoring" name="kelas" onchange="this.form.requestSubmit()">
+    <option value="" {{ 'selected' if not kelas_pilih }}>Semua Kelas</option>
+    {% for pilihan in [('Kelas Aktif', false),('Kelas Selesai', true)] %}
+      {% set grup = kelas_list|selectattr('status_kelas', 'equalto', 'Selesai')|list if pilihan[1] else kelas_list|rejectattr('status_kelas', 'equalto', 'Selesai')|list %}
+      {% if grup %}<optgroup label="{{ pilihan[0] }}">
+      {% for k in grup %}<option value="{{ k.id }}" {{ 'selected' if kelas_pilih == k.id }}>{{ k.nama_kelas }} · {{ k.pertemuan_selesai }}/8{{ ' · Selesai' if k.status_kelas == 'Selesai' }}</option>{% endfor %}
+      </optgroup>{% endif %}
+    {% endfor %}
+  </select>
+</form>
+{% endif %}
+<div class="table-tools" data-search-panel="monitoring-siswa"><input class="table-search" type="search" placeholder="Cari nama siswa atau kelas..." aria-label="Cari monitoring siswa"></div>
+<div class="table-card" data-table-page><div class="table-scroll">
 <table class="data-table">
   <thead><tr><th class="th-left">Nama Siswa</th><th>Kelas</th><th>Rata-rata Nilai</th><th>Hadir</th><th>Izin</th><th>Sakit</th><th>Alpha</th><th>Catatan Akhir</th><th>Aksi</th></tr></thead>
   <tbody>
@@ -53,6 +69,7 @@
 {% set rata = data.nilai.rata_rata %}
 
 <div class="page-head">
+  <a class="back-button" href="{{ back_url }}">{{ ic('arrow-left', 18) }} Back</a>
   <div>
     <h1>Monitoring Anak</h1>
     <p class="sub">Rekap presensi, perkembangan nilai, dan catatan akhir dari pengajar.</p>
@@ -65,9 +82,6 @@
         {% for k in daftar_kelas %}<option value="{{ k.id }}" {{ 'selected' if k.id == kelas_id }}>{{ k.nama_kelas }}{{ ' · Riwayat' if k.selesai else ' · Aktif' }}</option>{% endfor %}
       </select>
     </form>
-    {% endif %}
-    {% if user.role != 'siswa' %}
-    <a class="btn btn-light" href="{{ url_for('profil_siswa', siswa_id=siswa.id) }}">{{ ic('user', 16) }} Buka Profil</a>
     {% endif %}
   </div>
 </div>
@@ -157,13 +171,13 @@
          role="img" aria-label="Grafik nilai {{ siswa.nama }} dari {{ n_plot }} nilai tugas">
       <defs>
         <linearGradient id="isiNilai" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#2e3a66" stop-opacity=".17"/>
-          <stop offset="100%" stop-color="#2e3a66" stop-opacity="0"/>
+          <stop offset="0%" stop-color="#2381fb" stop-opacity=".22"/>
+          <stop offset="100%" stop-color="#2381fb" stop-opacity=".015"/>
         </linearGradient>
       </defs>
 
       {# garis bantu + label sumbu Y (0-100 penuh, tidak dipotong biar tidak menyesatkan) #}
-      <g stroke="#e7eaf3" stroke-width="1">
+      <g class="mon-chart-grid" stroke="#e7eaf3" stroke-width="1">
         <line x1="64" y1="56" x2="760" y2="56"/><line x1="64" y1="116" x2="760" y2="116"/>
         <line x1="64" y1="176" x2="760" y2="176"/><line x1="64" y1="236" x2="760" y2="236"/>
         <line x1="64" y1="296" x2="760" y2="296"/>
@@ -185,7 +199,7 @@
       {% set pasangan = [] %}
       {% for d in ns.titik %}{% set _ = pasangan.append(d.x ~ ',' ~ d.y) %}{% endfor %}
       <path d="M{{ pasangan | join(' L') }} L{{ ns.titik[-1].x }},296 L{{ ns.titik[0].x }},296 Z" fill="url(#isiNilai)"/>
-      <polyline points="{{ pasangan | join(' ') }}" fill="none" stroke="#2e3a66" stroke-width="2.5"
+      <polyline points="{{ pasangan | join(' ') }}" fill="none" stroke="#1678fa" stroke-width="3"
                 stroke-linecap="round" stroke-linejoin="round"/>
 
       {# titik + tooltip (CSS :hover, tanpa JS) #}
@@ -238,14 +252,14 @@
     {# tiap status bawa warna (buat atribut stroke donut) DAN nama class (buat titik legenda) #}
     {% set STATUS = [('Hadir', '#2fa855', 'd-hadir', p.hadir), ('Izin', '#e0a21a', 'd-izin', p.izin),
                      ('Sakit', '#3b82c4', 'd-sakit', p.sakit), ('Alpha', '#d9453d', 'd-alpha', p.alfa)] %}
-    {% if total_temu %}
     <div class="donut-wrap">
       <svg width="190" height="190" viewBox="0 0 190 190" role="img" aria-label="Kehadiran {{ persen }} persen">
         {% set K = 364.42 %}
         {% set nd = namespace(mulai=0) %}
         <g transform="rotate(-90 95 95)" fill="none" stroke-width="20">
+          <circle cx="95" cy="95" r="58" stroke="{{ '#8994a8' if not total_temu else '#e1e6ef' }}"/>
           {% for nama, warna, kelas, jml in STATUS %}
-            {% set seg = jml / total_temu * K %}
+            {% set seg = jml / total_temu * K if total_temu else 0 %}
             {% if jml %}
             <circle cx="95" cy="95" r="58" stroke="{{ warna }}"
                     stroke-dasharray="{{ (seg - 3)|round(2) if seg > 4 else seg|round(2) }} {{ (K - seg + 3)|round(2) }}"
@@ -254,11 +268,10 @@
             {% set nd.mulai = nd.mulai + seg %}
           {% endfor %}
         </g>
-        <text class="donut-angka" x="95" y="90" text-anchor="middle">{{ persen }}%</text>
-        <text class="donut-label" x="95" y="111" text-anchor="middle">Kehadiran</text>
+        <text class="donut-angka" x="95" y="90" text-anchor="middle">{{ persen ~ '%' if total_temu else '–' }}</text>
+        <text class="donut-label" x="95" y="111" text-anchor="middle">{{ 'Kehadiran' if total_temu else 'Belum ada data' }}</text>
       </svg>
     </div>
-    {% endif %}
 
     <div class="legend">
       {% for nama, warna, kelas, jml in STATUS %}
@@ -274,11 +287,11 @@
 
 {# ---------- daftar nilai + catatan akhir ---------- #}
 <div class="mon-row">
-  <section class="card">
+  <section class="card" data-table-page>
     <div class="card-head">
       <div><h2>Daftar Nilai</h2><p class="muted">Rincian tiap tugas, terbaru di atas.</p></div>
     </div>
-    <div class="table-scroll mon-tabel">
+    <div class="table-scroll mon-tabel" data-table-scroll>
     <table class="data-table">
       <thead><tr><th class="th-left">Tugas</th><th>Tenggat</th><th>Dikumpulkan</th><th>Nilai</th></tr></thead>
       <tbody>

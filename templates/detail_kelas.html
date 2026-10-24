@@ -5,7 +5,7 @@
 {% block content %}
 {# data dari app.py: kelas, pengajar_list, siswa_list, presensi_list, user, tab, tanggal_boleh
    presensi_list: [{tanggal, label, status {siswa_id: 'hadir'|...}, materi}] #}
-{{ kelas_head(kelas, pengajar_list, tab, admin=(user.role == 'admin')) }}
+{{ kelas_head(kelas, pengajar_list, tab, admin=(user.role == 'admin'), kembali=back_url) }}
 
 {% set STATUS = [('hadir', 'Hadir'), ('izin', 'Izin'), ('sakit', 'Sakit'), ('alfa', 'Alpha')] %}
 
@@ -16,14 +16,14 @@
 {# ---------- siswa: rekap kehadiran dirinya sendiri, semua pertemuan sekaligus ---------- #}
 {# tabel diberi class presensi-rekap-table (lebar kolom sama rata & rata kiri) dan
    table-card--kotak (sudut kotak). Sebelumnya class ini tidak terpasang sehingga CSS-nya tidak jalan. #}
-<div class="table-card table-card--kotak"><div class="table-scroll">
+<div class="table-card table-card--kotak" data-table-page><div class="table-scroll">
 <table class="data-table presensi-rekap-table">
-  <thead><tr><th>Pertemuan</th><th>Materi</th><th>Pengajar</th><th>Kehadiran</th></tr></thead>
+  <thead><tr><th>Pertemuan / Jam</th><th>Ruangan</th><th>Materi</th><th>Pengajar</th><th>Kehadiran</th></tr></thead>
   <tbody>
   {% for p in presensi_list %}
   {% set saya = p.status.get(user.id) %}
   <tr>
-    <td class="td-strong">{{ p.label }}</td>
+    <td class="td-strong">{{ p.label }} · {{ p.jam }}</td><td>{{ p.ruangan }}</td>
     <td>{{ p.materi or '-' }}</td>
     <td>{{ p.nama_pengajar or '-' }}</td>
     <td>
@@ -40,15 +40,15 @@
 {# ---------- pengajar (bisa mengisi) & admin (lihat saja) ---------- #}
 {# pertemuan yang terbuka mengikuti ?tanggal= dari URL. Dipakai sehabis menyimpan
    presensi, supaya halamannya tidak balik sendiri ke pertemuan paling baru. #}
-{% set tgl_pilih = request.args.get('tanggal') %}
-{% set ada_pilihan = tgl_pilih and presensi_list | selectattr('tanggal', 'equalto', tgl_pilih) | list %}
+{% set sesi_pilih = request.args.get('jadwal', type=int) %}
+{% set ada_pilihan = sesi_pilih and presensi_list | selectattr('jadwal_id', 'equalto', sesi_pilih) | list %}
 
 <div class="presensi-pick">
-  <label for="pilih-tanggal">Tanggal</label>
+  <label for="pilih-tanggal">Pertemuan (tanggal dan jam)</label>
   <div class="select-wrap">
     <select id="pilih-tanggal" data-presensi-pick>
       {% for p in presensi_list %}
-      <option value="panel-{{ p.tanggal }}" {{ 'selected' if (p.tanggal == tgl_pilih) or (not ada_pilihan and loop.first) }}>{{ p.label }}{% if p.materi %} · {{ p.materi }}{% endif %}</option>
+      <option value="panel-{{ p.jadwal_id }}" {{ 'selected' if (p.jadwal_id == sesi_pilih) or (not ada_pilihan and loop.first) }}>{{ p.label }} · {{ p.jam }} · {{ p.ruangan }}{% if p.materi %} · {{ p.materi }}{% endif %}</option>
       {% endfor %}
     </select>
     {{ ic('chevron', 18) }}
@@ -58,14 +58,15 @@
 {% for p in presensi_list %}
 {# tanggal_boleh dikirim app.py. None = guru tetap / admin (tidak dibatasi).
    Daftar tanggal = guru pengganti, cuma boleh mengisi pertemuan yang dijadwalkan untuk dia. #}
-{% set bisa_isi = user.role == 'pengajar' and (tanggal_boleh is none or p.tanggal in tanggal_boleh) %}
-<form class="presensi-panel" id="panel-{{ p.tanggal }}" method="post"
-      action="{{ url_for('simpan_presensi', kelas_id=kelas.id) }}" {{ 'hidden' if not ((p.tanggal == tgl_pilih) or (not ada_pilihan and loop.first)) }}>
+{% set bisa_isi = user.role == 'pengajar' and (tanggal_boleh is none or p.tanggal in tanggal_boleh) and (not p.pengganti_id or p.pengganti_id == user.id) %}
+<form class="presensi-panel" id="panel-{{ p.jadwal_id }}" method="post"
+      action="{{ url_for('simpan_presensi', kelas_id=kelas.id) }}" {{ 'hidden' if not ((p.jadwal_id == sesi_pilih) or (not ada_pilihan and loop.first)) }}>
   <input type="hidden" name="tanggal" value="{{ p.tanggal }}">
+  <input type="hidden" name="jadwal_id" value="{{ p.jadwal_id }}">
   {# daftar siswa yang tampil di form. Siswa yang centangnya dilepas akan
      dihapus presensinya saat disimpan, bukan dibiarkan memakai nilai lama. #}
   <input type="hidden" name="siswa_tampil" value="{{ siswa_list | map(attribute='id') | join(',') }}">
-  <div class="table-card"><div class="table-scroll">
+  <div class="table-card" data-table-page><div class="table-scroll">
   <table class="data-table presensi-table">
     <thead><tr>
       <th class="th-left">Nama Siswa</th>

@@ -6,6 +6,7 @@
 {% block content %}
 {# data dari app.py: data (dict profil siswa), bisa_ubah, kelas_id, siswa_id #}
 <div class="page-head">
+  <a class="back-button" href="{{ back_url }}">{{ ic('arrow-left', 18) }} Back</a>
   <div>
     <h1>Profil Siswa</h1>
     <p class="sub">{{ 'Profil kamu di Fluenglo.' if bisa_ubah else 'Lihat informasi profil' }}</p>
@@ -16,7 +17,15 @@
   <div class="profile-col">
     <p class="col-title">Profil</p>
     <div class="profile-body">
-      {{ avatar(data.foto, data.nama, 'avatar-xl') }}
+      <div class="profile-photo-actions">
+        {{ avatar(data.foto, data.nama, 'avatar-xl') }}
+        {% if data.foto and data.foto != 'default_avatar.png' and boleh_hapus_foto %}
+        <form method="post" action="{{ url_for('hapus_foto_siswa', siswa_id=siswa_id) }}">
+          <input type="hidden" name="asal" value="{{ request.endpoint }}">
+          <button type="submit" class="btn btn-light btn-sm btn-remove-photo">{{ ic('trash', 15) }} Hapus Foto</button>
+        </form>
+        {% endif %}
+      </div>
       <div class="profile-fields">
         <div class="field"><span class="field-label">Nama Lengkap</span><div class="read strong">{{ data.nama }}</div></div>
         <div class="field"><span class="field-label">Username</span><div class="read">{{ data.username }}</div></div>
@@ -62,7 +71,7 @@
     <div class="field"><label>Email <span class="label-note">(opsional)</span></label>
       <input type="email" name="email" value="{{ data.email or '' }}" placeholder="nama@email.com"></div>
     <div class="field span-2"><label>Alamat</label>
-      <input type="text" name="alamat" value="{{ data.alamat or '' }}" placeholder="Masukkan alamat"></div>
+      <input type="text" name="alamat" value="{{ data.alamat or '' }}" placeholder="Masukkan alamat" required></div>
     <div class="field span-2"><label>Photo Profil <span class="label-note">(kosong = tetap)</span></label>
       <input type="file" name="foto" accept="image/*"></div>
   </div></div>

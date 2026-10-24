@@ -9,17 +9,17 @@
 </div>
 <div class="dash-metrics dash-metrics-admin">
  {{ metric('Jumlah Siswa', data.stat.siswa, 'users','blue','Mengikuti kelas di '~data.tahun,url_for('kelola_akun',tab='siswa')) }}
- {{ metric('Jumlah Pengajar', data.stat.pengajar, 'users','gold','Mengajar di '~data.tahun,url_for('kelola_akun',tab='pengajar')) }}
- {{ metric('Jumlah Kelas', data.stat.kelas, 'door','green','Kelas terjadwal',url_for('kelola_kelas')) }}
+ {{ metric('Jumlah Pengajar', data.stat.pengajar, 'users','gold','Total akun pengajar',url_for('kelola_akun',tab='pengajar')) }}
+ {{ metric('Jumlah Kelas Terjadwal', data.stat.kelas, 'door','green','Kelas dengan jadwal pada tahun ini',url_for('kelola_kelas')) }}
  {{ metric('Jumlah Pertemuan', data.stat.pertemuan, 'calendar','violet','Pertemuan terjadwal',url_for('kelola_jadwal')) }}
  {{ metric('Jumlah Materi', data.stat.materi, 'book','sky','Materi diunggah pada tahun ini') }}
  {{ metric('Jumlah Tugas', data.stat.tugas, 'note','rose','Tugas dibuat pada tahun ini') }}
 </div>
 <div class="dash-layout dash-layout-main">
- <section class="dash-panel dash-span-2"><div class="dash-panel-heading"><h2>Jumlah Siswa Tahun {{ data.tahun }}</h2><p>Jumlah siswa unik yang memiliki kelas terjadwal di tiap bulan.</p></div>
+ <section class="dash-panel dash-span-2"><div class="dash-panel-heading"><h2>Jumlah Siswa Tahun {{ data.tahun }}</h2><p>Jumlah peserta kelas terjadwal di tiap bulan.</p></div>
  {{ line_chart(data.bulanan, ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des']) }}
  </section>
- <section class="dash-panel"><div class="dash-panel-heading"><h2>Rekap Data Tahunan</h2><p>Ringkasan pada tahun ajaran {{ data.tahun }}.</p></div>
+ <section class="dash-panel"><div class="dash-panel-heading"><h2>Rekap Data Tahunan</h2><p>Ringkasan kegiatan terjadwal pada {{ data.tahun }}.</p></div>
  <div class="dash-recap-content">
    <div class="dash-ring" style="background:{{ data.diagram_rekap.gradien }}" role="img"
         aria-label="Perbandingan enam kategori: {% for item in data.diagram_rekap.irisan %}{{ item.kategori }} {{ item.jumlah }}{% if not loop.last %}, {% endif %}{% endfor %}">
@@ -27,7 +27,7 @@
    </div>
    <div class="dash-recap-list">
      {% for title,key in [('Siswa','siswa'),('Pengajar','pengajar'),('Kelas','kelas'),('Materi','materi'),('Tugas','tugas'),('Pertemuan','pertemuan')] %}
-     <div><span class="dash-recap-name"><i class="dash-recap-dot" style="background:{{ data.diagram_rekap.irisan[loop.index0].warna }}" aria-hidden="true"></i>{{ title }}</span><strong>{{ data.stat[key] }}</strong></div>
+     <div><span class="dash-recap-name"><i class="dash-recap-dot" style="background:{{ data.diagram_rekap.irisan[loop.index0].warna }}" aria-hidden="true"></i>{{ title }}</span><strong>{{ data.rekap_tahunan[key] }}</strong></div>
      {% endfor %}
    </div>
  </div>
@@ -35,11 +35,12 @@
 </div>
 <div class="dash-layout dash-layout-two">
  <section class="dash-panel"><div class="dash-panel-heading"><h2>Aktivitas Terbaru</h2><p>Aktivitas yang memiliki tanggal tercatat pada tahun {{ data.tahun }}.</p></div>{{ activities(data.aktivitas) }}</section>
- <section class="dash-panel"><div class="dash-panel-heading"><h2>Progress Kelas</h2><p>Jumlah pertemuan yang sudah dicatat presensinya, dari target 8 per kelas.</p></div>
+ <section class="dash-panel dash-progress-panel"><div class="dash-panel-heading"><h2>Progress Kelas</h2><p>Jumlah pertemuan yang sudah dicatat presensinya, dari target 8 per kelas.</p></div>
+ <div class="dash-progress-list" tabindex="0" aria-label="Daftar progress kelas, dapat digulir">
  {% for k in data.progress %}<a class="dash-progress-row" href="{{ url_for('detail_kelas',kelas_id=k.id) }}"><span>{{ k.nama }} <small>{{ k.selesai }} dari {{ k.total }} pertemuan</small></span>
  <span class="dash-progress-bar"><i style="width:{{ (k.selesai*100/k.total)|round|int if k.total else 0 }}%"></i></span></a>
  {% else %}<p class="dash-empty">Belum ada kelas yang dijadwalkan pada tahun ini.</p>{% endfor %}
- </section>
+ </div></section>
 </div>
 <section class="dash-panel dash-bottom"><div class="dash-panel-heading"><h2>Perbandingan Tahun Ajaran</h2><p>Maksimal 3 tahun terakhir yang memiliki data hingga {{ data.tahun }}.</p></div>
 {% if data.rekap %}<div class="table-scroll"><table class="dash-table"><thead><tr><th>Kategori</th>{% for year,item in data.rekap %}<th>{{ year }}</th>{% endfor %}</tr></thead><tbody>

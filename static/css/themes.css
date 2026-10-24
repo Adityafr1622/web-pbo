@@ -191,7 +191,8 @@
 :root[data-theme="dark"] .n-kurang { background: #542d3a; color: #ffb7bd; }
 :root[data-theme="dark"] .chart-nilai .sumbu,
 :root[data-theme="dark"] .chart-nilai .label-titik { fill: #c6d8ed; }
-:root[data-theme="dark"] .chart-nilai .label-rata { fill: #ffe09b; }
+:root[data-theme="dark"] .chart-nilai .label-rata { fill: #7a5a00; }
+:root[data-theme="dark"] .chart-nilai .mon-chart-grid { stroke: #45607d; }
 :root[data-theme="dark"] .chart-nilai .pt-dot { fill: #182944; stroke: #83b6ff; }
 :root[data-theme="dark"] .chart-nilai .pt:hover .pt-dot { fill: #83b6ff; }
 :root[data-theme="dark"] .chart-nilai .pt-dot.kosong { stroke: #849abd; }
@@ -292,10 +293,7 @@
     content: none;
 }
 :root[data-theme="dark"] .topbar .brand img {
-    filter:
-        drop-shadow(0 0 1px rgba(255, 238, 168, .92))
-        drop-shadow(0 0 4px rgba(255, 221, 102, .55))
-        drop-shadow(0 0 8px rgba(255, 210, 74, .26));
+    filter: none;
     position: relative;
     z-index: 1;
 }
@@ -345,3 +343,16 @@
 :root[data-theme="dark"] .dash-metric-arrow { color: #9dc6ff; }
 :root[data-theme="dark"] .pw-read .pw-asli,
 :root[data-theme="dark"] .riwayat-item .pw-asli { background: #233955; }
+
+/* Separate original logo files selected by theme, never a white rectangle. */
+:root[data-theme="dark"] .topbar .brand .brand-light { display:none; }
+:root[data-theme="dark"] .topbar .brand .brand-dark { display:block; }
+:root[data-theme="dark"] .dash-empty-ring { border-color:#6b778a; color:#bac5d5; }
+:root[data-theme="dark"] .page-head h1 { color:var(--ink); }
+
+/* Halaman login/publik tidak memakai Dark Mode akun sebelumnya. */
+:root[data-theme-user="guest"] { color-scheme:light; }
+
+:root[data-theme="dark"] .table-search { background:#213650; color:#f3f7ff; border-color:#536987; }
+:root[data-theme="dark"] .kelas-status-label { background:rgba(24,48,78,.72); color:#d7e7ff; }
+:root[data-theme="dark"] .kelas-status-label.is-finished { background:#204a3b; color:#aef1cc; }

@@ -152,12 +152,13 @@
 
 {# banner kelas + tab Materi | Tugas | Presensi. Dipakai bareng oleh
    materi.html, detail_materi.html, tugas.html, detail_tugas.html, detail_kelas.html. #}
-{% macro kelas_head(kelas, pengajar_list, tab, admin=false) -%}
+{% macro kelas_head(kelas, pengajar_list, tab, admin=false, kembali=none) -%}
 <div class="page-head">
   <div>
     <h1>{{ 'Kelola Kelas' if admin else 'Kelas' }}</h1>
     <p class="sub">{{ 'Administrator dapat menambahkan kelas untuk siswa dan pengajar.' if admin else 'Materi, tugas, dan presensi kelas kamu.' }}</p>
   </div>
+  {{ back_utama(kembali or url_for('kelola_kelas' if admin else 'lihat_kelas')) }}
 </div>
 
 {# banner kelas ikut memakai background yang dipilih admin.
@@ -178,4 +179,7 @@
   <span class="sep">|</span>
   <a href="{{ url_for('detail_kelas', kelas_id=kelas.id) }}" class="{{ 'is-active' if tab == 'presensi' }}">Presensi</a>
 </nav>
+{%- endmacro %}
+{% macro back_utama(tujuan) -%}
+<a class="back-button" href="{{ tujuan }}">{{ ic('arrow-left', 18) }} <span>Back</span></a>
 {%- endmacro %}

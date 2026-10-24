@@ -233,3 +233,84 @@ revisi ini.
 - Nama kelas di kartu, pemilih kelas, dan progres dashboard mempertahankan warna biru aslinya dengan latar teks terang khusus Dark Mode agar tetap terbaca.
 - Kotak putih di belakang logo pada Dark Mode dihilangkan; diganti sorotan kuning transparan dari CSS, tanpa mengubah berkas logo asli.
 - Tidak ada perubahan pada model, database, route, atau JavaScript tema.
+
+## Revisi terarah (13 poin) — 23 Oktober 2026
+- **Kelola Akun**: judul terlihat lagi. Tombol Back sejajar dengan Tambah Siswa/Pengajar; di Kelas/Jadwal sejajar tombol tambah.
+- **Navigasi**: Back profil akun sendiri menuju Dashboard; jika profil dibuka lewat **Kelola Akun → Buka Profil**, Back kembali ke Kelola Akun.
+- **Tabel**: bentuk kotak/sudut siku-siku; scroll vertikal pada daftar panjang dengan header tabel tetap terlihat serta scroll horizontal pada layar sempit.
+- **Presensi**: hanya tanggal yang terdaftar di Jadwal tampil di pilihan pertemuan. Catatan presensi lama yang tanggalnya tidak cocok **tidak dihapus**.
+- **Monitoring**: diagram donat tetap tampil abu-abu ketika belum ada catatan; pada Dashboard Siswa kondisi kosong grafik juga memiliki indikator donat abu-abu.
+- **Layout**: panel dashboard/monitoring sejajar, memenuhi area konten tersedia; komponen responsif dipertahankan.
+- **Form profil**: Batal mengembalikan isian sebelum edit dan menutup modal.
+- **Password**: pergantian dan reset via admin yang benar-benar mengubah password kini dicatat satu kali secara atomik, sementara penggantian dengan password identik ditolak. Histori password sebelumnya tidak dimodifikasi.
+- **Logo**: navbar menggunakan `static/images/logo_light.png` pada tema terang dan `static/images/logo_dark.png` pada tema gelap. Karena tidak ada dua aset baru yang terpisah pada unggahan, kedua file mula-mula **salinan logo PNG lama**; keduanya bebas diganti gambar final dengan nama yang sama. Efek cahaya kuning mengikuti bentuk logo di tema gelap.
+- **Foto pengajar & username**: validasi keunikan username dijalankan di browser sebelum mengirim data sehingga file foto yang dipilih tidak hilang ketika username bentrok; server juga memverifikasi username sebelum menyimpan foto.
+- **Navbar**: jarak antar menu diperkecil tanpa mengubah route atau ikon.
+
+Pengujian: 18 regresi database berhasil, 20 template lolos parsing Jinja, JavaScript lolos pemeriksaan sintaks Node, dua pengujian interaksi browser mock berhasil (Batal/duplikat foto). **Pengujian Flask end-to-end penuh masih harus dilakukan** di mesin dengan Flask dan Werkzeug terinstal; `requirements.txt` tetap sama. Untuk database berisi data, jangan jalankan `seed.py`.
+
+## Revisi Jadwal, Ruangan, dan Presensi per Pertemuan — Oktober 2026
+
+Revisi ini **menggantikan keterbatasan `kelas + tanggal`** yang disebut pada catatan revisi-revisi sebelumnya. Struktur yang sudah ada tetap dipakai, hanya menambah `jadwal.ruangan` dan `presensi.jadwal_id` untuk membedakan dua sesi kelas pada tanggal sama.
+
+- **Jadwal:** dropdown `Semua Kelas` atau kelas tertentu, untuk Admin/Pengajar/Siswa sesuai hak akses. Kolom **Ruangan** pada tabel jadwal dan opsi wajib **A01 / A02 / A03** pada form tambah/edit.
+- **Monitoring:** dropdown seluruh kelas/kelas tertentu. Pengajar hanya melihat kelas yang berhak ia ajar; siswa memakai pilihan riwayat kelas lama seperti sebelumnya.
+- **Validasi bentrok:** tanggal yang sama dan rentang jam yang saling *overlap* akan ditolak jika kelas sama, ruangan sama, atau pengajar yang **benar-benar bertugas** sama. Jadwal yang berdempetan tanpa tumpang tindih boleh. Dua ruang berbeda pada jam sama boleh **selama kelas dan pengajar yang bertugas juga berbeda**. Penolakan berlaku untuk tambah dan edit; pemeriksaan tambahan dalam transaksi `BEGIN IMMEDIATE` mencegah dua penyimpanan serentak meloloskan bentrok.
+- **Pengajar pengganti:** jika terisi, ia yang dianggap bertugas pada sesi tersebut. Pengajar tetap hanya menjadi keterangan untuk penjadwalan tersebut dan boleh mengajar kelas lain pada jam yang sama, asalkan kelas lain itu memang menjadi tanggung jawabnya. Pengganti tidak boleh bentrok dengan kelas/jadwal lain sebagai pengajar tetap maupun pengganti.
+- **Presensi:** setiap catatan kini mengacu ke **`jadwal.id`**. Presensi pagi dan sore, meski tanggal dan siswa sama, masing-masing memiliki panel, jam, ruangan, status serta record tersendiri. Ketika tidak ada catatan valid, status sesi belum selesai. Progres kelas (maksimum 8) dan grafik siswa mengikuti ID sesi, bukan jumlah tanggal berbeda. Jam dan ruangan terlihat pada pemilih presensi dan riwayat siswa.
+- **Perlindungan histori:** jadwal yang sudah memiliki presensi tidak boleh dihapus, dan kelas, tanggal, serta jamnya tidak boleh diubah. Untuk jadwal lama yang tidak memiliki ruangan, `ruangan` tetap kosong sampai dipilih admin saat mengedit; sistem tidak menebaknya.
+- **Migrasi:** `database.migrasi()` otomatis bekerja saat Flask dijalankan, termasuk migrasi dari `UNIQUE(tanggal, siswa_id, kelas_id)` ke `UNIQUE(jadwal_id, siswa_id)`, tanpa menghapus baris presensi. Baris lama dipasangkan ke **jadwal pertama berdasarkan jam** pada kelas/tanggal yang cocok. Bila dulu sudah ada dua sesi satu hari, tidak ada informasi jam per catatan lama untuk mengetahui sesi aslinya; **periksa hasil pemasangannya secara manual**. Baris lama tanpa jadwal yang cocok tetap tersimpan dengan `jadwal_id` kosong, tetapi tidak dihitung sebagai sesi selesai. Buat **cadangan `fluenglo.db`** sebelum menjalankan versi ini dengan data nyata. Jangan jalankan `seed.py`.
+- **Logo Dark Mode:** navbar kini mencari `static/images/dark_logo.png`. Karena berkas tersebut tidak terdapat pada ZIP sumber yang diterima, proyek menggunakan **fallback `logo_dark.png`** jika `dark_logo.png` belum ada. Salin file asli `dark_logo.png` milikmu ke `web-pbo/static/images/` tanpa mengubah nama agar tampil seperti yang kamu inginkan. Light tetap menggunakan `logo_light.png`.
+
+Uji perubahan: `python -m unittest discover -s tests -v` di lingkungan yang sudah menginstal dependensi. Pengujian dilakukan pada database sementara, tidak pada berkas data yang akan dipakai pengguna. Pengujian server Flask lengkap dengan semua interaksi browser **belum dilakukan** di lingkungan ini.
+
+
+### Revisi Dashboard & Profil (24 Oktober 2026)
+- Kartu **Jumlah Kelas Terjadwal** tetap mengikuti filter tahun. Kartu **Jumlah Pengajar** mencerminkan seluruh akun role pengajar di Kelola Akun, sedangkan rekap historis hanya menghitung pengajar yang terjadwal.
+- Siswa dan admin bisa **menghapus foto siswa** melalui halaman profil (POST, pengajar tidak memiliki izin; admin tidak mendapat fitur ganti foto). File upload lama tidak dihapus dari storage.
+- Tombol **Batal** pada modal formulir memulihkan isian awal **tanpa menutup modal**. Gunakan tombol X untuk menutup.
+- Navbar kembali berbentuk pill. Glow kuning logo Dark Mode dihapus. Tombol diberi hover/focus subtle serta dukungan reduced motion.
+
+
+### Catatan paket revisi: gambar lokal tetap milik pengguna
+- Paket ZIP revisi ini sengaja **tidak menyertakan `static/images/`** supaya gambar dan logo milik Anda tidak tertimpa.
+- Ekstrak atau salin revisi ke project Fluenglo yang **sudah memiliki folder `static/images/`**. Jangan menghapus folder tersebut.
+- Untuk Dark Mode, project menggunakan `static/images/dark_logo.png`; untuk Light Mode, `static/images/logo_light.png`.
+- Tombol tautan teks **Kembali ke tugas** dan **Kembali ke materi** di detail dihapus karena sudah ada tombol **Back**.
+
+### Revisi 24 Oktober 2026 — Satu Back & lima Aktivitas Terbaru
+- Halaman **Kelas** (`/kelas`, untuk Siswa/Pengajar) kini hanya menampilkan tombol Back milik header yang sejajar judul. Tombol Back otomatis tambahan pada `base.html` tidak lagi muncul untuk endpoint `lihat_kelas`.
+- Halaman **Jadwal** (`/jadwal`) menggunakan template bersama seperti Kelola Jadwal; tombol Back otomatis tambahan juga dihindari agar tidak muncul dua kali.
+- Bagian **Aktivitas Terbaru** Dashboard Admin/Pengajar/Siswa dibatasi maksimal **5 aktivitas terbaru**, urut waktu menurun. Aktivitas baru menggeser entri tertua dari daftar tampilan, **tanpa menghapus histori** di database. Pengajar sudah membatasi 5; Admin diubah 6 → 5 dan Siswa 4 → 5.
+- Perubahan kode hanya di `templates/base.html` dan `database.py`; tambahan pengujian berada di `tests/test_back_aktivitas.py`.
+- **Folder `static/images/` sengaja tidak dikirimkan dalam ZIP**. Biarkan aset logo dan gambar pribadi tetap berada di folder images pada project lokal saat menyalin revisi.
+
+---
+
+## Revisi gabungan UTS — 24 Oktober 2026
+
+Paket ini **dimaksudkan untuk digabungkan** ke folder project Fluenglo yang sudah ada. **Jangan hapus data lama.** Sebelum menyalin, backup project dan khususnya `fluenglo.db`, `static/uploads/`, serta `static/images/`.
+
+Paket ZIP revisi ini sengaja **tidak menyertakan**:
+
+- `static/images/` — logo (termasuk `logo_light.png` / `logo_dark.png`) dan background milik pengguna tetap dipertahankan;
+- `static/uploads/` — file materi, foto, jawaban, dan lampiran yang telah diunggah tidak akan tertimpa;
+- `fluenglo.db` — data akun, kelas, presensi, dan nilai pengguna tidak akan tertimpa.
+
+Jika menjalankan project di folder yang benar-benar baru (bukan merge), perlu menyalin ketiga aset lokal di atas dari project milik sendiri. **Jangan menjalankan `seed.py` pada database yang sudah berisi data.** Perintah menjalankan aplikasi tetap `python app.py` setelah dependensi di `requirements.txt` diinstal.
+
+Perubahan yang dibatasi pada kebutuhan UTS:
+
+1. Enam kartu Dashboard Admin dipadatkan, tidak mengubah judul dan sumber query statistik.
+2. Status kelas otomatis `Belum Mulai` (0/8), `Berlangsung` (1–7/8), `Selesai` (8/8) berdasarkan **ID jadwal dengan presensi tercatat**, bukan jumlah siswa atau tanggal yang lewat.
+3. Filter kelas di Jadwal serta Monitoring mengutamakan kelas yang belum selesai dan meletakkan kelas selesai di bawah, tanpa menghapus histori.
+4. Jawaban tugas siswa tetap maksimal satu file. Sebelum dinilai, siswa boleh menghapusnya dan mengumpulkan lagi; sesudah dinilai harus menghubungi pengajar.
+5. Pengajar boleh memasang satu file lampiran opsional ketika membuat tugas, dan mengganti atau menghapusnya saat mengedit. File terpisah dari berkas jawaban siswa.
+6. Search pada Kelola Akun, Monitoring, Kelola Kelas, Jadwal, daftar pengumpulan pengajar, Materi/Tugas kelas; menggunakan data yang sudah dimuat sesuai hak akses.
+7. Pagination 8 baris/item per halaman pada daftar/tabel besar. Search memfilter seluruh data pada daftar sebelum paginasi, bukan hanya halaman yang sedang terlihat.
+8. Tombol Back di header halaman, sejajar judul, tanpa duplikasi tombol dari layout utama. Di detail tugas/materi, tujuan Back mengikuti halaman induknya.
+9. Halaman publik/Login selalu Light Mode. Setelah login, preferensi tema masing-masing akun tetap berlaku.
+
+**Migrasi minimal**: startup `database.migrasi()` menambahkan kolom `tugas.file_lampiran` bila belum ada. Tidak menghapus data historis. File lama tetap digunakan saat formulir edit tidak memilih lampiran baru.
+
+**Verifikasi terbatas**: pengujian regresi database, parsing 20 template Jinja, sintaks JavaScript, browser mock-up untuk Search/pagination. Pengujian Flask end-to-end pada data produksi harus dijalankan di komputer tempat dependensi Flask tersedia; lingkungan penyusunan ZIP ini tidak dapat menginstal Flask karena jaringan terblokir.

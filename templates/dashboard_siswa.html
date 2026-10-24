@@ -23,7 +23,7 @@
  {% if data.presensi %}
  {{ line_chart(data.presensi|map(attribute='nilai')|list, data.presensi|map(attribute='label')|list, 100, '%') }}
  <div class="dash-trend-summary">{% for point in data.presensi %}<span>Pertemuan {{ point.label }}: <strong>{{ point.nilai }}%</strong>{% if point.arah %} <small class="trend-{{ point.arah }}">{{ '↑' if point.arah=='naik' else ('↓' if point.arah=='turun' else '=') }} {{ point.arah|capitalize }}</small>{% endif %}</span>{% endfor %}</div>
- {% else %}<div class="dash-no-data"><div class="dash-chart-grid"></div><p>Belum ada data presensi</p></div>{% endif %}
+ {% else %}<div class="dash-no-data"><div class="dash-chart-grid"></div><div class="dash-empty-ring" role="img" aria-label="Belum ada data presensi"><span>–<small>Belum ada data<br>presensi</small></span></div></div>{% endif %}
  </section>
  <section class="dash-panel"><div class="dash-panel-heading"><h2>Aktivitas Terbaru</h2><p>Aktivitas pembelajaran kelas yang dipilih.</p></div>{{ activities(data.aktivitas) }}</section>
 </div>
@@ -33,7 +33,7 @@
 <section class="dash-panel"><div class="dash-panel-heading"><h2>Materi Pembelajaran</h2><p>Materi kelas yang dipilih.</p></div><a class="dash-class-tile" href="{{ url_for('kelola_materi',kelas_id=kelas_id) }}"><span class="dash-icon dash-violet">{{ ic('book',21) }}</span><span><strong>{{ data.stat.materi }} materi</strong><small>Buka daftar materi ›</small></span></a></section>
 </div>
 {% if panel %}
-<section id="dashboard-daftar" class="dash-panel dash-bottom" tabindex="-1">
+<section id="dashboard-daftar" class="dash-panel dash-bottom" tabindex="-1" data-table-page>
  <div class="dash-panel-heading dash-panel-heading-actions">
   <div><h2>{{ {'dikerjakan':'Tugas Sudah Dikerjakan','belum_tugas':'Tugas Belum Dikerjakan','dinilai':'Tugas Sudah Dinilai','belum_nilai':'Tugas Belum Dinilai'}[panel] }}</h2>
    <p>Daftar tugas {{ kelas.nama }} sesuai pilihan pada kartu statistik.</p></div>

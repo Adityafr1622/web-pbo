@@ -4,7 +4,7 @@
 
 {% block content %}
 {# data dari app.py: kelas, materi_list, user, tab, pengajar_list #}
-{{ kelas_head(kelas, pengajar_list, tab, admin=(user.role == 'admin')) }}
+{{ kelas_head(kelas, pengajar_list, tab, admin=(user.role == 'admin'), kembali=back_url) }}
 
 {% if user.role == 'pengajar' %}
 <div class="tab-actions">
@@ -12,9 +12,10 @@
 </div>
 {% endif %}
 
-<div class="feed">
+<div class="table-tools" data-search-panel="feed"><input class="table-search" type="search" placeholder="Cari judul materi..." aria-label="Cari judul materi..."></div>
+<div class="feed" data-list-page data-list-name="feed">
   {% for m in materi_list %}
-  <div class="feed-row">
+  <div data-list-item class="feed-row">
     <a class="feed-item" href="{{ url_for('detail_materi', materi_id=m.id) }}">
       <span class="feed-ic feed-ic-book">{{ ic('book', 30) }}</span>
       <span class="feed-text">

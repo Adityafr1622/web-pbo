@@ -31,7 +31,7 @@
 <div class="dash-class-grid">{% for k in data.progress %}
 <a href="{{ url_for('detail_kelas', kelas_id=k.id) }}" class="dash-class-tile"><span class="dash-icon dash-blue">{{ k.nama[0] }}</span><span><strong>{{ k.nama }}</strong><small>{{ k.selesai }} / {{ k.total }} pertemuan</small></span><span class="dashboard-next">›</span></a>
 {% else %}<p class="dash-empty">Belum ada kelas yang diajar.</p>{% endfor %}</div></section>
-{% if panel %}<section id="dashboard-daftar" class="dash-panel dash-bottom"><div class="dash-panel-heading"><h2>{{ {'siswa':'Daftar Siswa','dinilai':'Pengumpulan Sudah Dinilai','belum':'Pengumpulan Belum Dinilai','materi':'Materi yang Diunggah'}[panel] }}</h2><p>Daftar sesuai filter kelas di atas.</p></div>
+{% if panel %}<section id="dashboard-daftar" class="dash-panel dash-bottom" data-table-page><div class="dash-panel-heading"><h2>{{ {'siswa':'Daftar Siswa','dinilai':'Pengumpulan Sudah Dinilai','belum':'Pengumpulan Belum Dinilai','materi':'Materi yang Diunggah'}[panel] }}</h2><p>Daftar sesuai filter kelas di atas.</p></div>
 <div class="table-scroll"><table class="dash-table"><thead><tr><th>{{ 'Nama Siswa' if panel=='siswa' else 'Judul' }}</th><th>Kelas</th><th>Aksi</th></tr></thead><tbody>
 {% for d in data.daftar %}<tr><th>{{ d.nama if panel=='siswa' else d.judul }}</th><td>{{ d.kelas_nama }}</td><td>
 {% if panel=='siswa' %}<a href="{{ url_for('monitoring_siswa',siswa_id=d.id,kelas=d.kelas_id) }}">Monitoring ›</a>

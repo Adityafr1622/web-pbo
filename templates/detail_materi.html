@@ -4,9 +4,8 @@
 
 {% block content %}
 {# data dari app.py: kelas, materi (objek Materi), baris (row database), nama_pengajar, user, tab #}
-{{ kelas_head(kelas, pengajar_list, tab, admin=(user.role == 'admin')) }}
+{{ kelas_head(kelas, pengajar_list, tab, admin=(user.role == 'admin'), kembali=back_url) }}
 
-<a class="btn btn-light btn-sm back-btn" href="{{ url_for('kelola_materi', kelas_id=kelas.id) }}">{{ ic('arrow-left', 15) }} Kembali ke materi</a>
 
 <div class="feed-item static">
   <span class="feed-ic feed-ic-book">{{ ic('book', 30) }}</span>

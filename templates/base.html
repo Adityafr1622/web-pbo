@@ -1,6 +1,6 @@
 {% from '_macros.html' import ic, avatar %}
 <!DOCTYPE html>
-<html lang="id" data-theme-user="{{ id_login or 'guest' }}" data-theme="light">
+<html lang="id" data-theme-user="{{ 'guest' if request.endpoint == 'login' else (id_login or 'guest') }}" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -14,7 +14,7 @@
   var root = document.documentElement;
   var user = root.getAttribute('data-theme-user') || 'guest';
   try {
-    root.dataset.theme = (user === 'guest' ? localStorage.getItem('fluenglo-theme-v1:browser') : localStorage.getItem('fluenglo-theme-v1:' + user)) === 'dark' ? 'dark' : 'light';
+    root.dataset.theme = (user !== 'guest' && localStorage.getItem('fluenglo-theme-v1:' + user) === 'dark') ? 'dark' : 'light';
   } catch (error) { root.dataset.theme = 'light'; }
 }());
 </script>
@@ -37,7 +37,7 @@
  ('Jadwal','lihat_jadwal','calendar',[]),
  ('Monitoring Anak','monitoring','chart',['monitoring_siswa']) ] %}
 <header class="topbar">
-  <a class="brand" href="{{ url_for('dashboard') }}"><img src="{{ url_for('static', filename='images/logo-fluenglo.png') }}" alt="Fluenglo"></a>
+  <a class="brand" href="{{ url_for('dashboard') }}"><img class="brand-light" src="{{ url_for('static', filename='images/logo_light.png') }}" alt="Fluenglo" width="604" height="242"><img class="brand-dark" src="{{ url_for('static', filename='images/dark_logo.png') }}" alt="" aria-hidden="true" width="604" height="242" onerror='this.onerror=null;this.src={{ url_for("static", filename="images/logo_dark.png")|tojson }}'></a>
   <nav class="nav">
     {% for label, ep, icon, extra in NAV if label in menu_user %}
     <a href="{{ url_for(ep) }}" class="{{ 'active' if request.endpoint == ep or request.endpoint in extra }}">{{ ic(icon, 18) }}<span>{{ label }}</span></a>
@@ -67,11 +67,6 @@
   </div>
 </header>
 <main class="page">
-  {% if request.endpoint not in ('dashboard', 'login') %}
-  <div class="back-navigation"><a class="back-button" href="{{ back_url or url_for('dashboard') }}">
-    {{ ic('arrow-left', 18) }} <span>Back</span>
-  </a></div>
-  {% endif %}
   {% block content %}{% endblock %}
 </main>
 {% endblock %}
@@ -93,5 +88,6 @@
 
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+<script src="{{ url_for('static', filename='js/list-search.js') }}"></script>
 </body>
 </html>

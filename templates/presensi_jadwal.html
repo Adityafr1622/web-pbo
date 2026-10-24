@@ -3,18 +3,18 @@
 {% block title %}Presensi Jadwal · Fluenglo{% endblock %}
 {% block content %}
 <div class="page-head">
+  <a class="back-button" href="{{ back_url }}">{{ ic('arrow-left', 18) }} Back</a>
   <div>
     <h1>Isi Presensi</h1>
-    <p class="sub">{{ kelas.nama_kelas }} · {{ label_tanggal }} · {{ jadwal.jam }}</p>
+    <p class="sub">{{ kelas.nama_kelas }} · {{ label_tanggal }} · {{ jadwal.jam }} · Ruangan {{ jadwal.ruangan or '—' }}</p>
     <p class="form-note">Kamu ditugaskan sebagai pengganti hanya untuk jadwal ini. Halaman ini tidak memberikan akses ke materi, tugas, atau jadwal lain di kelas.</p>
   </div>
-  <a class="btn btn-light" href="{{ url_for('lihat_jadwal') }}">Kembali ke Jadwal</a>
 </div>
 {% set STATUS = [('hadir', 'Hadir'), ('izin', 'Izin'), ('sakit', 'Sakit'), ('alfa', 'Alpha')] %}
 <form class="presensi-panel" method="post" action="{{ url_for('presensi_jadwal', jadwal_id=jadwal.id) }}">
   <input type="hidden" name="tanggal" value="{{ jadwal.tanggal }}">
   <input type="hidden" name="siswa_tampil" value="{{ siswa_list | map(attribute='id') | join(',') }}">
-  <div class="table-card"><div class="table-scroll">
+  <div class="table-card" data-table-page><div class="table-scroll">
     <table class="data-table presensi-table">
       <thead><tr><th class="th-left">Nama Siswa</th>{% for kode, nama in STATUS %}<th>{{ nama }}<label class="chk-semua"><input type="checkbox" data-semua-status="{{ kode }}"><span class="chk"></span> Semua</label></th>{% endfor %}</tr></thead>
       <tbody>

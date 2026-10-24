@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS jadwal (
     pengajar_id INTEGER NOT NULL,
     tanggal TEXT,
     materi TEXT,
+    ruangan TEXT,
     -- Pengganti hanya berlaku untuk jadwal/pertemuan ini.
     pengganti_id INTEGER,
     FOREIGN KEY(kelas_id) REFERENCES kelas(id),
@@ -89,6 +90,7 @@ CREATE TABLE IF NOT EXISTS tugas (
     pengajar_id INTEGER NOT NULL,
     tanggal_dibuat TEXT,
     tanggal_edit TEXT,
+    file_lampiran TEXT,
     FOREIGN KEY(kelas_id) REFERENCES kelas(id),
     FOREIGN KEY(pengajar_id) REFERENCES users(id)
 );
@@ -129,7 +131,8 @@ CREATE TABLE IF NOT EXISTS presensi (
     kelas_id INTEGER NOT NULL,
     status TEXT DEFAULT 'Belum Hadir',
     pengajar_id INTEGER,
-    UNIQUE (tanggal, siswa_id, kelas_id),
+    jadwal_id INTEGER REFERENCES jadwal(id),
+    UNIQUE (jadwal_id, siswa_id),
     FOREIGN KEY (pengajar_id) REFERENCES users(id)
 );
 

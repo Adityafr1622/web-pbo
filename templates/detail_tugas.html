@@ -5,9 +5,8 @@
 {% block content %}
 {# data dari app.py: tugas, kelas, pengumpulan (siswa), baris_siswa (pengajar/admin),
    komentar ({siswa_id: [baris komentar]}), user, tab, sudah_lewat #}
-{{ kelas_head(kelas, pengajar_list, tab, admin=(user.role == 'admin')) }}
+{{ kelas_head(kelas, pengajar_list, tab, admin=(user.role == 'admin'), kembali=back_url) }}
 
-<a class="btn btn-light btn-sm back-btn" href="{{ url_for('daftar_tugas', kelas_id=kelas.id) }}">{{ ic('arrow-left', 15) }} Kembali ke tugas</a>
 
 <div class="subtabs">
   <button type="button" class="pill is-active" data-pane="petunjuk">Petunjuk</button>
@@ -26,6 +25,7 @@
     </div>
     <h3>Petunjuk</h3>
     <p class="pre-line">{{ tugas.deskripsi or 'Pengajar belum menuliskan petunjuk untuk tugas ini.' }}</p>
+    {% if tugas.file_lampiran %}<a class="btn btn-light" href="{{ url_for('unduh_lampiran_tugas', tugas_id=tugas.id) }}">{{ ic('book', 16) }} Unduh lampiran: {{ tugas.file_lampiran|nama_berkas }}</a>{% endif %}
   </div>
 </section>
 
@@ -62,6 +62,12 @@
     <p class="muted">Kamu belum mengumpulkan tugas ini.</p>
     {% endif %}
 
+    {% if pengumpulan and pengumpulan.nilai is none %}
+    <form method="post" action="{{ url_for('tarik_kembali_jawaban', tugas_id=tugas.id) }}" data-confirm-submit="Hapus file jawaban? Kamu bisa mengumpulkan lagi nanti.">
+      <button type="submit" class="btn btn-light">{{ ic('trash', 16) }} Hapus File Jawaban</button>
+    </form>
+    {% elif pengumpulan and pengumpulan.nilai is not none %}<p class="form-note">Jawaban sudah dinilai. Hubungi pengajar untuk revisi.</p>{% endif %}
+    {% if not pengumpulan or pengumpulan.nilai is none %}
     <form class="kumpul-form" method="post" action="{{ url_for('kumpul_tugas', tugas_id=tugas.id) }}" enctype="multipart/form-data">
       <div class="field"><label>{{ 'Ganti berkas jawaban' if pengumpulan else 'Berkas jawaban' }}</label>
         <input type="file" name="file_jawaban" required></div>
@@ -70,6 +76,7 @@
       {% if sudah_lewat %}<p class="form-note note-telat">{{ ic('clock', 14) }} Tenggat sudah lewat. Pengumpulan masih dibuka, tetapi berkasnya akan ditandai <strong>Terlambat</strong> dan pengajar bisa melihat penanda itu.</p>{% endif %}
       {% if pengumpulan %}<p class="form-note">Mengumpulkan ulang akan menghapus nilai lama, jadi pengajar perlu menilai lagi.</p>{% endif %}
     </form>
+    {% endif %}
   </div>
 
   {# percakapan privat siswa ini dengan pengajar #}
@@ -97,7 +104,8 @@
   {# ---------- tampilan pengajar & admin: seluruh siswa kelas ---------- #}
   <div class="card strip-title"><h2>Pengumpulan: {{ tugas.judul }}</h2></div>
 
-  <div class="table-card"><div class="table-scroll">
+  <div class="table-tools" data-search-panel="pengumpulan-tugas"><input class="table-search" type="search" placeholder="Cari nama siswa..." aria-label="Cari siswa yang mengumpulkan tugas"></div>
+  <div class="table-card" data-table-page><div class="table-scroll">
   <table class="data-table">
     <thead><tr><th class="th-left">Siswa</th><th>Berkas</th><th>Nilai</th><th>Komentar</th><th>Profil</th><th>Status</th></tr></thead>
     <tbody>

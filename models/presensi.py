@@ -40,10 +40,10 @@ class Presensi:
         return cls.dari_row(row)
 
     @classmethod
-    def ambil_kelas(cls, kelas_id, tanggal):
+    def ambil_kelas(cls, kelas_id, tanggal, jadwal_id=None):
         """Satu objek Presensi untuk SETIAP siswa di kelas pada tanggal tsb.
         Siswa yang belum dicatat otomatis berstatus 'Belum Hadir' (id=None)."""
-        tersimpan = {r["siswa_id"]: r for r in database.ambil_presensi_kelas_tanggal(kelas_id, tanggal)}
+        tersimpan = {r["siswa_id"]: r for r in database.ambil_presensi_kelas_tanggal(kelas_id, tanggal, jadwal_id)}
         hasil = []
         for s in database.ambil_siswa_by_kelas(kelas_id):
             if s["id"] in tersimpan:
@@ -102,7 +102,7 @@ class Presensi:
     # Di dalamnya ada validasi, upsert (nggak duplikat), dan transaksi database,
     # tapi pemanggil (Pengajar / route Flask) nggak perlu tau.
     @staticmethod
-    def simpan_massal(kelas_id, tanggal, data_status, pengajar_id=None):
+    def simpan_massal(kelas_id, tanggal, data_status, pengajar_id=None, jadwal_id=None):
         """Simpan presensi banyak siswa sekaligus.
         data_status: {siswa_id: 'hadir' / 'Izin' / ...}. Semua divalidasi dulu,
         kalau ada satu yang salah nggak ada yang tersimpan. Return jumlah siswa."""
@@ -112,11 +112,11 @@ class Presensi:
         for sid, st in data_status.items():
             bersih[_ke_int(sid, "Siswa")] = Presensi.normalisasi_status(st)
         kelas_id, tanggal = Presensi.cek_input(kelas_id, tanggal, bersih.keys())
-        database.simpan_presensi_massal(kelas_id, tanggal, bersih, pengajar_id)
+        database.simpan_presensi_massal(kelas_id, tanggal, bersih, pengajar_id, jadwal_id)
         return len(bersih)
 
     @staticmethod
-    def hapus_banyak(kelas_id, tanggal, siswa_ids):
+    def hapus_banyak(kelas_id, tanggal, siswa_ids, jadwal_id=None):
         """BARU: kosongkan kehadiran beberapa siswa pada satu pertemuan (centang dibatalkan).
         ABSTRACTION: pemanggil cukup menyebut siswa mana yang dibatalkan; validasi tanggal
         dan penghapusan barisnya diurus di sini."""
@@ -126,7 +126,7 @@ class Presensi:
         kelas_id, tanggal = Presensi.cek_input(kelas_id, tanggal, siswa_ids)
         jumlah = 0
         for sid in siswa_ids:
-            jumlah += database.hapus_presensi(kelas_id, tanggal, sid)
+            jumlah += database.hapus_presensi(kelas_id, tanggal, sid, jadwal_id)
         return jumlah
 
     def simpan(self):
@@ -157,7 +157,7 @@ class Presensi:
         for (kelas_id, tanggal), daftar in kelompok.items():
             Presensi.simpan_massal(kelas_id, tanggal, {p.siswa_id: "Hadir" for p in daftar})
             id_tersimpan = {r["siswa_id"]: r["id"]
-                            for r in database.ambil_presensi_kelas_tanggal(kelas_id, tanggal)}
+                            for r in database.ambil_presensi_kelas_tanggal(kelas_id, tanggal, jadwal_id)}
             for p in daftar:  # sinkronkan objek dengan yang sudah masuk database
                 p.status = "Hadir"
                 p.id = id_tersimpan.get(p.siswa_id, p.id)

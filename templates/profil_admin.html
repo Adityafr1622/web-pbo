@@ -2,7 +2,8 @@
 {% from '_macros.html' import avatar %}
 {% block title %}Profil Admin · Fluenglo{% endblock %}
 {% block content %}
-<div class="page-head"><div><h1>Profil Administrator</h1><p class="sub">Informasi akun administrator Fluenglo.</p></div></div>
+<div class="page-head">
+  <a class="back-button" href="{{ back_url }}">{{ ic('arrow-left', 18) }} Back</a><div><h1>Profil Administrator</h1><p class="sub">Informasi akun administrator Fluenglo.</p></div></div>
 <section class="card mon-siswa" style="max-width:650px">
 {{ avatar(foto_login, user.nama, 'avatar-lg') }}
 <div><h2>{{ user.nama }}</h2><p class="muted">{{ user.username }} · Administrator</p></div>

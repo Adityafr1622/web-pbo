@@ -4,7 +4,7 @@
 
 {% block content %}
 {# data dari app.py: kelas, tugas_list, user, tab, pengajar_list #}
-{{ kelas_head(kelas, pengajar_list, tab, admin=(user.role == 'admin')) }}
+{{ kelas_head(kelas, pengajar_list, tab, admin=(user.role == 'admin'), kembali=back_url) }}
 
 {% if user.role == 'pengajar' %}
 <div class="tab-actions">
@@ -12,9 +12,10 @@
 </div>
 {% endif %}
 
-<div class="feed">
+<div class="table-tools" data-search-panel="feed"><input class="table-search" type="search" placeholder="Cari judul tugas..." aria-label="Cari judul tugas..."></div>
+<div class="feed" data-list-page data-list-name="feed">
   {% for t in tugas_list %}
-  <div class="feed-row">
+  <div data-list-item class="feed-row">
     <a class="feed-item" href="{{ url_for('detail_tugas', tugas_id=t.id) }}">
       <span class="feed-ic feed-ic-pen">{{ ic('pen', 28) }}</span>
       <span class="feed-text">
@@ -26,7 +27,7 @@
     <div class="aksi feed-aksi">
       <button type="button" class="icon-btn icon-edit" title="Edit tugas" data-edit="modal-edit-tugas"
         data-action="{{ url_for('edit_tugas', tugas_id=t.id) }}"
-        data-fill='{{ {"judul": t.judul, "deskripsi": t.deskripsi, "deadline": (t.deadline or "")[:16]|replace(" ", "T")}|tojson }}'>{{ ic('pencil', 16) }}</button>
+        data-fill='{{ {"judul": t.judul, "deskripsi": t.deskripsi, "deadline": (t.deadline or "")[:16]|replace(" ", "T"), "lampiran_lama": (t.file_lampiran|nama_berkas if t.file_lampiran else "")}|tojson }}'>{{ ic('pencil', 16) }}</button>
       <button type="button" class="icon-btn icon-del" title="Hapus tugas" data-confirm="{{ url_for('hapus_tugas', tugas_id=t.id) }}"
         data-text="Yakin ingin menghapus tugas {{ t.judul }}? Seluruh pengumpulan dan komentarnya ikut terhapus.">{{ ic('trash', 16) }}</button>
     </div>
@@ -39,22 +40,26 @@
 
 {% if user.role == 'pengajar' %}
 {% call modal('modal-tambah-tugas', 'Buat Tugas') %}
-<form method="post" action="{{ url_for('buat_tugas', kelas_id=kelas.id) }}">
+<form method="post" action="{{ url_for('buat_tugas', kelas_id=kelas.id) }}" enctype="multipart/form-data">
   <div class="modal-body">
     {{ field('Judul Tugas', 'judul', 'Contoh: Tugas 1 - Descriptive Text') }}
     {{ ta('Petunjuk Tugas', 'deskripsi', 'Tulis petunjuk pengerjaan untuk siswa', false, 5) }}
     {{ field('Tenggat', 'deadline', '', 'datetime-local') }}
+    <div class="field"><label>Lampiran tugas <span class="label-note">(opsional, 1 file)</span></label><input type="file" name="file_lampiran"></div>
   </div>
   <div class="modal-foot"><button type="button" class="btn btn-light" data-reset-form>Batal</button><button class="btn btn-yellow">Tambahkan</button></div>
 </form>
 {% endcall %}
 
 {% call modal('modal-edit-tugas', 'Edit Tugas') %}
-<form method="post">
+<form method="post" enctype="multipart/form-data">
   <div class="modal-body">
     {{ field('Judul Tugas', 'judul', '') }}
     {{ ta('Petunjuk Tugas', 'deskripsi', '', false, 5) }}
     {{ field('Tenggat', 'deadline', '', 'datetime-local') }}
+    <div class="field"><label>Lampiran saat ini</label><p class="form-note" data-current-attachment>Belum ada lampiran</p>
+      <label class="file-delete-choice"><input type="checkbox" name="hapus_lampiran" value="1"> Hapus lampiran lama</label></div>
+    <div class="field"><label>Lampiran tugas <span class="label-note">(opsional, 1 file)</span></label><input type="file" name="file_lampiran"></div>
   </div>
   <div class="modal-foot"><button type="button" class="btn btn-light" data-reset-form>Batal</button><button class="btn btn-yellow">Simpan</button></div>
 </form>
