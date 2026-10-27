@@ -8,15 +8,15 @@
  <select id="tahun" name="tahun" onchange="this.form.requestSubmit()">{% for y in data.tahun_opsi %}<option value="{{ y }}" {{ 'selected' if y==data.tahun }}>{{ y }}</option>{% endfor %}</select></form>{% endif %}
 </div>
 <div class="dash-metrics dash-metrics-admin">
- {{ metric('Jumlah Siswa', data.stat.siswa, 'users','blue','Mengikuti kelas di '~data.tahun,url_for('kelola_akun',tab='siswa')) }}
+ {{ metric('Jumlah Siswa', data.stat.siswa, 'users','blue','Siswa terdaftar di '~data.tahun,url_for('kelola_akun',tab='siswa')) }}
  {{ metric('Jumlah Pengajar', data.stat.pengajar, 'users','gold','Total akun pengajar',url_for('kelola_akun',tab='pengajar')) }}
- {{ metric('Jumlah Kelas Terjadwal', data.stat.kelas, 'door','green','Kelas dengan jadwal pada tahun ini',url_for('kelola_kelas')) }}
+ {{ metric('Jumlah Kelas', data.stat.kelas, 'door','green','Kelas pada tahun ini',url_for('kelola_kelas')) }}
  {{ metric('Jumlah Pertemuan', data.stat.pertemuan, 'calendar','violet','Pertemuan terjadwal',url_for('kelola_jadwal')) }}
  {{ metric('Jumlah Materi', data.stat.materi, 'book','sky','Materi diunggah pada tahun ini') }}
  {{ metric('Jumlah Tugas', data.stat.tugas, 'note','rose','Tugas dibuat pada tahun ini') }}
 </div>
 <div class="dash-layout dash-layout-main">
- <section class="dash-panel dash-span-2"><div class="dash-panel-heading"><h2>Jumlah Siswa Tahun {{ data.tahun }}</h2><p>Jumlah peserta kelas terjadwal di tiap bulan.</p></div>
+ <section class="dash-panel dash-span-2"><div class="dash-panel-heading"><h2>Jumlah Siswa Tahun {{ data.tahun }}</h2><p>Jumlah siswa yang mendaftar di tiap bulan.</p></div>
  {{ line_chart(data.bulanan, ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des']) }}
  </section>
  <section class="dash-panel"><div class="dash-panel-heading"><h2>Rekap Data Tahunan</h2><p>Ringkasan kegiatan terjadwal pada {{ data.tahun }}.</p></div>
