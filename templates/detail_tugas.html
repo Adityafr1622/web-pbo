@@ -121,11 +121,20 @@
       </td>
       <td>
         {% if user.role == 'pengajar' and b.pengumpulan_id %}
-        <form class="nilai-form" method="post" action="{{ url_for('beri_nilai_tugas', pengumpulan_id=b.pengumpulan_id) }}">
-          <input type="number" name="nilai" min="0" max="100" step="1" value="{{ b.nilai|round|int if b.nilai is not none else '' }}" placeholder="—" aria-label="Nilai {{ b.siswa_nama }}">
-          <span class="muted">/100</span>
-          <button class="btn btn-yellow btn-sm">Simpan</button>
-        </form>
+        <div class="aksi">
+          <form class="nilai-form" method="post" action="{{ url_for('beri_nilai_tugas', pengumpulan_id=b.pengumpulan_id) }}">
+            <input type="number" name="nilai" min="0" max="100" step="1" value="{{ b.nilai|round|int if b.nilai is not none else '' }}" placeholder="—" aria-label="Nilai {{ b.siswa_nama }}" required>
+            <span class="muted">/100</span>
+            <button class="btn btn-yellow btn-sm">Simpan</button>
+          </form>
+          {% if b.nilai is not none %}
+          <button type="button" class="icon-btn icon-del" title="Hapus nilai"
+            data-confirm="{{ url_for('hapus_nilai_tugas', pengumpulan_id=b.pengumpulan_id) }}"
+            data-judul="Hapus Nilai"
+            data-ok="Ya, Hapus"
+            data-text="Yakin ingin menghapus nilai {{ b.siswa_nama }} pada tugas {{ tugas.judul }}? Berkas jawaban siswa tetap tersimpan dan dapat dinilai ulang nanti.">{{ ic('trash', 16) }}</button>
+          {% endif %}
+        </div>
         {% else %}
         {{ b.nilai|round|int if b.nilai is not none else '—' }} <span class="muted">/100</span>
         {% endif %}

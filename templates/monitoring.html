@@ -18,22 +18,24 @@
   <a class="back-button" href="{{ back_url }}">{{ ic('arrow-left', 18) }} Back</a>
 </div>
 
-{% if kelas_list %}
-<form method="get" action="{{ url_for('monitoring') }}" class="kelas-filter-row">
-  <label for="filter-kelas-monitoring">Tampilkan kelas</label>
-  <select id="filter-kelas-monitoring" name="kelas" onchange="this.form.requestSubmit()">
-    <option value="" {{ 'selected' if not kelas_pilih }}>Semua Kelas</option>
-    {% for pilihan in [('Kelas Aktif', false),('Kelas Selesai', true)] %}
-      {% set grup = kelas_list|selectattr('status_kelas', 'equalto', 'Selesai')|list if pilihan[1] else kelas_list|rejectattr('status_kelas', 'equalto', 'Selesai')|list %}
-      {% if grup %}<optgroup label="{{ pilihan[0] }}">
-      {% for k in grup %}<option value="{{ k.id }}" {{ 'selected' if kelas_pilih == k.id }}>{{ k.nama_kelas }} · {{ k.pertemuan_selesai }}/8{{ ' · Selesai' if k.status_kelas == 'Selesai' }}</option>{% endfor %}
-      </optgroup>{% endif %}
-    {% endfor %}
-  </select>
-</form>
-{% endif %}
-<div class="table-tools" data-search-panel="monitoring-siswa"><input class="table-search" type="search" placeholder="Cari nama siswa atau kelas..." aria-label="Cari monitoring siswa"></div>
-<div class="table-card" data-table-page><div class="table-scroll">
+<div class="table-tools table-tools--with-filter" data-search-panel="monitoring-siswa">
+  <input class="table-search" type="search" placeholder="Cari nama siswa atau kelas..." aria-label="Cari monitoring siswa">
+  {% if kelas_list %}
+  <form method="get" action="{{ url_for('monitoring') }}" class="kelas-filter-row">
+    <label for="filter-kelas-monitoring">Tampilkan kelas</label>
+    <select id="filter-kelas-monitoring" name="kelas" onchange="this.form.requestSubmit()">
+      <option value="" {{ 'selected' if not kelas_pilih }}>Semua Kelas</option>
+      {% for pilihan in [('Kelas Aktif', false),('Kelas Selesai', true)] %}
+        {% set grup = kelas_list|selectattr('status_kelas', 'equalto', 'Selesai')|list if pilihan[1] else kelas_list|rejectattr('status_kelas', 'equalto', 'Selesai')|list %}
+        {% if grup %}<optgroup label="{{ pilihan[0] }}">
+        {% for k in grup %}<option value="{{ k.id }}" {{ 'selected' if kelas_pilih == k.id }}>{{ k.nama_kelas }} · {{ k.pertemuan_selesai }}/8{{ ' · Selesai' if k.status_kelas == 'Selesai' }}</option>{% endfor %}
+        </optgroup>{% endif %}
+      {% endfor %}
+    </select>
+  </form>
+  {% endif %}
+</div>
+<div class="table-card{{ ' table-card--pagination-only' if user.role == 'admin' else '' }}" data-table-page><div class="table-scroll">
 <table class="data-table">
   <thead><tr><th class="th-left">Nama Siswa</th><th>Kelas</th><th>Rata-rata Nilai</th><th>Hadir</th><th>Izin</th><th>Sakit</th><th>Alpha</th><th>Catatan Akhir</th><th>Aksi</th></tr></thead>
   <tbody>

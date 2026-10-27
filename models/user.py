@@ -594,6 +594,20 @@ class Pengajar(User):
             nilai=nilai
         )
 
+    def hapus_nilai(self, pengumpulan):
+        """Menghapus (mengosongkan) nilai pengumpulan siswa. Return tugas_id (buat redirect)."""
+        pengumpulan_id = Pengajar._ke_int(pengumpulan, "Data pengumpulan")
+        data = database.ambil_pengumpulan_by_id(pengumpulan_id)
+        if not data:
+            raise ValueError("Pengumpulan tugas tidak ditemukan.")
+        tugas = database.ambil_tugas_by_id(data["tugas_id"])
+        if not tugas:
+            raise ValueError("Tugas tidak ditemukan.")
+        if not self.mengajar_kelas(tugas["kelas_id"]):
+            raise ValueError("Kamu tidak berhak menghapus nilai tugas ini.")
+        database.hapus_nilai_pengumpulan(pengumpulan_id)
+        return data["tugas_id"]
+
     def komentar_tugas(self, tugas, isi, siswa=None):
         from models.akademik import Komentar
 
@@ -688,13 +702,13 @@ class Pengajar(User):
     def boleh_lihat_pengajar(self, pengajar_id):
         return True
 
-    def catat_presensi(self, kelas, siswa, status, tanggal=None):
+    def catat_presensi(self, kelas, siswa, status, tanggal=None, jadwal_id=None):
         """Catat presensi satu siswa. kelas/siswa boleh objek atau id.
         tanggal format YYYY-MM-DD, default hari ini (harus ada di jadwal kelas)."""
         kelas_id = getattr(kelas, "id", kelas)
         siswa_id = getattr(siswa, "id", siswa)
         tanggal = tanggal or date.today().isoformat()
-        return self.catat_presensi_kelas(kelas_id, tanggal, {siswa_id: status})
+        return self.catat_presensi_kelas(kelas_id, tanggal, {siswa_id: status}, jadwal_id=jadwal_id)
 
     def catat_presensi_kelas(self, kelas, tanggal, data_status, kosongkan=None, jadwal_id=None):
         """Catat presensi banyak siswa sekaligus. data_status: {siswa_id: status}.
@@ -706,17 +720,30 @@ class Pengajar(User):
             kelas_id = int(kelas_id)
         except (TypeError, ValueError):
             raise ValueError("Kelas tidak valid.")
-        jadwal_terpilih = database.ambil_jadwal_by_id(jadwal_id) if jadwal_id else None
+        tanggal = Presensi.cek_tanggal(tanggal)
+        if jadwal_id is None:
+            kandidat = [j for j in database.ambil_jadwal_by_kelas(kelas_id) if j['tanggal'] == tanggal]
+            if len(kandidat) == 1:
+                jadwal_terpilih = kandidat[0]
+                jadwal_id = jadwal_terpilih['id']
+            else:
+                jadwal_terpilih = None
+        else:
+            try:
+                jadwal_id = int(jadwal_id)
+            except (TypeError, ValueError):
+                raise ValueError('Pilih pertemuan yang valid untuk mencatat presensi.')
+            jadwal_terpilih = database.ambil_jadwal_by_id(jadwal_id)
         if not jadwal_terpilih or jadwal_terpilih['kelas_id'] != kelas_id or jadwal_terpilih['tanggal'] != tanggal:
             raise ValueError('Pilih pertemuan yang valid untuk mencatat presensi.')
-        # Pengajar tetap dapat mengelola presensi kelas. Pengganti harus cocok
-        # dengan jadwal spesifik (kelas + tanggal), bukan sekadar pernah mengganti kelas.
-        if jadwal_terpilih['pengganti_id'] and jadwal_terpilih['pengganti_id'] != self.id:
-            raise ValueError('Presensi pertemuan ini ditugaskan kepada pengajar pengganti.')
-        if not self.mengajar_kelas(kelas_id):
-            jadwal = jadwal_terpilih if jadwal_terpilih['pengganti_id'] == self.id else None
-            if not jadwal or not self.boleh_presensi_jadwal(jadwal):
-                raise ValueError("Kamu tidak ditugaskan sebagai pengganti untuk jadwal presensi ini.")
+        # Pengajar tetap kelas hanya bisa menyimpan presensi jika jadwal tersebut
+        # tidak sedang dialihkan kepada pengajar pengganti lain. Pengajar pengganti
+        # hanya dapat menyimpan presensi pada jadwal yang ditugaskan kepadanya.
+        if jadwal_terpilih['pengganti_id']:
+            if jadwal_terpilih['pengganti_id'] != self.id:
+                raise ValueError('Presensi pertemuan ini ditugaskan kepada pengajar pengganti.')
+        elif not self.mengajar_kelas(kelas_id):
+            raise ValueError("Kamu bukan pengajar di kelas ini.")
 
         kosongkan = list(kosongkan or [])
         if not data_status and not kosongkan:
@@ -825,6 +852,8 @@ class Admin(User):
                     raise ValueError("Pilih kelas untuk siswa.")
                 if database.ambil_kelas_by_id(kelas_id) is None:
                     raise ValueError("Kelas yang dipilih tidak ditemukan.")
+                if database.kelas_memiliki_aktivitas(kelas_id):
+                    raise ValueError("Kelas yang dipilih sudah memiliki presensi atau progress pembelajaran.")
 
             user_id = database.tambah_user(
                 nama=data["nama"].strip(),
@@ -883,12 +912,19 @@ class Admin(User):
                     perubahan["foto"] = data["foto"]
             if target["role"] == "siswa":  # admin bisa ubah WA, alamat, dan kelas siswa
                 no_wa, alamat = Siswa.cek_data_admin(data.get("whatsapp"), data.get("alamat"))
-                try:
-                    kelas_id = int(data.get("kelas_id"))
-                except (TypeError, ValueError):
-                    raise ValueError("Pilih kelas untuk siswa.")
+                raw_kelas = data.get("kelas_id")
+                if raw_kelas in (None, "") and target["kelas_id"] and database.kelas_memiliki_aktivitas(target["kelas_id"], user_id):
+                    kelas_id = target["kelas_id"]
+                else:
+                    try:
+                        kelas_id = int(raw_kelas)
+                    except (TypeError, ValueError):
+                        raise ValueError("Pilih kelas untuk siswa.")
                 if database.ambil_kelas_by_id(kelas_id) is None:
                     raise ValueError("Kelas yang dipilih tidak ditemukan.")
+                if database.kelas_memiliki_aktivitas(kelas_id, user_id):
+                    if kelas_id != target["kelas_id"]:
+                        raise ValueError("Kelas yang dipilih sudah memiliki presensi atau progress pembelajaran.")
                 perubahan.update(no_whatsapp=no_wa, alamat=alamat, kelas_id=kelas_id)
             hasil = database.edit_user(user_id, **perubahan)
             if didik:  #pendidikan terakhirnya ikut diperbarui
@@ -995,7 +1031,8 @@ class Admin(User):
 
             tabel = {
                 "total_siswa": """
-                    SELECT COUNT(*) FROM users WHERE role = 'siswa'
+                    SELECT COUNT(*) FROM riwayat_kelas r
+                    JOIN users u ON u.id = r.siswa_id WHERE u.role = 'siswa'
                 """,
                 "total_pengajar": """
                     SELECT COUNT(*) FROM users WHERE role = 'pengajar'

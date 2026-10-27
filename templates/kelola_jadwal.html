@@ -48,27 +48,28 @@
 
 {# pilih kelas mana yang jadwalnya ditampilkan. Admin dapat semua kelas,
    pengajar hanya kelas yang dia ajar, siswa hanya kelas yang pernah dia ikuti. #}
-{% if kelas_list %}
-<form method="get" action="{{ url_for(request.endpoint) }}" class="kelas-filter-row">
-  <label for="filter-kelas-jadwal">Tampilkan kelas</label>
-  <select id="filter-kelas-jadwal" name="kelas" onchange="this.form.requestSubmit()">
-    <option value="" {{ 'selected' if not kelas_pilih }}>Semua Kelas</option>
-    {% for pilihan in [('Kelas Aktif', false),('Kelas Selesai', true)] %}
-      {% set grup = kelas_list|selectattr('status_kelas', 'equalto', 'Selesai')|list if pilihan[1] else kelas_list|rejectattr('status_kelas', 'equalto', 'Selesai')|list %}
-      {% if grup %}<optgroup label="{{ pilihan[0] }}">
-      {% for k in grup %}<option value="{{ k.id }}" {{ 'selected' if kelas_pilih == k.id }}>{{ k.nama_kelas }} · {{ k.pertemuan_selesai }}/8{{ ' · Selesai' if k.status_kelas == 'Selesai' }}</option>{% endfor %}
-      </optgroup>{% endif %}
-    {% endfor %}
-  </select>
-</form>
-{% endif %}
-
-<div class="table-tools" data-search-global="jadwal"><input class="table-search" type="search" placeholder="Cari kelas, pengajar, tanggal, atau ruangan..." aria-label="Cari jadwal"></div>
+<div class="table-tools table-tools--with-filter" data-search-global="jadwal">
+  <input class="table-search" type="search" placeholder="Cari kelas, pengajar, tanggal, atau ruangan..." aria-label="Cari jadwal">
+  {% if kelas_list %}
+  <form method="get" action="{{ url_for(request.endpoint) }}" class="kelas-filter-row">
+    <label for="filter-kelas-jadwal">Tampilkan kelas</label>
+    <select id="filter-kelas-jadwal" name="kelas" onchange="this.form.requestSubmit()">
+      <option value="" {{ 'selected' if not kelas_pilih }}>Semua Kelas</option>
+      {% for pilihan in [('Kelas Aktif', false),('Kelas Selesai', true)] %}
+        {% set grup = kelas_list|selectattr('status_kelas', 'equalto', 'Selesai')|list if pilihan[1] else kelas_list|rejectattr('status_kelas', 'equalto', 'Selesai')|list %}
+        {% if grup %}<optgroup label="{{ pilihan[0] }}">
+        {% for k in grup %}<option value="{{ k.id }}" {{ 'selected' if kelas_pilih == k.id }}>{{ k.nama_kelas }} · {{ k.pertemuan_selesai }}/8{{ ' · Selesai' if k.status_kelas == 'Selesai' }}</option>{% endfor %}
+        </optgroup>{% endif %}
+      {% endfor %}
+    </select>
+  </form>
+  {% endif %}
+</div>
 {% set punya_tombol_presensi = user.role == 'pengajar' and jadwal_list|selectattr('is_pengganti_saya')|list|length > 0 %}
 {% for minggu, items in jadwal_list|groupby('minggu') %}
 <section class="jadwal-group">
   <h2 class="group-title">Jadwal Mengajar Minggu Ke-{{ minggu }}</h2>
-  <div class="table-card" data-table-page data-list-group="jadwal"><div class="table-scroll">
+  <div class="table-card table-card--no-scroll" data-table-page data-no-paginate data-list-group="jadwal"><div class="table-scroll">
   <table class="data-table align-left">
     <thead><tr><th>Kelas</th><th>Hari</th><th>Tanggal</th><th>Ruangan</th><th>Pengajar</th><th>Jam</th><th>Materi</th>{% if bisa_kelola or punya_tombol_presensi %}<th>Aksi</th>{% endif %}<th>Status</th></tr></thead>
     <tbody>

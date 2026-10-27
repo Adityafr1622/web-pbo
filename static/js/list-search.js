@@ -17,6 +17,8 @@
       (root.previousElementSibling && root.previousElementSibling.matches('[data-search-panel]') ?
         root.previousElementSibling.querySelector('.table-search') : null);
     const input = globalInput || localSearch;
+    const noPaginate = root.hasAttribute('data-no-paginate');
+    const pageSize = noPaginate ? rows.length : PAGE_SIZE;
     let page = 1;
     const footer = document.createElement('div'); footer.className = 'pagination-bar';
     const info = document.createElement('span'); info.className = 'pagination-info';
@@ -27,7 +29,7 @@
     next.className = 'btn btn-light btn-sm'; next.textContent = 'Berikutnya ›';
     const pageLabel = document.createElement('span'); pageLabel.className = 'pagination-current';
     controls.append(previous, pageLabel, next); footer.append(info, controls);
-    root.append(footer);
+    if (!noPaginate) root.append(footer);
     const empty = document.createElement('p'); empty.className = 'search-empty';
     empty.textContent = 'Tidak ada data yang sesuai dengan pencarian.';
     root.append(empty);
@@ -36,23 +38,27 @@
       if (reset) page = 1;
       const query = norm(input ? input.value : '');
       const matches = rows.filter(row => norm(row.textContent).includes(query));
-      const pages = Math.max(1, Math.ceil(matches.length / PAGE_SIZE));
+      const pages = Math.max(1, Math.ceil(matches.length / Math.max(1, pageSize)));
       page = Math.min(page, pages);
-      const from = (page - 1) * PAGE_SIZE;
-      const selected = new Set(matches.slice(from, from + PAGE_SIZE));
+      const from = (page - 1) * pageSize;
+      const selected = new Set(noPaginate ? matches : matches.slice(from, from + pageSize));
       rows.forEach(row => { row.hidden = !selected.has(row); });
-      info.textContent = matches.length ? `Menampilkan ${from + 1}–${Math.min(from + PAGE_SIZE, matches.length)} dari ${matches.length} data` : '0 data ditemukan';
-      pageLabel.textContent = `${page} / ${pages}`;
-      previous.disabled = page === 1; next.disabled = page === pages;
-      controls.hidden = matches.length <= PAGE_SIZE;
+      if (!noPaginate) {
+        info.textContent = matches.length ? `Menampilkan ${from + 1}–${Math.min(from + pageSize, matches.length)} dari ${matches.length} data` : '0 data ditemukan';
+        pageLabel.textContent = `${page} / ${pages}`;
+        previous.disabled = page === 1; next.disabled = page === pages;
+        controls.hidden = matches.length <= pageSize;
+      }
       empty.hidden = matches.length !== 0;
       if (root.dataset.listGroup === 'jadwal') {
         const section = root.closest('.jadwal-group');
         if (section) section.hidden = matches.length === 0 && !!query;
       }
     };
-    previous.addEventListener('click', () => { if (page > 1) { page--; render(); } });
-    next.addEventListener('click', () => { page++; render(); });
+    if (!noPaginate) {
+      previous.addEventListener('click', () => { if (page > 1) { page--; render(); } });
+      next.addEventListener('click', () => { page++; render(); });
+    }
     if (input && !globalInput) input.addEventListener('input', () => render(true));
     render();
     return { render };

@@ -474,8 +474,11 @@ def kelola_akun():
     # + pendidikan (buat kolom tabel pengajar & isian modal edit) dan daftar
     # + riwayat_password (kartu Riwayat Perubahan Password) dan terakhir_ubah (kolom Password Diubah)
     # pilihan gelar/jurusan, supaya template tidak menulis ulang daftarnya sendiri.
-    return render_template('kelola_akun.html', users=users, kelas_list=database.ambil_semua_kelas(),
-                           riwayat_password=database.ambil_riwayat_password(),
+    semua_kelas = database.ambil_semua_kelas()
+    return render_template('kelola_akun.html', users=users,
+                           kelas_list=database.ambil_kelas_tersedia_siswa(),
+                           semua_kelas_map={k['id']: k['nama_kelas'] for k in semua_kelas},
+                           riwayat_password=database.ambil_riwayat_password(limit=5),
                            terakhir_ubah=database.ambil_terakhir_ubah_password(),
                            pendidikan={u['id']: database.ambil_pendidikan(u['id'])
                                        for u in users if u['role'] == 'pengajar'},
@@ -523,6 +526,7 @@ def edit_akun(user_id):
         flash(str(e), 'danger')
         # modal edit dibuka lagi dengan isian terakhir + action-nya, jadi tombol
         # Simpan tetap menuju akun yang sama.
+        kelas_target = database.ambil_kelas_by_id(target['kelas_id']) if target['kelas_id'] else None
         ingat_isian('modal-edit-' + tab, aksi=url_for('edit_akun', user_id=user_id),
                     nama=request.form.get('nama', ''),
                     username=request.form.get('username', ''),
@@ -530,7 +534,8 @@ def edit_akun(user_id):
                     whatsapp=request.form.get('whatsapp', ''),
                     alamat=request.form.get('alamat', ''),
                     nik=request.form.get('nik', ''),
-                    kelas_id=request.form.get('kelas_id', ''),
+                    kelas_id=request.form.get('kelas_id', '') or target['kelas_id'],
+                    kelas_nama=kelas_target['nama_kelas'] if kelas_target else '',
                     gelar=request.form.get('gelar', ''),       
                     jurusan=request.form.get('jurusan', ''),
                     jurusan_lain=request.form.get('jurusan_lain', ''),
@@ -1249,6 +1254,26 @@ def beri_nilai_tugas(pengumpulan_id):
     except ValueError as e:
         flash(str(e), 'danger')
     return redirect(url_for('detail_tugas', tugas_id=data['tugas_id'], pane='siswa'))
+
+
+@app.route('/pengumpulan/<int:pengumpulan_id>/nilai/hapus', methods=['GET', 'POST'])
+def hapus_nilai_tugas(pengumpulan_id):
+    user = get_current_user()
+    if not user or user.role != 'pengajar':
+        return redirect(url_for('login'))
+
+    data = database.ambil_pengumpulan_by_id(pengumpulan_id)
+    if not data:
+        flash('Pengumpulan tugas tidak ditemukan.', 'danger')
+        return redirect(url_for('dashboard'))
+
+    try:
+        tugas_id = user.hapus_nilai(pengumpulan_id)
+        flash('Nilai berhasil dihapus!', 'success')
+        return redirect(url_for('detail_tugas', tugas_id=tugas_id, pane='siswa'))
+    except ValueError as e:
+        flash(str(e), 'danger')
+        return redirect(url_for('detail_tugas', tugas_id=data['tugas_id'], pane='siswa'))
 
 
 # --- ROUTE CATATAN AKHIR (dari profil siswa, oleh pengajar) ---

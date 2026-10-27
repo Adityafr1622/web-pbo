@@ -16,7 +16,7 @@
 {# ---------- siswa: rekap kehadiran dirinya sendiri, semua pertemuan sekaligus ---------- #}
 {# tabel diberi class presensi-rekap-table (lebar kolom sama rata & rata kiri) dan
    table-card--kotak (sudut kotak). Sebelumnya class ini tidak terpasang sehingga CSS-nya tidak jalan. #}
-<div class="table-card table-card--kotak" data-table-page><div class="table-scroll">
+<div class="table-card table-card--kotak"><div class="table-scroll">
 <table class="data-table presensi-rekap-table">
   <thead><tr><th>Pertemuan / Jam</th><th>Ruangan</th><th>Materi</th><th>Pengajar</th><th>Kehadiran</th></tr></thead>
   <tbody>
@@ -40,7 +40,7 @@
 {# ---------- pengajar (bisa mengisi) & admin (lihat saja) ---------- #}
 {# pertemuan yang terbuka mengikuti ?tanggal= dari URL. Dipakai sehabis menyimpan
    presensi, supaya halamannya tidak balik sendiri ke pertemuan paling baru. #}
-{% set sesi_pilih = request.args.get('jadwal', type=int) %}
+{% set sesi_pilih = request.args.get('jadwal', '')|int(default=0) %}
 {% set ada_pilihan = sesi_pilih and presensi_list | selectattr('jadwal_id', 'equalto', sesi_pilih) | list %}
 
 <div class="presensi-pick">
@@ -66,7 +66,7 @@
   {# daftar siswa yang tampil di form. Siswa yang centangnya dilepas akan
      dihapus presensinya saat disimpan, bukan dibiarkan memakai nilai lama. #}
   <input type="hidden" name="siswa_tampil" value="{{ siswa_list | map(attribute='id') | join(',') }}">
-  <div class="table-card" data-table-page><div class="table-scroll">
+  <div class="table-card"><div class="table-scroll">
   <table class="data-table presensi-table">
     <thead><tr>
       <th class="th-left">Nama Siswa</th>
@@ -103,6 +103,8 @@
   </table></div></div>
   {% if bisa_isi and siswa_list %}
   <div class="presensi-foot"><button class="btn btn-navy">Simpan Presensi</button></div>
+  {% elif user.role == 'pengajar' and p.pengganti_id and p.pengganti_id != user.id %}
+  <p class="form-note note-telat">{{ ic('lock', 14) }} Pertemuan ini ditugaskan kepada pengajar pengganti ({{ p.nama_pengajar }}). Presensi pertemuan ini hanya bisa dilihat.</p>
   {% elif user.role == 'pengajar' and tanggal_boleh is not none %}
   {# guru pengganti sedang melihat pertemuan yang bukan jatahnya #}
   <p class="form-note note-telat">{{ ic('lock', 14) }} Kamu guru pengganti di kelas ini, jadi hanya bisa

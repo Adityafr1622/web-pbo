@@ -55,6 +55,21 @@
     if (!f) return openM(m);
     f.reset();
     if (aksi) f.action = aksi;
+    // Pada modal Edit Siswa, opsi kelas utama hanya memuat kelas dengan progress 0.
+    // Jika siswa saat ini berada di kelas yang sudah berjalan, tampilkan kelas saat ini
+    // khusus untuk akun tersebut agar perubahan password/biodata tetap dapat disimpan.
+    const selKelas = m.id === 'modal-edit-siswa' ? f.elements['kelas_id'] : null;
+    if (selKelas) {
+      $$('option[data-current-only]', selKelas).forEach(o => o.remove());
+      const kid = data && data.kelas_id != null ? String(data.kelas_id) : '';
+      if (kid && !$$('option', selKelas).some(o => o.value === kid)) {
+        const opt = document.createElement('option');
+        opt.value = kid;
+        opt.textContent = (data && data.kelas_nama) ? `${data.kelas_nama} (Kelas saat ini)` : `Kelas #${kid}`;
+        opt.dataset.currentOnly = '1';
+        selKelas.appendChild(opt);
+      }
+    }
     Object.entries(data || {}).forEach(([k, v]) => {
       const i = f.elements[k];
       if (!i || i.type === 'file') return;
@@ -287,13 +302,19 @@
       const form = t.closest('form');
       const kode = t.dataset.semuaStatus;
       $$('input[type=radio][value="' + kode + '"]', form).forEach(r => { if (!r.disabled) r.checked = t.checked; });
+      if (t.checked) {
+        $$('[data-semua-status]', form).forEach(s => { if (s !== t) s.checked = false; });
+      }
       return;
     }
 
-    // Kalau satu baris diubah manual, tombol "Semua" untuk status tersebut dilepas.
+    // Kalau satu baris diubah manual, tombol "Semua" disinkronkan.
     if (t.type === 'radio' && t.name.startsWith('st_')) {
-      const semua = $('[data-semua-status="' + t.value + '"]', t.closest('form') || document);
-      if (semua) semua.checked = false;
+      const form = t.closest('form') || document;
+      $$('[data-semua-status]', form).forEach(s => {
+        const radios = $$('input[type=radio][value="' + s.dataset.semuaStatus + '"]:not(:disabled)', form);
+        s.checked = radios.length > 0 && radios.every(r => r.checked);
+      });
     }
   });
 
@@ -309,7 +330,12 @@
   document.addEventListener('click', e => {
     const w = e.target.closest ? e.target.closest('.chk-wrap') : null;
     const i = w && $('input[type=radio]', w);
-    if (i && i === radioSebelum) { i.checked = false; radioSebelum = null; }
+    if (i && i === radioSebelum) {
+      i.checked = false;
+      radioSebelum = null;
+      const form = i.closest('form') || document;
+      $$('[data-semua-status]', form).forEach(s => { s.checked = false; });
+    }
   });
 
   // form dicegat dulu sebelum terkirim. Balon bawaan browser dimatikan
@@ -386,60 +412,3 @@
   }
 })();
 
-document.addEventListener("DOMContentLoaded", () => {
-  // Semua checkbox status per siswa
-  const statusCheckboxes = document.querySelectorAll(
-    '.chk-wrap input[type="checkbox"]'
-  );
-
-  // Checkbox "Semua" di header setiap status
-  const semuaCheckboxes = document.querySelectorAll(
-    '.chk-semua input[type="checkbox"]'
-  );
-
-  // Saat memilih status untuk satu siswa
-  statusCheckboxes.forEach((checkbox) => {
-    checkbox.addEventListener("change", () => {
-      if (!checkbox.checked) return;
-
-      const siswaId = checkbox.dataset.siswa;
-      const status = checkbox.value;
-
-      // Matikan status lain untuk siswa yang sama
-      statusCheckboxes.forEach((item) => {
-        if (
-          item !== checkbox &&
-          item.dataset.siswa === siswaId
-        ) {
-          item.checked = false;
-        }
-      });
-
-      // Kalau ada checkbox "Semua" yang aktif,
-      // matikan karena sekarang ada siswa yang berbeda status
-      semuaCheckboxes.forEach((semua) => {
-        semua.checked = false;
-      });
-    });
-  });
-
-  // Saat klik "Semua" pada suatu status
-  semuaCheckboxes.forEach((semua) => {
-    semua.addEventListener("change", () => {
-      if (!semua.checked) return;
-
-      const status = semua.value;
-
-      statusCheckboxes.forEach((checkbox) => {
-        checkbox.checked = checkbox.value === status;
-      });
-
-      // Pastikan checkbox "Semua" lain mati
-      semuaCheckboxes.forEach((item) => {
-        if (item !== semua) {
-          item.checked = false;
-        }
-      });
-    });
-  });
-});

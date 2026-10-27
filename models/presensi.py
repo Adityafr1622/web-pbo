@@ -129,11 +129,12 @@ class Presensi:
             jumlah += database.hapus_presensi(kelas_id, tanggal, sid, jadwal_id)
         return jumlah
 
-    def simpan(self):
+    def simpan(self, pengajar_id=None, jadwal_id=None):
         """Simpan objek ini (insert, atau update kalau siswa+kelas+tanggal sudah ada)."""
         self.status = Presensi.normalisasi_status(self.status)
         self.kelas_id, self.tanggal = Presensi.cek_input(self.kelas_id, self.tanggal, [self.siswa_id])
-        self.id = database.simpan_presensi(self.tanggal, self.siswa_id, self.kelas_id, self.status)
+        self.id = database.simpan_presensi(self.tanggal, self.siswa_id, self.kelas_id, self.status,
+                                           pengajar_id=pengajar_id, jadwal_id=jadwal_id)
         return self.id
 
     def update_status(self, status):
@@ -147,7 +148,7 @@ class Presensi:
         return self.status
 
     @staticmethod
-    def tandai_semua_hadir(daftar_presensi):
+    def tandai_semua_hadir(daftar_presensi, jadwal_id=None):
         """Tandai semua Presensi di daftar jadi 'Hadir' (tombol 'hadir semua' buat pengajar).
         Disimpan per kelas+tanggal dalam satu transaksi. Return jumlah yang diubah."""
         kelompok = {}
@@ -155,7 +156,8 @@ class Presensi:
             kelompok.setdefault((p.kelas_id, p.tanggal), []).append(p)
 
         for (kelas_id, tanggal), daftar in kelompok.items():
-            Presensi.simpan_massal(kelas_id, tanggal, {p.siswa_id: "Hadir" for p in daftar})
+            Presensi.simpan_massal(kelas_id, tanggal, {p.siswa_id: "Hadir" for p in daftar},
+                                   jadwal_id=jadwal_id)
             id_tersimpan = {r["siswa_id"]: r["id"]
                             for r in database.ambil_presensi_kelas_tanggal(kelas_id, tanggal, jadwal_id)}
             for p in daftar:  # sinkronkan objek dengan yang sudah masuk database

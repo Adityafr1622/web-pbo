@@ -43,7 +43,7 @@
  </div></section>
 </div>
 <section class="dash-panel dash-bottom"><div class="dash-panel-heading"><h2>Perbandingan Tahun Ajaran</h2><p>Maksimal 3 tahun terakhir yang memiliki data hingga {{ data.tahun }}.</p></div>
-{% if data.rekap %}<div class="table-scroll"><table class="dash-table"><thead><tr><th>Kategori</th>{% for year,item in data.rekap %}<th>{{ year }}</th>{% endfor %}</tr></thead><tbody>
+{% if data.rekap %}<div class="table-scroll table-scroll--no-scroll"><table class="dash-table"><thead><tr><th>Kategori</th>{% for year,item in data.rekap %}<th>{{ year }}</th>{% endfor %}</tr></thead><tbody>
 {% for title,key in [('Siswa','siswa'),('Pengajar','pengajar'),('Kelas','kelas'),('Materi','materi'),('Tugas','tugas'),('Pertemuan','pertemuan')] %}
 <tr><th>{{ title }}</th>{% for year,item in data.rekap %}<td>{{ item[key] }}</td>{% endfor %}</tr>
 {% endfor %}

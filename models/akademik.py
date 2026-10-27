@@ -434,6 +434,16 @@ class Pengumpulan:
         self.nilai = nilai
         return self.nilai
 
+    def hapus_nilai(self):
+        if self.id is None:
+            row = database.ambil_pengumpulan_by_tugas_siswa(self.tugas_id, self.siswa_id)
+            if row is None:
+                raise ValueError("Pengumpulan tugas tidak ditemukan.")
+            self.id = row["id"]
+        database.hapus_nilai_pengumpulan(self.id)
+        self.nilai = None
+        return None
+
 
 class Komentar:
     def __init__(self, id, tugas_id, user_id, isi_komentar, waktu, siswa_id=None):

@@ -59,7 +59,7 @@
 <div class="table-tools" data-panel="siswa" data-search-panel="akun-siswa"><input class="table-search" type="search" placeholder="Cari nama, username, atau email siswa..." aria-label="Cari akun siswa"></div>
 <div class="table-card" data-panel="siswa" data-table-page><div class="table-scroll">
 <table class="data-table table-akun">
-  <thead><tr><th>Nama</th><th>Kelas</th><th>Username</th><th>Email</th><th>No. WhatsApp</th><th>Alamat</th><th>Password</th><th>Diubah</th><th>Profil Lengkap</th><th>Aksi</th></tr></thead>
+  <thead><tr><th>Nama</th><th>Kelas</th><th>Username</th><th>Email</th><th>No. WhatsApp</th><th>Alamat</th><th>Password</th><th>Diubah</th><th>Status Kelulusan</th><th>Profil Lengkap</th><th>Aksi</th></tr></thead>
   <tbody>
   {% for u in siswa %}
   <tr>
@@ -68,16 +68,17 @@
     <td class="td-clip">{{ u.email or '-' }}</td><td class="td-nowrap">{{ wa_link(u.no_whatsapp) }}</td><td class="td-clip">{{ u.alamat or '-' }}</td>
     {{ sel_password(u) }}
     <td class="td-nowrap">{{ terakhir_ubah[u.id]|tgl_singkat if u.id in terakhir_ubah else 'Belum pernah' }}</td>
+    <td class="td-nowrap">{% if u.lulus %}<span class="badge badge-ok">{{ ic('check', 13) }} Lulus</span>{% else %}<span class="badge badge-abu">Belum Lulus</span>{% endif %}</td>
     <td><a class="link-profil" href="{{ url_for('biodata_akun', user_id=u.id) }}">Buka Profil</a></td>
     <td><div class="aksi">
       <button type="button" class="icon-btn icon-edit" title="Edit" data-edit="modal-edit-siswa"
         data-action="{{ url_for('edit_akun', user_id=u.id) }}"
-        data-fill='{{ {"nama": u.nama, "username": u.username, "kelas_id": u.kelas_id, "whatsapp": u.no_whatsapp, "alamat": u.alamat}|tojson }}'>{{ ic('pencil', 16) }}</button>
+        data-fill='{{ {"nama": u.nama, "username": u.username, "kelas_id": u.kelas_id, "kelas_nama": (u.kelas_nama or semua_kelas_map.get(u.kelas_id, "")), "whatsapp": u.no_whatsapp, "alamat": u.alamat}|tojson }}'>{{ ic('pencil', 16) }}</button>
       <button type="button" class="icon-btn icon-del" title="Hapus" data-confirm="{{ url_for('hapus_akun', user_id=u.id) }}"
         data-text="Yakin ingin menghapus akun {{ u.nama }}? Tindakan ini tidak dapat dibatalkan.">{{ ic('trash', 16) }}</button>
     </div></td>
   </tr>
-  {% else %}<tr class="row-empty"><td colspan="10">Belum ada akun siswa. Klik "Tambah Siswa" untuk membuat akun pertama.</td></tr>
+  {% else %}<tr class="row-empty"><td colspan="11">Belum ada akun siswa. Klik "Tambah Siswa" untuk membuat akun pertama.</td></tr>
   {% endfor %}
   </tbody>
 </table></div></div>
@@ -125,8 +126,8 @@
 
 {# ===== riwayat password (data dari tabel riwayat_password) ===== #}
 <section class="card riwayat">
-  <h2>Riwayat Perubahan Password</h2>
-  <p class="muted">Tercatat saat siswa atau pengajar mengganti passwordnya sendiri, lengkap dengan password lama dan barunya.</p>
+  <h2>Riwayat perubahan password terbaru</h2>
+  <p class="muted">Tercatat saat password akun siswa atau pengajar diubah, lengkap dengan password lama dan barunya.</p>
   {% if riwayat_password %}
   <ul class="riwayat-list">
     {% for r in riwayat_password %}
@@ -176,7 +177,7 @@
   <div class="modal-body"><div class="form-grid">
     {{ field('Nama Lengkap', 'nama', '') }}
     <div class="field"><label>Kelas</label>
-      <select name="kelas_id" required>{% for k in kelas_list %}<option value="{{ k.id }}">{{ k.nama_kelas }}</option>{% endfor %}</select></div>
+      <select name="kelas_id" required><option value="">Pilih kelas</option>{% for k in kelas_list %}<option value="{{ k.id }}">{{ k.nama_kelas }}</option>{% endfor %}</select></div>
     {{ field('Username', 'username', '', minlen=5, pesan=pesan_user) }}
     {{ field('Nomor WhatsApp', 'whatsapp', '', pat=pat_wa, pesan=pesan_wa) }}
     {{ pwfield(req=false, ph='Kosongkan jika tidak diubah', pat=pat_pw, pesan=pesan_pw) }}

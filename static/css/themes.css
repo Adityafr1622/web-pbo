@@ -119,8 +119,22 @@
 :root[data-theme="dark"] .kelas-tabs .sep { color: #6782a6; }
 
 /* Inputs, dropdowns and editors: keep native controls readable. */
-:root[data-theme="dark"] :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea,.multi-btn,.multi-list,.pick,.dash-controls select) {
-    background-color: #213650; color: #f3f7ff; border-color: #536987;
+:root[data-theme="dark"] :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea,.multi-btn,.multi-list,.pick,.dash-controls select,.kelas-filter-row select) {
+    background-color: #213650; color: #f3f7ff; border-color: #536987; color-scheme: dark;
+}
+:root[data-theme="dark"] :is(select,.dash-controls select,.kelas-filter-row select) :is(option,optgroup) {
+    background-color: #1b2b43; color: #f3f7ff;
+}
+:root[data-theme="dark"] :is(select,.dash-controls select,.kelas-filter-row select):hover {
+    background-color: #274060; border-color: #6b88ad;
+}
+:root[data-theme="dark"] :is(select,.dash-controls select,.kelas-filter-row select):focus {
+    background-color: #243c5a; color: #ffffff; border-color: #83b6ff;
+    outline: 0; box-shadow: 0 0 0 3px rgba(131, 182, 255, .22);
+}
+:root[data-theme="dark"] .dash-controls form,
+:root[data-theme="dark"] .kelas-filter-row label {
+    color: #c6d8f0;
 }
 :root[data-theme="dark"] :is(input,textarea)::placeholder { color: #a4b6d1; opacity: 1; }
 :root[data-theme="dark"] :is(.field > label,.field-label,.label-note) { color: #c0cee5; }
@@ -304,32 +318,33 @@
 :root[data-theme="dark"] .kelas-foto .kelas-title { color: #1f2a4d; }
 :root[data-theme="dark"] .kelas-bg .kelas-title { color: #fff; }
 
-/* Class names on dashboard cards and in the class picker keep the same
-   Fluenglo blue as Light Mode. Pale backing maintains contrast in Dark Mode. */
+/* Class names on dashboard cards, class picker, and admin progress in Dark Mode:
+   remove pale/white backing and use light readable text on dark surfaces. */
+:root[data-theme="dark"] .dash-class-tile {
+    background: #213450;
+    border-color: #344a65;
+    color: #eef5ff;
+}
 :root[data-theme="dark"] .dash-class-tile strong {
-    color: #164fba;
-    background: #eaf2ff;
-    border-radius: 6px;
-    display: inline-block;
-    padding: 2px 7px;
-    margin-left: -7px;
+    color: #f3f8ff;
+    background: transparent;
+    padding: 0;
+    margin-left: 0;
 }
 :root[data-theme="dark"] .dash-picker select:not([multiple]) {
-    color: #154ab6;
-    background: #eaf2ff;
+    color: #f3f7ff;
+    background: #213650;
     border-radius: 8px;
     padding: 6px 8px;
 }
-/* Admin progress names keep the light-mode blue without losing contrast. */
-:root[data-theme="dark"] .dash-progress-row { color: #2053ac; }
+:root[data-theme="dark"] .dash-progress-row { color: #eaf3ff; }
+:root[data-theme="dark"] .dash-progress-row:hover { color: #9ac7ff; }
 :root[data-theme="dark"] .dash-progress-row > span:first-child {
-    color: #2053ac;
-    width: fit-content;
-    background: #eaf2ff;
-    border-radius: 7px;
-    padding: 4px 9px;
+    color: #f3f8ff;
+    background: transparent;
+    padding: 0;
 }
-:root[data-theme="dark"] .dash-progress-row small { color: #567cad; }
+:root[data-theme="dark"] .dash-progress-row small { color: #adc4e4; }
 
 /* SVG grid strokes in rendered dashboard charts use the original light-mode stroke. */
 :root[data-theme="dark"] .dashboard-chart svg line[stroke="#e4ecf8"] { stroke: #3a4e69; }
@@ -356,3 +371,21 @@
 :root[data-theme="dark"] .table-search { background:#213650; color:#f3f7ff; border-color:#536987; }
 :root[data-theme="dark"] .kelas-status-label { background:rgba(24,48,78,.72); color:#d7e7ff; }
 :root[data-theme="dark"] .kelas-status-label.is-finished { background:#204a3b; color:#aef1cc; }
+:root[data-theme="dark"] .table-scroll,
+:root[data-theme="dark"] .dash-layout-two .dash-progress-list {
+    scrollbar-color: #4b6587 #162438;
+}
+:root[data-theme="dark"] .table-scroll::-webkit-scrollbar-track,
+:root[data-theme="dark"] .dash-layout-two .dash-progress-list::-webkit-scrollbar-track {
+    background: #162438;
+    border-left-color: var(--line);
+}
+:root[data-theme="dark"] .table-scroll::-webkit-scrollbar-thumb,
+:root[data-theme="dark"] .dash-layout-two .dash-progress-list::-webkit-scrollbar-thumb {
+    background: #4b6587;
+    border-color: #162438;
+}
+:root[data-theme="dark"] .table-scroll::-webkit-scrollbar-thumb:hover,
+:root[data-theme="dark"] .dash-layout-two .dash-progress-list::-webkit-scrollbar-thumb:hover {
+    background: #6382ab;
+}

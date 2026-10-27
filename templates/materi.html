@@ -6,13 +6,12 @@
 {# data dari app.py: kelas, materi_list, user, tab, pengajar_list #}
 {{ kelas_head(kelas, pengajar_list, tab, admin=(user.role == 'admin'), kembali=back_url) }}
 
-{% if user.role == 'pengajar' %}
-<div class="tab-actions">
+<div class="table-tools" data-search-panel="feed">
+  <input class="table-search" type="search" placeholder="Cari judul materi..." aria-label="Cari judul materi...">
+  {% if user.role == 'pengajar' %}
   <button type="button" class="btn btn-yellow" data-open="modal-tambah-materi">{{ ic('plus', 16) }} Unggah Materi</button>
+  {% endif %}
 </div>
-{% endif %}
-
-<div class="table-tools" data-search-panel="feed"><input class="table-search" type="search" placeholder="Cari judul materi..." aria-label="Cari judul materi..."></div>
 <div class="feed" data-list-page data-list-name="feed">
   {% for m in materi_list %}
   <div data-list-item class="feed-row">

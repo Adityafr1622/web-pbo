@@ -1586,7 +1586,7 @@ html { scrollbar-gutter: stable; overflow-y: scroll; }
 .table-card, .table-card .table-scroll, .mon-tabel, .mon-tabel .data-table th,
 .jadwal-group .table-card, .jadwal-group .table-scroll { border-radius:0 !important; }
 .table-scroll, .chart-scroll { width:100%; max-width:100%; overflow-x:auto; overscroll-behavior-inline:contain; }
-.table-scroll { max-height:min(65vh,680px); overflow-y:auto; scrollbar-gutter:stable; }
+.table-scroll { max-height:min(65vh,680px); overflow-y:scroll; scrollbar-gutter:stable; }
 .table-scroll .data-table thead th, .table-scroll .dash-table thead th { position:sticky; top:0; z-index:2; }
 /* A growing student list never pushes its neighbors or the viewport outward. */
 .dash-table { min-width:480px; }
@@ -1653,11 +1653,12 @@ html { scrollbar-gutter: stable; overflow-y: scroll; }
 @media(max-width:480px) { .dash-metrics-admin { grid-template-columns:1fr; } }
 
 /* Pencarian dan paginasi mengikuti bentuk asli tabel, tanpa mengubah navbar. */
-.table-tools { display:flex; align-items:center; gap:10px; margin:10px 0 12px; }
+.table-tools { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:10px 0 14px; flex-wrap:wrap; }
 .table-card > .table-tools { margin:0; padding:12px 14px; }
-.table-search { min-width:0; width:min(100%,410px); padding:10px 14px;
+.table-search { min-width:0; width:min(100%,410px); min-height:42px; padding:10px 14px;
   border-radius:10px; border:1px solid var(--line); font:inherit;
   background:var(--card); color:var(--ink); }
+.table-tools > .btn { min-height:42px; margin-left:auto; }
 .table-search:focus { outline:2px solid #7caaff; outline-offset:1px; }
 .pagination-bar { display:flex; gap:12px; align-items:center; justify-content:space-between;
   flex-wrap:wrap; padding:12px 14px; color:var(--muted); font-size:12px; }
@@ -1676,7 +1677,11 @@ tr[hidden], [data-list-item][hidden], .jadwal-group[hidden], .pagination-control
 /* Semua Back ada di header sendiri, di sisi kanan; tidak menambah baris di atas judul. */
 .page-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
 .page-head > .back-button { flex:none; order:10; margin-left:auto; }
-@media(max-width:600px) { .page-head { flex-wrap:wrap; } .table-search { width:100%; } }
+@media(max-width:600px) {
+  .page-head { flex-wrap:wrap; }
+  .table-search { width:100%; }
+  .table-tools > .btn { width:100%; margin-left:0; }
+}
 /* Tata letak compact yang disetujui: ikon di kiri, informasi di kanan. */
 .dash-metrics-admin .dash-metric {
   display:grid;
@@ -1695,5 +1700,72 @@ tr[hidden], [data-list-item][hidden], .jadwal-group[hidden], .pagination-control
 /* Progress Admin: daftar terbatasi agar sejajar dengan Aktivitas Terbaru.
    Hanya konten progress yang scroll, bukan panel/halaman seluruhnya. */
 .dash-layout-two .dash-progress-panel { min-height:0; display:flex; flex-direction:column; }
-.dash-layout-two .dash-progress-list { max-height:335px; min-height:0; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; scrollbar-width:thin; flex:0 1 auto; }
+.dash-layout-two .dash-progress-list { max-height:335px; min-height:0; overflow-y:scroll; overscroll-behavior:contain; scrollbar-gutter:stable; scrollbar-width:thin; flex:0 1 auto; }
 .dash-layout-two .dash-progress-list:focus-visible { outline:2px solid #4387db; outline-offset:2px; }
+
+/* Scrollbar konsisten pada area presensi dan tabel scroll (tetap terlihat meskipun baris < 8). */
+.table-scroll,
+.dash-layout-two .dash-progress-list {
+  scrollbar-width: thin;
+  scrollbar-color: #b7c4dc #edf2fa;
+}
+.table-scroll::-webkit-scrollbar,
+.dash-layout-two .dash-progress-list::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.table-scroll::-webkit-scrollbar-track,
+.dash-layout-two .dash-progress-list::-webkit-scrollbar-track {
+  background: #edf2fa;
+  border-left: 1px solid var(--line);
+}
+.table-scroll::-webkit-scrollbar-thumb,
+.dash-layout-two .dash-progress-list::-webkit-scrollbar-thumb {
+  background: #b7c4dc;
+  border-radius: 999px;
+  border: 2px solid #edf2fa;
+}
+.table-scroll::-webkit-scrollbar-thumb:hover,
+.dash-layout-two .dash-progress-list::-webkit-scrollbar-thumb:hover {
+  background: #94a7ca;
+}
+
+/* Tabel dengan pagination (Next/Sebelumnya), Jadwal, dan Perbandingan Tahun Ajaran:
+   hilangkan scroll vertikal internal agar tidak dobel dengan pagination.
+   Area presensi (yang hanya memakai scroll tanpa pagination) tetap memiliki scrollbar. */
+[data-table-page] .table-scroll,
+.table-card--pagination-only .table-scroll,
+.table-card--no-scroll .table-scroll,
+.table-scroll--no-scroll,
+.jadwal-group .table-scroll {
+  max-height: none;
+  overflow-y: visible;
+  scrollbar-gutter: auto;
+}
+
+/* Pilihan kelas di samping kanan kolom search pada Monitoring dan Jadwal. */
+.table-tools--with-filter {
+  justify-content: flex-start;
+  align-items: center;
+  gap: 14px;
+}
+.table-tools--with-filter .kelas-filter-row {
+  margin: 0;
+  gap: 10px;
+  flex-wrap: nowrap;
+}
+.table-tools--with-filter .kelas-filter-row label {
+  white-space: nowrap;
+}
+.table-tools--with-filter .kelas-filter-row select {
+  min-height: 42px;
+}
+@media (max-width: 720px) {
+  .table-tools--with-filter .kelas-filter-row {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .table-tools--with-filter .kelas-filter-row select {
+    width: 100%;
+  }
+}
